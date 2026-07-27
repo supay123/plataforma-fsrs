@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "check:functions": "bash scripts/check-edge-functions.sh",
+    "format:functions": "deno fmt --config supabase/functions/deno.json supabase/functions",
+    "test": "pnpm test:unit",
+    "test:unit": "deno test --allow-env --allow-sys=umask --config supabase/functions/deno.json supabase/functions/_shared",
+    "test:integration": "bash scripts/test-edge-functions-integration.sh"
   },
   "keywords": [],
   "author": "",

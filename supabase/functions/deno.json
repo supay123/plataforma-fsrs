@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "imports": {
+    "@supabase/functions-js": "jsr:@supabase/functions-js@2.110.8",
+    "@supabase/server": "npm:@supabase/server@1.4.1",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.110.8",
+    "ts-fsrs": "npm:ts-fsrs@5.4.1",
+    "xlsx": "npm:@e965/xlsx@0.20.3"
+  },
+  "nodeModulesDir": "auto"
+}

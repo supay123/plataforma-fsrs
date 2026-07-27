@@ -9,6 +9,34 @@ valid user access token in `Authorization: Bearer <token>`. The login endpoint
 requires the project's publishable key. Service-role credentials are never
 accepted from, or returned to, a client.
 
+## Code organization
+
+Each function is bundled independently by Supabase, but its module graph may
+import source files from `supabase/functions/_shared`. Endpoint-specific
+request contracts live beside the handler:
+
+```text
+admin-renew-access/
+├── deno.json
+├── deno.lock
+├── index.ts
+└── interfaces.ts
+```
+
+Shared domain contracts use named `*.interfaces.ts` modules under `_shared`.
+Database table, view, and RPC names are centralized in
+`_shared/database.constants.ts`; schema-derived Supabase types live in
+`_shared/database.types.ts`.
+
+Every endpoint has its own pinned `deno.json` and lockfile so a function can be
+checked and deployed without inheriting dependencies that it does not use.
+Regenerate database types after schema changes with:
+
+```sh
+pnpm exec supabase gen types --local --schema public \
+  > supabase/functions/_shared/database.types.ts
+```
+
 ## Function catalog
 
 | Function | Allowed role | Purpose |
