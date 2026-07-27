@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { scheduleAnswer, toFsrsCard } from "./fsrs.ts";
+import { scheduleAnswer, toFsrsCard } from "../fsrs.ts";
 
 const config = {
   library_name: "ts-fsrs",

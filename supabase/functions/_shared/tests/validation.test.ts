@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { AppError } from "./errors.ts";
-import { assertPassword, generatePassword } from "./password.ts";
+import { AppError } from "../errors.ts";
+import { assertPassword, generatePassword } from "../password.ts";
 import {
   assertDateOrder,
   isWithinDateRange,
   limaDate,
   option,
   uuid,
-} from "./validation.ts";
+} from "../validation.ts";
 
 Deno.test("validates UUIDs and answer options", () => {
   assert.equal(

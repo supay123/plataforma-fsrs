@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { AppError, handle } from "./errors.ts";
+import { AppError, handle } from "../errors.ts";
 
 Deno.test("serializes expected application errors without leaking a stack", async () => {
   const response = await handle(() =>

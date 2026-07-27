@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { csvCell, toCsv } from "./csv.ts";
+import { csvCell, toCsv } from "../csv.ts";
 
 Deno.test("escapes commas, quotes, and newlines in CSV cells", () => {
   assert.equal(csvCell('a,"b"\nc'), '"a,""b""\nc"');

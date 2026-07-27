@@ -4,7 +4,7 @@ import {
   QUESTION_COLUMNS,
   rowsFromWorkbook,
   validateQuestionRows,
-} from "./questions.ts";
+} from "../questions.ts";
 
 const validRow = {
   pregunta: "¿Cuánto es $2+2$?",
