@@ -23,7 +23,7 @@ admin-renew-access/
 └── interfaces.ts
 ```
 
-Shared domain contracts use named `*.interfaces.ts` modules under `_shared`.
+Shared domain contracts use named `*.interfaces.ts` modules under `_shared/interfaces`.
 Database table, view, and RPC names are centralized in
 `_shared/database.constants.ts`; schema-derived Supabase types live in
 `_shared/database.types.ts`.

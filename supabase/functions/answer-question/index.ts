@@ -4,7 +4,7 @@ import { requireProfile } from "../_shared/auth.ts";
 import { RPCS, TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
 import { scheduleAnswer } from "../_shared/fsrs.ts";
-import type { FsrsConfig, StoredCard } from "../_shared/fsrs.interfaces.ts";
+import type { FsrsConfig, StoredCard } from "../_shared/interfaces/fsrs.interfaces.ts";
 import { nonNegativeInteger, option, uuid } from "../_shared/validation.ts";
 import type { AnswerQuestionBody } from "./interfaces.ts";
 

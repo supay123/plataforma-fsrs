@@ -1,4 +1,4 @@
-import type { QuestionPayload } from "./session.interfaces.ts";
+import type { QuestionPayload } from "./interfaces/session.interfaces.ts";
 import type { AppProfile, EdgeContext } from "./types.ts";
 import { TABLES } from "./database.constants.ts";
 import { AppError } from "./errors.ts";

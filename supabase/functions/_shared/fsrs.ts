@@ -1,7 +1,7 @@
 import { type Card, createEmptyCard, fsrs, Rating } from "ts-fsrs";
 import type { Json } from "./database.types.ts";
 import { AppError } from "./errors.ts";
-import type { FsrsConfig, StoredCard } from "./fsrs.interfaces.ts";
+import type { FsrsConfig, StoredCard } from "./interfaces/fsrs.interfaces.ts";
 
 function numberValue(value: number | string | null, fallback = 0): number {
   if (value === null) return fallback;
