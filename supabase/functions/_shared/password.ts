@@ -31,6 +31,12 @@ export function generatePassword(length = 12): string {
   return required.join("");
 }
 
+export function generatePin(): string {
+  const values = new Uint32Array(6);
+  crypto.getRandomValues(values);
+  return Array.from(values, (value) => String(value % 10)).join("");
+}
+
 export function assertPassword(password: string): void {
   if (
     password.length < 8 ||
@@ -42,4 +48,16 @@ export function assertPassword(password: string): void {
       "Password must contain at least 8 characters, uppercase, lowercase, and a digit.",
     );
   }
+}
+
+export function assertCredential(
+  role: "teacher" | "student",
+  credential: string,
+): void {
+  if (role === "student" && /^\d{6}$/.test(credential)) return;
+  assertPassword(credential);
+}
+
+export function generateCredential(role: "teacher" | "student"): string {
+  return role === "student" ? generatePin() : generatePassword();
 }

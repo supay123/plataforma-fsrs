@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { AppError } from "../errors.ts";
-import { assertPassword, generatePassword } from "../password.ts";
+import {
+  assertCredential,
+  assertPassword,
+  generateCredential,
+  generatePassword,
+  generatePin,
+} from "../password.ts";
 import {
   assertDateOrder,
   isWithinDateRange,
@@ -37,4 +43,14 @@ Deno.test("generates passwords satisfying the application policy", () => {
   assert.equal(password.length, 12);
   assert.doesNotThrow(() => assertPassword(password));
   assert.throws(() => assertPassword("password"));
+});
+
+Deno.test("supports six-digit student PINs without weakening teacher passwords", () => {
+  const pin = generatePin();
+  assert.match(pin, /^\d{6}$/);
+  assert.match(generateCredential("student"), /^\d{6}$/);
+  assert.doesNotThrow(() => assertCredential("student", "482731"));
+  assert.throws(() => assertCredential("student", "12345"));
+  assert.throws(() => assertCredential("teacher", "482731"));
+  assert.doesNotThrow(() => assertCredential("teacher", generatePassword()));
 });

@@ -29,7 +29,6 @@ Deno.test({
     const adminPassword = "AdminPass9!";
     const teacherPassword = "TeacherPass9!";
     const resetTeacherPassword = "NewTeacher9!";
-    const studentPassword = "StudentPass9!";
 
     async function invoke(
       name: string,
@@ -126,7 +125,6 @@ Deno.test({
         user_code: `STUDENT-${suffix}`,
         full_name: "Integration Student",
         college_id: college.id,
-        password: studentPassword,
         access_valid_from: "2026-01-01",
         access_valid_until: "2027-12-31",
       },
@@ -134,6 +132,10 @@ Deno.test({
       201,
     );
     const studentId = (studentCreate.user as { id: string }).id;
+    const studentPin =
+      (studentCreate.credentials as { temporary_password: string })
+        .temporary_password;
+    assert.match(studentPin, /^\d{6}$/);
 
     await jsonResponse(
       "admin-update-user",
@@ -168,7 +170,7 @@ Deno.test({
       (teacherLogin.session as { access_token: string }).access_token;
     const studentLogin = await jsonResponse("login-with-code", {
       code: `STUDENT-${suffix}`,
-      password: studentPassword,
+      password: studentPin,
       expected_role: "student",
     });
     const studentToken =

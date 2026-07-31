@@ -3,7 +3,10 @@ import { withAppSupabase } from "../_shared/server.ts";
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
-import { assertPassword, generatePassword } from "../_shared/password.ts";
+import {
+  assertCredential,
+  generateCredential,
+} from "../_shared/password.ts";
 import { optionalString, requiredString, uuid } from "../_shared/validation.ts";
 import type { ResetUserCredentialsBody } from "./interfaces.ts";
 
@@ -16,20 +19,6 @@ export default {
         const body = await readJson<ResetUserCredentialsBody>(request);
         const userId = uuid(body.user_id, "user_id");
         const newCode = optionalString(body.user_code, "user_code", 100);
-        const generatedPassword = body.password === undefined;
-        const password = generatedPassword
-          ? generatePassword()
-          : requiredString(body.password, "password", 200);
-        try {
-          assertPassword(password);
-        } catch (error) {
-          throw new AppError(
-            400,
-            "weak_password",
-            error instanceof Error ? error.message : "Weak password.",
-          );
-        }
-
         const { data: current, error: currentError } = await context
           .supabaseAdmin
           .from(TABLES.profiles)
@@ -37,8 +26,21 @@ export default {
           .eq("id", userId)
           .in("role", ["teacher", "student"])
           .maybeSingle();
-        if (currentError || !current) {
+        if (currentError || !current || current.role === "admin") {
           throw new AppError(404, "user_not_found", "User not found.");
+        }
+        const generatedPassword = body.password === undefined;
+        const password = generatedPassword
+          ? generateCredential(current.role)
+          : requiredString(body.password, "password", 200);
+        try {
+          assertCredential(current.role, password);
+        } catch (error) {
+          throw new AppError(
+            400,
+            "weak_password",
+            error instanceof Error ? error.message : "Weak password.",
+          );
         }
 
         if (newCode) {

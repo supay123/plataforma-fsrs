@@ -3,7 +3,10 @@ import { withAppSupabase } from "../_shared/server.ts";
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
-import { assertPassword, generatePassword } from "../_shared/password.ts";
+import {
+  assertCredential,
+  generateCredential,
+} from "../_shared/password.ts";
 import {
   assertDateOrder,
   date,
@@ -32,10 +35,10 @@ export default {
         const collegeId = uuid(body.college_id, "college_id");
         const generatedPassword = body.password === undefined;
         const password = generatedPassword
-          ? generatePassword()
+          ? generateCredential(role)
           : requiredString(body.password, "password", 200);
         try {
-          assertPassword(password);
+          assertCredential(role, password);
         } catch (error) {
           throw new AppError(
             400,
