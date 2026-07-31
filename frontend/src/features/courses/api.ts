@@ -1,0 +1,10 @@
+import { supabase } from "../../lib/supabase/client";
+import type { TablesInsert, TablesUpdate } from "../../types/database";
+export async function listCourses() { const { data, error } = await supabase.from("courses").select("*, colleges(name), profiles!courses_teacher_id_fkey(full_name)").neq("status", "archived").order("name"); if (error) throw error; return data; }
+export async function createCourse(value: TablesInsert<"courses">) { const { data, error } = await supabase.from("courses").insert(value).select().single(); if (error) throw error; return data; }
+export async function updateCourse(id: string, value: TablesUpdate<"courses">) { const { data, error } = await supabase.from("courses").update(value).eq("id", id).select().single(); if (error) throw error; return data; }
+export async function listTopics(courseId: string) { const { data, error } = await supabase.from("topics").select("*").eq("course_id", courseId).neq("status", "archived").order("position"); if (error) throw error; return data; }
+export async function createTopic(value: TablesInsert<"topics">) { const { data, error } = await supabase.from("topics").insert(value).select().single(); if (error) throw error; return data; }
+export async function updateTopic(id: string, value: TablesUpdate<"topics">) { const { data, error } = await supabase.from("topics").update(value).eq("id", id).select().single(); if (error) throw error; return data; }
+export async function listStudentCourses() { const { data, error } = await supabase.from("courses").select("*, course_enrollments!inner(student_id,status)").eq("course_enrollments.status", "active").eq("status", "active").order("name"); if (error) throw error; return data; }
+export async function enrollStudent(value: { course_id: string; student_id: string; enrolled_by: string }) { const { data, error } = await supabase.from("course_enrollments").upsert({ ...value, status: "active", ended_at: null }, { onConflict: "course_id,student_id" }).select().single(); if (error) throw error; return data; }
