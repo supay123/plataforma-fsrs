@@ -208,26 +208,15 @@ Deno.test({
       });
     assert.ifError(enrollmentError);
 
-    const rows = [
-      {
-        pregunta: "What is 1 + 1?",
-        respuesta_a: "2",
-        respuesta_b: "3",
-        respuesta_c: "4",
-        respuesta_d: "5",
-        respuesta_correcta: "A",
-        explicacion: "One plus one equals two.",
-      },
-      {
-        pregunta: "What is 2 + 2?",
-        respuesta_a: "3",
-        respuesta_b: "4",
-        respuesta_c: "5",
-        respuesta_d: "6",
-        respuesta_correcta: "B",
-        explicacion: "",
-      },
-    ];
+    const rows = Array.from({ length: 20 }, (_, index) => ({
+      pregunta: `What is ${index + 1} + 1?`,
+      respuesta_a: String(index + 2),
+      respuesta_b: String(index + 3),
+      respuesta_c: String(index + 4),
+      respuesta_d: String(index + 5),
+      respuesta_correcta: "A",
+      explicacion: index === 0 ? "Add one." : "",
+    }));
     const preview = await jsonResponse(
       "import-questions",
       {
@@ -240,7 +229,7 @@ Deno.test({
     );
     assert.equal(
       (preview.report as { accepted: number }).accepted,
-      2,
+      20,
     );
     await jsonResponse(
       "import-questions",
@@ -258,7 +247,7 @@ Deno.test({
         .from(TABLES.questions)
         .select("explanation")
         .eq("topic_id", topic.id)
-        .eq("statement", "What is 2 + 2?")
+        .eq("statement", "What is 2 + 1?")
         .single();
     assert.ifError(explanationError);
     assert.equal(questionWithoutExplanation.explanation, null);
@@ -270,14 +259,27 @@ Deno.test({
       201,
     );
     const session = started.session as { id: string; total_questions: number };
-    const questions = started.questions as Array<{
+    let questions = started.questions as Array<{
       session_question_id: string;
       question: Record<string, unknown>;
     }>;
-    assert.equal(session.total_questions, 2);
-    assert.equal(questions.length, 2);
+    assert.equal(session.total_questions, 20);
+    assert.equal(questions.length, 20);
     assert.equal("correct_option" in questions[0]!.question, false);
     assert.equal("explanation" in questions[0]!.question, false);
+
+    const preservedIds = questions.slice(0, 16).map((question) => question.session_question_id);
+    const { error: shrinkQuestionsError } = await adminClient
+      .from(TABLES.assessmentSessionQuestions)
+      .delete()
+      .eq("session_id", session.id)
+      .gt("position", 16);
+    assert.ifError(shrinkQuestionsError);
+    const { error: shrinkSessionError } = await adminClient
+      .from(TABLES.assessmentSessions)
+      .update({ total_questions: 16 })
+      .eq("id", session.id);
+    assert.ifError(shrinkSessionError);
 
     const resumed = await jsonResponse(
       "start-session",
@@ -286,23 +288,27 @@ Deno.test({
       201,
     );
     assert.equal((resumed.session as { id: string }).id, session.id);
+    questions = resumed.questions as typeof questions;
+    assert.equal(questions.length, 20);
+    assert.deepEqual(
+      questions.slice(0, 16).map((question) => question.session_question_id),
+      preservedIds,
+    );
     await jsonResponse(
       "get-session",
       { session_id: session.id },
       { token: studentToken },
     );
 
-    for (const question of questions) {
-      await jsonResponse(
-        "answer-question",
-        {
-          session_question_id: question.session_question_id,
-          selected_option: "A",
-          response_time_ms: 1200,
-        },
-        { token: studentToken },
-      );
-    }
+    await jsonResponse(
+      "answer-question",
+      {
+        session_question_id: questions[0]!.session_question_id,
+        selected_option: "A",
+        response_time_ms: 1200,
+      },
+      { token: studentToken },
+    );
     const retry = await jsonResponse(
       "answer-question",
       {
@@ -316,16 +322,23 @@ Deno.test({
 
     const completed = await jsonResponse(
       "complete-session",
-      { session_id: session.id },
+      {
+        session_id: session.id,
+        answers: questions.slice(1).map((question) => ({
+          session_question_id: question.session_question_id,
+          selected_option: "A",
+          response_time_ms: 1200,
+        })),
+      },
       { token: studentToken },
     );
     assert.equal(
       (completed.session as { answered_questions: number }).answered_questions,
-      2,
+      20,
     );
     await jsonResponse(
       "complete-session",
-      { session_id: session.id },
+      { session_id: session.id, answers: [] },
       { token: studentToken },
     );
 
@@ -334,12 +347,61 @@ Deno.test({
       { session_id: session.id },
       { token: studentToken },
     );
-    assert.equal((review.questions as unknown[]).length, 2);
+    assert.equal((review.questions as unknown[]).length, 20);
     assert.ok(
       "correct_option" in (review.questions as Record<string, unknown>[])[0]!,
     );
     assert.ok(
       "explanation" in (review.questions as Record<string, unknown>[])[0]!,
+    );
+
+    const scheduledSession = await jsonResponse(
+      "start-session",
+      { topic_id: topic.id },
+      { token: studentToken },
+      201,
+    );
+    const scheduledQuestions = scheduledSession.questions as Array<{
+      selection_reason: string;
+    }>;
+    assert.equal(scheduledQuestions.length, 20);
+    assert.ok(scheduledQuestions.every((question) => question.selection_reason === "scheduled"));
+
+    const { data: shortTopic, error: shortTopicError } = await adminClient
+      .from(TABLES.topics)
+      .insert({
+        course_id: course.id,
+        name: `Short topic ${suffix}`,
+        position: 2,
+        status: "active",
+        created_by: teacherId,
+      })
+      .select("id")
+      .single();
+    assert.ifError(shortTopicError);
+    const { error: shortQuestionsError } = await adminClient
+      .from(TABLES.questions)
+      .insert(Array.from({ length: 19 }, (_, index) => ({
+        topic_id: shortTopic.id,
+        statement: `Short question ${index + 1}`,
+        option_a: "A",
+        option_b: "B",
+        option_c: "C",
+        option_d: "D",
+        correct_option: "A",
+        status: "active",
+        created_by: teacherId,
+      })));
+    assert.ifError(shortQuestionsError);
+    const insufficient = await jsonResponse(
+      "start-session",
+      { topic_id: shortTopic.id },
+      { token: studentToken },
+      409,
+    );
+    assert.equal(
+      (insufficient.error as { code: string }).code,
+      "insufficient_active_questions",
     );
 
     const exportResponse = await invoke(
@@ -366,7 +428,7 @@ Deno.test({
     ]);
     assert.ifError(cardsError);
     assert.ifError(logsError);
-    assert.equal(cardCount, 2);
-    assert.equal(logCount, 2);
+    assert.equal(cardCount, 20);
+    assert.equal(logCount, 20);
   },
 });

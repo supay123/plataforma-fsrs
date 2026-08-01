@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Spinner, Textarea } from "../../components/ui";
-import { createCourse, listCourses, updateCourse } from "../../features/courses/api";
+import { archiveCourse, createCourse, listCourses, updateCourse } from "../../features/courses/api";
 import { useAuth } from "../../features/auth/AuthProvider";
 
 const empty = { name: "", description: "" };
@@ -23,6 +23,13 @@ export function CoursesPage() {
       void client.invalidateQueries({ queryKey: ["courses"] });
     },
   });
+  const archive = useMutation({
+    mutationFn: archiveCourse,
+    onSuccess: (_course, courseId) => {
+      if (editingId === courseId) { setEditingId(null); setForm(empty); }
+      void client.invalidateQueries({ queryKey: ["courses"] });
+    },
+  });
   if (query.isLoading) return <Spinner />;
   return <>
     <PageHeader title="Mis cursos" description="Administra cursos y sus temas." />
@@ -32,6 +39,9 @@ export function CoursesPage() {
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => { setEditingId(course.id); setForm({ name: course.name, description: course.description ?? "" }); }}>Editar</Button>
           <Button variant="ghost" onClick={() => void updateCourse(course.id, { status: course.status === "active" ? "inactive" : "active" }).then(() => client.invalidateQueries({ queryKey: ["courses"] }))}>{course.status === "active" ? "Desactivar" : "Activar"}</Button>
+          <Button variant="danger" disabled={archive.isPending && archive.variables === course.id} onClick={() => {
+            if (window.confirm(`¿Eliminar el curso “${course.name}”? Se conservarán sus resultados históricos.`)) archive.mutate(course.id);
+          }}>Eliminar</Button>
           <Link to={`/profesor/cursos/${course.id}`}><Button>Temas</Button></Link>
         </div>
       </Card>) : <EmptyState>No tienes cursos registrados.</EmptyState>}</div>

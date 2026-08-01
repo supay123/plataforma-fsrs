@@ -1890,6 +1890,10 @@ export type Database = {
         Args: { p_session_id: string; p_student_id: string };
         Returns: string;
       };
+      edge_submit_and_complete_session: {
+        Args: { p_results: Json; p_session_id: string; p_student_id: string };
+        Returns: string;
+      };
       edge_find_profile_by_code: {
         Args: { p_code: string };
         Returns: {
@@ -1925,7 +1929,7 @@ export type Database = {
       enrollment_status: "active" | "inactive";
       fsrs_rating: "Again" | "Good";
       import_status: "validating" | "completed" | "failed";
-      question_selection_reason: "due" | "new";
+      question_selection_reason: "due" | "new" | "scheduled";
       question_status: "draft" | "active" | "inactive" | "archived";
       session_status: "in_progress" | "completed" | "abandoned";
       topic_status: "draft" | "active" | "inactive" | "archived";
@@ -2078,7 +2082,7 @@ export const Constants = {
       enrollment_status: ["active", "inactive"],
       fsrs_rating: ["Again", "Good"],
       import_status: ["validating", "completed", "failed"],
-      question_selection_reason: ["due", "new"],
+      question_selection_reason: ["due", "new", "scheduled"],
       question_status: ["draft", "active", "inactive", "archived"],
       session_status: ["in_progress", "completed", "abandoned"],
       topic_status: ["draft", "active", "inactive", "archived"],

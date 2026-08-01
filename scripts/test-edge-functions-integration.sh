@@ -2,7 +2,9 @@
 set -euo pipefail
 
 pnpm exec supabase start
-pnpm exec supabase db reset --local --yes
+if [[ "${SKIP_DB_RESET:-false}" != "true" ]]; then
+  pnpm exec supabase db reset --local --yes
+fi
 
 status_env="$(pnpm exec supabase status -o env 2>/dev/null)"
 eval "$status_env"

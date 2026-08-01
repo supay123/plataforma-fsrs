@@ -15,7 +15,11 @@ export async function normalizeError(error: unknown): Promise<AppError> {
   if (error instanceof FunctionsHttpError) {
     try {
       const body = await error.context.json();
-      return new AppError(body?.error?.code ?? "function_error", body?.error?.message ?? error.message, body?.error?.details);
+      const code = body?.error?.code ?? "function_error";
+      if (error.context.status === 401 || code === "unauthorized") {
+        return new AppError("session_expired", "Tu sesión expiró. Vuelve a ingresar.");
+      }
+      return new AppError(code, body?.error?.message ?? error.message, body?.error?.details);
     } catch { return new AppError("function_error", error.message); }
   }
   if (error instanceof FunctionsRelayError) return new AppError("relay_error", "El servicio no está disponible.");

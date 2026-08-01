@@ -22,6 +22,19 @@ export default {
             p_limit: 20,
           });
         if (error || typeof sessionId !== "string") {
+          const insufficient = error?.message.match(
+            /insufficient_active_questions:required=(\d+),available=(\d+)/,
+          );
+          if (insufficient) {
+            const required = Number(insufficient[1]);
+            const available = Number(insufficient[2]);
+            throw new AppError(
+              409,
+              "insufficient_active_questions",
+              `Este tema necesita ${required} preguntas activas y actualmente tiene ${available}.`,
+              { required, available },
+            );
+          }
           throw new AppError(
             400,
             "session_start_failed",

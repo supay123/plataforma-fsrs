@@ -1,7 +1,7 @@
 export interface QuestionPayload {
   session_question_id: string;
   position: number;
-  selection_reason: "due" | "new";
+  selection_reason: "due" | "new" | "scheduled";
   selected_option: string | null;
   answered_at: string | null;
   question: {

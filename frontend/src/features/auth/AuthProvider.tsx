@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { clearAllSessionDrafts } from "../sessions/draft";
 import { queryClient } from "../../lib/query/client";
 import { supabase } from "../../lib/supabase/client";
 import type { AppRole, LoginResponse, Profile } from "../../types/contracts";
@@ -24,16 +25,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const generation = useRef(0);
+  const currentUserId = useRef<string | null>(null);
 
   const sync = useCallback(async (next: Session | null) => {
+    const syncGeneration = ++generation.current;
+    setLoading(true);
+    setProfile(null);
+    await queryClient.cancelQueries();
+    queryClient.clear();
     setSession(next);
-    setProfile(next ? await loadProfile(next.user.id) : null);
-    setLoading(false);
+    currentUserId.current = next?.user.id ?? null;
+    try {
+      const nextProfile = next ? await loadProfile(next.user.id) : null;
+      if (generation.current !== syncGeneration) return;
+      setProfile(nextProfile);
+    } finally {
+      if (generation.current === syncGeneration) setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    void supabase.auth.getSession().then(({ data }) => sync(data.session)).catch(() => setLoading(false));
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => { queueMicrotask(() => void sync(next)); });
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      queueMicrotask(() => {
+        if (event === "SIGNED_OUT") clearAllSessionDrafts();
+        if (event === "TOKEN_REFRESHED" && next?.user.id === currentUserId.current) {
+          setSession(next);
+          return;
+        }
+        void sync(next).catch((error) => console.error("Authentication synchronization failed", error));
+      });
+    });
     return () => data.subscription.unsubscribe();
   }, [sync]);
 
@@ -45,8 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [sync]);
 
   const logout = useCallback(async () => {
+    clearAllSessionDrafts();
     await supabase.auth.signOut();
-    queryClient.clear();
     await sync(null);
   }, [sync]);
 

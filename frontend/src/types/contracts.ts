@@ -27,7 +27,7 @@ export interface ImportResponse { batch_id?: string; report: ImportReport; accep
 export interface SessionQuestion {
   session_question_id: string;
   position: number;
-  selection_reason: "due" | "new";
+  selection_reason: "due" | "new" | "scheduled";
   selected_option: AnswerOption | null;
   answered_at: string | null;
   question: { id: string; statement: string; option_a: string; option_b: string; option_c: string; option_d: string };
@@ -52,3 +52,9 @@ export interface ReviewQuestion {
   correct_option: AnswerOption; explanation: string | null; is_correct: boolean;
 }
 export interface ReviewResponse { session: SessionSummary; questions: ReviewQuestion[] }
+
+export interface SessionAnswer {
+  session_question_id: string;
+  selected_option: AnswerOption;
+  response_time_ms: number;
+}
