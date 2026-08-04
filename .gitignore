@@ -19,3 +19,4 @@ frontend/playwright-report/
 
 # vscode stuff
 .vscode/
+.codex_build/
