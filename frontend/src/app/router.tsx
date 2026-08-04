@@ -10,6 +10,7 @@ const TeacherDetailPage = lazy(() => import("../pages/admin/UserDetailPage").the
 const UserAccountPage = lazy(() => import("../pages/admin/UserAccountPage").then((m) => ({ default: m.UserAccountPage })));
 const UsersPage = lazy(() => import("../pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })));
 const ReviewPage = lazy(() => import("../pages/shared/ReviewPage").then((m) => ({ default: m.ReviewPage })));
+const SecurityPage = lazy(() => import("../pages/shared/SecurityPage").then((m) => ({ default: m.SecurityPage })));
 const StudentCoursePage = lazy(() => import("../pages/student/CoursePage").then((m) => ({ default: m.StudentCoursePage })));
 const StudentDashboardPage = lazy(() => import("../pages/student/DashboardPage").then((m) => ({ default: m.StudentDashboardPage })));
 const SessionPage = lazy(() => import("../pages/student/SessionPage").then((m) => ({ default: m.SessionPage })));
@@ -26,13 +27,13 @@ export function AppRouter() {
     <Route path="/profesor/login" element={<LoginPage role="teacher" />} />
     <Route path="/estudiante/login" element={<LoginPage role="student" />} />
     <Route path="/admin" element={<RoleGuard role="admin"><PortalLayout role="admin" /></RoleGuard>}>
-      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} />
+      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="/profesor" element={<RoleGuard role="teacher"><PortalLayout role="teacher" /></RoleGuard>}>
-      <Route index element={<Navigate to="cursos" replace />} /><Route path="cursos" element={<CoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="estudiantes" element={<StudentsPage />} /><Route path="estudiantes/:studentId/resultados" element={<StudentResultsPage />} /><Route path="sesiones/:sessionId" element={<ReviewPage />} />
+      <Route index element={<Navigate to="cursos" replace />} /><Route path="cursos" element={<CoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="estudiantes" element={<StudentsPage />} /><Route path="estudiantes/:studentId/resultados" element={<StudentResultsPage />} /><Route path="sesiones/:sessionId" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="/estudiante" element={<RoleGuard role="student"><PortalLayout role="student" /></RoleGuard>}>
-      <Route index element={<StudentDashboardPage />} /><Route path="cursos/:courseId" element={<StudentCoursePage />} /><Route path="temas/:topicId/sesion" element={<SessionPage />} /><Route path="sesiones/:sessionId/revision" element={<ReviewPage />} />
+      <Route index element={<StudentDashboardPage />} /><Route path="cursos/:courseId" element={<StudentCoursePage />} /><Route path="temas/:topicId/sesion" element={<SessionPage />} /><Route path="sesiones/:sessionId/revision" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes></Suspense>;

@@ -739,6 +739,10 @@ export type Database = {
           id: string;
           is_active: boolean;
           role: Database["public"]["Enums"]["app_user_role"];
+          security_answer_hash: string | null;
+          security_failed_attempts: number;
+          security_locked_until: string | null;
+          security_question: string | null;
           updated_at: string;
           user_code: string;
         };
@@ -752,6 +756,10 @@ export type Database = {
           id: string;
           is_active?: boolean;
           role: Database["public"]["Enums"]["app_user_role"];
+          security_answer_hash?: string | null;
+          security_failed_attempts?: number;
+          security_locked_until?: string | null;
+          security_question?: string | null;
           updated_at?: string;
           user_code: string;
         };
@@ -765,6 +773,10 @@ export type Database = {
           id?: string;
           is_active?: boolean;
           role?: Database["public"]["Enums"]["app_user_role"];
+          security_answer_hash?: string | null;
+          security_failed_attempts?: number;
+          security_locked_until?: string | null;
+          security_question?: string | null;
           updated_at?: string;
           user_code?: string;
         };

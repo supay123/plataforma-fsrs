@@ -2,6 +2,7 @@
 set -euo pipefail
 
 function_dirs=(
+  account-security
   admin-create-user
   admin-renew-access
   admin-reset-user-credentials
@@ -13,6 +14,7 @@ function_dirs=(
   get-session
   import-questions
   login-with-code
+  recover-password
   start-session
 )
 

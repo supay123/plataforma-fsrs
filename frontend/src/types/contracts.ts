@@ -1,7 +1,7 @@
 import type { Enums, Tables } from "./database";
 
 export type AppRole = Enums<"app_user_role">;
-export type Profile = Pick<Tables<"profiles">, "id" | "college_id" | "role" | "user_code" | "full_name" | "is_active" | "access_valid_from" | "access_valid_until">;
+export type Profile = Pick<Tables<"profiles">, "id" | "college_id" | "role" | "user_code" | "full_name" | "is_active" | "access_valid_from" | "access_valid_until" | "security_question">;
 export type AnswerOption = "A" | "B" | "C" | "D";
 
 export interface AppFunctionError {
@@ -15,6 +15,8 @@ export interface LoginResponse {
 
 export interface Credentials { user_code: string; temporary_password?: string }
 export interface UserMutationResponse { user?: Profile; student?: Profile; user_id?: string; credentials?: Credentials }
+export interface SecurityQuestionResponse { security_question: string }
+export interface CredentialsResponse { credentials: Credentials }
 
 export interface ImportRow {
   pregunta: string; respuesta_a: string; respuesta_b: string; respuesta_c: string;

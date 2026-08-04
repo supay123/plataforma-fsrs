@@ -168,6 +168,50 @@ Deno.test({
     });
     const teacherToken =
       (teacherLogin.session as { access_token: string }).access_token;
+    await jsonResponse(
+      "account-security",
+      {
+        action: "save_recovery",
+        security_question: "¿Cuál es la ciudad de integración?",
+        security_answer: "Lima Norte",
+      },
+      { token: teacherToken },
+    );
+    const recoveryQuestion = await jsonResponse("recover-password", {
+      action: "get_question",
+      code: `TEACHER-RESET-${suffix}`,
+      expected_role: "teacher",
+    });
+    assert.equal(
+      recoveryQuestion.security_question,
+      "¿Cuál es la ciudad de integración?",
+    );
+    await jsonResponse(
+      "recover-password",
+      {
+        action: "reset_password",
+        code: `TEACHER-RESET-${suffix}`,
+        expected_role: "teacher",
+        answer: "respuesta incorrecta",
+      },
+      {},
+      401,
+    );
+    const recovered = await jsonResponse("recover-password", {
+      action: "reset_password",
+      code: `TEACHER-RESET-${suffix}`,
+      expected_role: "teacher",
+      answer: "  lima   norte ",
+    });
+    const recoveredPassword = (recovered.credentials as {
+      temporary_password: string;
+    }).temporary_password;
+    assert.match(recoveredPassword, /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/);
+    await jsonResponse("login-with-code", {
+      code: `TEACHER-RESET-${suffix}`,
+      password: recoveredPassword,
+      expected_role: "teacher",
+    });
     const studentLogin = await jsonResponse("login-with-code", {
       code: `STUDENT-${suffix}`,
       password: studentPin,

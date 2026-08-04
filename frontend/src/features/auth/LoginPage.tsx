@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { GraduationCap } from "lucide-react";
+import { ArrowLeft, GraduationCap } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -7,7 +7,8 @@ import { z } from "zod";
 import { Alert, Button, Card, Field, Input } from "../../components/ui";
 import { normalizeError } from "../../lib/api/errors";
 import { todayInLima } from "../../lib/dates";
-import type { AppRole } from "../../types/contracts";
+import type { AppRole, Credentials } from "../../types/contracts";
+import { getRecoveryQuestion, recoverPassword } from "./api";
 import { useAuth } from "./AuthProvider";
 
 const schema = z.object({ code: z.string().trim().min(1, "Ingresa tu código."), password: z.string().min(6, "Debe tener al menos 6 caracteres.") });
@@ -22,6 +23,7 @@ export function LoginPage({ role }: { role: AppRole }) {
   const auth = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [recovering, setRecovering] = useState(false);
   const [error, setError] = useState("");
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({ resolver: zodResolver(schema) });
   const studentAccessExpired = auth.profile?.role === "student" &&
@@ -35,18 +37,65 @@ export function LoginPage({ role }: { role: AppRole }) {
   return <main className="grid min-h-screen place-items-center bg-gradient-to-br from-indigo-950 via-indigo-800 to-sky-700 p-4">
     <Card className="w-full max-w-md border-0 p-7 shadow-2xl">
       <Link to="/" className="mb-7 flex items-center gap-3 text-indigo-700"><GraduationCap size={32} /><span className="font-bold">Aula FSRS</span></Link>
-      <h1 className="text-2xl font-bold">Acceso de {portal[role].label}</h1>
-      <p className="mt-2 text-sm text-slate-600">Ingresa con el código entregado por la institución.</p>
-      <form onSubmit={submit} className="mt-6 grid gap-4">
-        {(searchParams.get("acceso") === "vencido" || studentAccessExpired) &&
-          <Alert tone="error">Tu periodo de acceso no está vigente. Solicita una renovación al administrador.</Alert>}
-        {error && <Alert tone="error">{error}</Alert>}
-        <Field label="Código" error={errors.code?.message}><Input autoComplete="username" {...register("code")} /></Field>
-        <Field label={role === "student" ? "Contraseña o PIN" : "Contraseña"} error={errors.password?.message}><Input type="password" autoComplete="current-password" {...register("password")} /></Field>
-        <Button disabled={isSubmitting}>{isSubmitting ? "Ingresando…" : "Ingresar"}</Button>
-        {auth.session && <Button type="button" variant="secondary" onClick={() => void auth.logout()}>Cerrar sesión guardada</Button>}
-      </form>
-      {/* <Link to="/" className="mt-5 block text-center text-sm text-slate-500 hover:text-indigo-700">Cambiar de portal</Link> */}
+      {recovering
+        ? <RecoveryForm role={role} onBack={() => setRecovering(false)} />
+        : <>
+          <h1 className="text-2xl font-bold">Acceso de {portal[role].label}</h1>
+          <p className="mt-2 text-sm text-slate-600">Ingresa con el código entregado por la institución.</p>
+          <form onSubmit={submit} className="mt-6 grid gap-4">
+            {(searchParams.get("acceso") === "vencido" || studentAccessExpired) &&
+              <Alert tone="error">Tu periodo de acceso no está vigente. Solicita una renovación al administrador.</Alert>}
+            {error && <Alert tone="error">{error}</Alert>}
+            <Field label="Código" error={errors.code?.message}><Input autoComplete="username" {...register("code")} /></Field>
+            <Field label={role === "student" ? "Contraseña o PIN" : "Contraseña"} error={errors.password?.message}><Input type="password" autoComplete="current-password" {...register("password")} /></Field>
+            <Button disabled={isSubmitting}>{isSubmitting ? "Ingresando…" : "Ingresar"}</Button>
+            <button type="button" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800" onClick={() => { setError(""); setRecovering(true); }}>¿Olvidaste tu contraseña?</button>
+            {auth.session && <Button type="button" variant="secondary" onClick={() => void auth.logout()}>Cerrar sesión guardada</Button>}
+          </form>
+        </>}
     </Card>
   </main>;
+}
+
+function RecoveryForm({ role, onBack }: { role: AppRole; onBack: () => void }) {
+  const [code, setCode] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const findQuestion = async () => {
+    try {
+      setBusy(true); setError("");
+      const result = await getRecoveryQuestion(code, role);
+      setQuestion(result.security_question);
+    } catch (reason) { setError((await normalizeError(reason)).message); }
+    finally { setBusy(false); }
+  };
+  const reset = async () => {
+    try {
+      setBusy(true); setError("");
+      const result = await recoverPassword(code, role, answer);
+      setCredentials(result.credentials);
+    } catch (reason) { setError((await normalizeError(reason)).message); }
+    finally { setBusy(false); }
+  };
+
+  return <>
+    <button type="button" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600" onClick={onBack}><ArrowLeft size={16} />Volver al acceso</button>
+    <h1 className="text-2xl font-bold">Restablecer contraseña</h1>
+    <p className="mt-2 text-sm text-slate-600">Confirma tu respuesta de seguridad para generar una nueva credencial.</p>
+    <div className="mt-6 grid gap-4">
+      {error && <Alert tone="error">{error}</Alert>}
+      {credentials
+        ? <Alert tone="success"><strong>Nueva credencial</strong><br />{credentials.user_code} / {credentials.temporary_password}<Button type="button" variant="ghost" className="mt-2" onClick={() => void navigator.clipboard.writeText(`${credentials.user_code}\n${credentials.temporary_password ?? ""}`)}>Copiar</Button></Alert>
+        : <>
+          <Field label="Código"><Input value={code} disabled={Boolean(question)} onChange={(event) => setCode(event.target.value)} autoComplete="username" /></Field>
+          {question
+            ? <><div className="rounded-xl bg-slate-100 p-3 text-sm font-medium text-slate-800">{question}</div><Field label="Respuesta"><Input type="password" value={answer} onChange={(event) => setAnswer(event.target.value)} autoComplete="off" /></Field><Button type="button" disabled={busy || answer.trim().length < 2} onClick={() => void reset()}>{busy ? "Restableciendo…" : "Generar nueva credencial"}</Button></>
+            : <Button type="button" disabled={busy || !code.trim()} onClick={() => void findQuestion()}>{busy ? "Consultando…" : "Continuar"}</Button>}
+        </>}
+    </div>
+  </>;
 }

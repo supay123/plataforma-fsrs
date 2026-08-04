@@ -39,6 +39,8 @@ done
 
 function_names=(
   login-with-code
+  recover-password
+  account-security
   admin-create-user
   admin-update-user
   admin-reset-user-credentials

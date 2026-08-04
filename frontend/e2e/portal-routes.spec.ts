@@ -12,6 +12,10 @@ for (const portal of portals) {
     await expect(page.getByRole("heading", { name: `Acceso de ${portal.role}` })).toBeVisible();
     await expect(page.getByLabel("Código")).toBeVisible();
     await expect(page.getByLabel(portal.label)).toBeVisible();
+    await page.getByRole("button", { name: "¿Olvidaste tu contraseña?" }).click();
+    await expect(page.getByRole("heading", { name: "Restablecer contraseña" })).toBeVisible();
+    await expect(page.getByLabel("Código")).toBeVisible();
+    await page.getByRole("button", { name: "Volver al acceso" }).click();
 
     await page.goto(portal.protected);
     await expect(page).toHaveURL(new RegExp(`${portal.login.replaceAll("/", "\\/")}$`));

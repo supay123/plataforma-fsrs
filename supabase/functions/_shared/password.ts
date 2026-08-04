@@ -51,13 +51,15 @@ export function assertPassword(password: string): void {
 }
 
 export function assertCredential(
-  role: "teacher" | "student",
+  role: "admin" | "teacher" | "student",
   credential: string,
 ): void {
   if (role === "student" && /^\d{6}$/.test(credential)) return;
   assertPassword(credential);
 }
 
-export function generateCredential(role: "teacher" | "student"): string {
+export function generateCredential(
+  role: "admin" | "teacher" | "student",
+): string {
   return role === "student" ? generatePin() : generatePassword();
 }

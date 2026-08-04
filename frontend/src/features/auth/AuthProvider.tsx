@@ -16,7 +16,7 @@ interface AuthState {
 const AuthContext = createContext<AuthState | null>(null);
 
 async function loadProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase.from("profiles").select("id,college_id,role,user_code,full_name,is_active,access_valid_from,access_valid_until").eq("id", userId).maybeSingle();
+  const { data, error } = await supabase.from("profiles").select("id,college_id,role,user_code,full_name,is_active,access_valid_from,access_valid_until,security_question").eq("id", userId).maybeSingle();
   if (error) throw error;
   return data;
 }

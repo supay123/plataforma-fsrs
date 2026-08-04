@@ -415,3 +415,6 @@ enabled = true
 
 [functions.login-with-code]
 verify_jwt = false
+
+[functions.recover-password]
+verify_jwt = false
