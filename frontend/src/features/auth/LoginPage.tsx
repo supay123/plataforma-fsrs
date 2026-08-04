@@ -46,7 +46,7 @@ export function LoginPage({ role }: { role: AppRole }) {
         <Button disabled={isSubmitting}>{isSubmitting ? "Ingresando…" : "Ingresar"}</Button>
         {auth.session && <Button type="button" variant="secondary" onClick={() => void auth.logout()}>Cerrar sesión guardada</Button>}
       </form>
-      <Link to="/" className="mt-5 block text-center text-sm text-slate-500 hover:text-indigo-700">Cambiar de portal</Link>
+      {/* <Link to="/" className="mt-5 block text-center text-sm text-slate-500 hover:text-indigo-700">Cambiar de portal</Link> */}
     </Card>
   </main>;
 }
