@@ -56,7 +56,7 @@ export function UsersPage() {
             <td><Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Activo" : "Inactivo"}</Badge></td>
             <td className="space-x-2">
               <Link className="text-sm font-semibold text-indigo-600" to={`/admin/usuarios/${user.id}`}>Editar</Link>
-              {user.role === "teacher" && <Link className="text-sm font-semibold text-indigo-600" to={`/admin/profesores/${user.id}`}>Asignaciones</Link>}
+              {user.role === "teacher" && <Link className="text-sm font-semibold text-indigo-600" to={`/admin/asignaciones?profesor=${user.id}`}>Asignaciones</Link>}
               <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: user.id, active: !user.is_active })}>
                 {user.is_active ? "Desactivar" : "Activar"}
               </Button>

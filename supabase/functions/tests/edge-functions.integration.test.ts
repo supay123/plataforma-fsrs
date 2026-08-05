@@ -312,7 +312,9 @@ Deno.test({
     assert.equal("correct_option" in questions[0]!.question, false);
     assert.equal("explanation" in questions[0]!.question, false);
 
-    const preservedIds = questions.slice(0, 16).map((question) => question.session_question_id);
+    const preservedIds = questions.slice(0, 16).map((question) =>
+      question.session_question_id
+    );
     const { error: shrinkQuestionsError } = await adminClient
       .from(TABLES.assessmentSessionQuestions)
       .delete()
@@ -409,7 +411,11 @@ Deno.test({
       selection_reason: string;
     }>;
     assert.equal(scheduledQuestions.length, 20);
-    assert.ok(scheduledQuestions.every((question) => question.selection_reason === "scheduled"));
+    assert.ok(
+      scheduledQuestions.every((question) =>
+        question.selection_reason === "scheduled"
+      ),
+    );
 
     const { data: shortTopic, error: shortTopicError } = await adminClient
       .from(TABLES.topics)
@@ -474,5 +480,190 @@ Deno.test({
     assert.ifError(logsError);
     assert.equal(cardCount, 20);
     assert.equal(logCount, 20);
+
+    const adminSessionClient = createClient(testUrl, testPublishableKey, {
+      global: { headers: { Authorization: `Bearer ${adminToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const teacherSessionClient = createClient(testUrl, testPublishableKey, {
+      global: { headers: { Authorization: `Bearer ${teacherToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { error: assignmentError } = await adminSessionClient.rpc(
+      "admin_sync_teacher_students",
+      { p_teacher_id: teacherId, p_student_ids: [studentId] },
+    );
+    assert.ifError(assignmentError);
+
+    const { error: topicBlockError } = await adminSessionClient
+      .from(TABLES.studentTopicAccess)
+      .upsert({
+        student_id: studentId,
+        topic_id: shortTopic.id,
+        is_blocked: true,
+        updated_by: authAdmin.user.id,
+      }, { onConflict: "student_id,topic_id" });
+    assert.ifError(topicBlockError);
+
+    const { error: blockCourseError } = await adminSessionClient
+      .from(TABLES.courseEnrollments)
+      .update({ status: "inactive", ended_at: new Date().toISOString() })
+      .eq("course_id", course.id)
+      .eq("student_id", studentId);
+    assert.ifError(blockCourseError);
+
+    const { data: hiddenTopicRows, error: hiddenTopicError } =
+      await adminSessionClient
+        .from("v_student_topic_access_status")
+        .select("topic_id")
+        .eq("topic_id", shortTopic.id)
+        .eq("student_id", studentId);
+    assert.ifError(hiddenTopicError);
+    assert.equal(hiddenTopicRows.length, 0);
+
+    const { error: resyncError } = await adminSessionClient.rpc(
+      "admin_sync_teacher_students",
+      { p_teacher_id: teacherId, p_student_ids: [studentId] },
+    );
+    assert.ifError(resyncError);
+    const { data: preservedEnrollment, error: preservedEnrollmentError } =
+      await adminClient.from(TABLES.courseEnrollments)
+        .select("status")
+        .eq("course_id", course.id)
+        .eq("student_id", studentId)
+        .single();
+    assert.ifError(preservedEnrollmentError);
+    assert.equal(preservedEnrollment.status, "inactive");
+
+    const { error: restoreCourseError } = await adminSessionClient
+      .from(TABLES.courseEnrollments)
+      .update({ status: "active", ended_at: null })
+      .eq("course_id", course.id)
+      .eq("student_id", studentId);
+    assert.ifError(restoreCourseError);
+    const { data: restoredTopic, error: restoredTopicError } =
+      await adminSessionClient
+        .from("v_student_topic_access_status")
+        .select("is_blocked")
+        .eq("topic_id", shortTopic.id)
+        .eq("student_id", studentId)
+        .single();
+    assert.ifError(restoredTopicError);
+    assert.equal(restoredTopic.is_blocked, true);
+
+    const { error: deactivateStudentError } = await adminClient
+      .from(TABLES.profiles)
+      .update({ is_active: false })
+      .eq("id", studentId);
+    assert.ifError(deactivateStudentError);
+    const { data: futureCourse, error: futureCourseError } =
+      await teacherSessionClient.from(TABLES.courses).insert({
+        college_id: college.id,
+        teacher_id: teacherId,
+        name: `Future course ${suffix}`,
+        created_by: teacherId,
+      }).select("id").single();
+    assert.ifError(futureCourseError);
+    const { count: futureEnrollmentCount, error: futureEnrollmentError } =
+      await adminClient.from(TABLES.courseEnrollments).select("*", {
+        count: "exact",
+        head: true,
+      }).eq("course_id", futureCourse.id).eq("student_id", studentId);
+    assert.ifError(futureEnrollmentError);
+    assert.equal(futureEnrollmentCount, 1);
+
+    const secondTeacherCreate = await jsonResponse(
+      "admin-create-user",
+      {
+        role: "teacher",
+        user_code: `TEACHER-SECOND-${suffix}`,
+        full_name: "Second Integration Teacher",
+        college_id: college.id,
+        password: teacherPassword,
+      },
+      { token: adminToken },
+      201,
+    );
+    const secondTeacherId = (secondTeacherCreate.user as { id: string }).id;
+    const { data: secondTeacherCourse, error: secondTeacherCourseError } =
+      await adminClient.from(TABLES.courses).insert({
+        college_id: college.id,
+        teacher_id: secondTeacherId,
+        name: `Second teacher course ${suffix}`,
+        created_by: secondTeacherId,
+      }).select("id").single();
+    assert.ifError(secondTeacherCourseError);
+    const { error: secondAssignmentError } = await adminSessionClient.rpc(
+      "admin_sync_teacher_students",
+      { p_teacher_id: secondTeacherId, p_student_ids: [studentId] },
+    );
+    assert.ifError(secondAssignmentError);
+    const {
+      count: secondTeacherEnrollmentCount,
+      error: secondTeacherEnrollmentError,
+    } = await adminClient.from(TABLES.courseEnrollments).select("*", {
+      count: "exact",
+      head: true,
+    }).eq("course_id", secondTeacherCourse.id).eq("student_id", studentId);
+    assert.ifError(secondTeacherEnrollmentError);
+    assert.equal(secondTeacherEnrollmentCount, 1);
+
+    const { error: forbiddenSyncError } = await teacherSessionClient.rpc(
+      "admin_sync_teacher_students",
+      { p_teacher_id: teacherId, p_student_ids: [studentId] },
+    );
+    assert.ok(forbiddenSyncError);
+    assert.equal(forbiddenSyncError.code, "42501");
+
+    const teacherWithoutCourses = await jsonResponse(
+      "admin-create-user",
+      {
+        role: "teacher",
+        user_code: `TEACHER-EMPTY-${suffix}`,
+        full_name: "Teacher Without Courses",
+        college_id: college.id,
+        password: teacherPassword,
+      },
+      { token: adminToken },
+      201,
+    );
+    const { error: emptyTeacherError } = await adminSessionClient.rpc(
+      "admin_sync_teacher_students",
+      {
+        p_teacher_id: (teacherWithoutCourses.user as { id: string }).id,
+        p_student_ids: [studentId],
+      },
+    );
+    assert.ok(emptyTeacherError);
+    assert.match(emptyTeacherError.message, /at least one course/i);
+
+    const { error: unassignError } = await adminSessionClient.rpc(
+      "admin_sync_teacher_students",
+      { p_teacher_id: teacherId, p_student_ids: [] },
+    );
+    assert.ifError(unassignError);
+    const { count: firstTeacherRemaining, error: firstTeacherRemainingError } =
+      await adminClient.from(TABLES.courseEnrollments)
+        .select("course_id,courses!inner(teacher_id)", {
+          count: "exact",
+          head: true,
+        })
+        .eq("student_id", studentId)
+        .eq("courses.teacher_id", teacherId);
+    assert.ifError(firstTeacherRemainingError);
+    assert.equal(firstTeacherRemaining, 0);
+    const {
+      count: secondTeacherRemaining,
+      error: secondTeacherRemainingError,
+    } = await adminClient.from(TABLES.courseEnrollments)
+      .select("course_id,courses!inner(teacher_id)", {
+        count: "exact",
+        head: true,
+      })
+      .eq("student_id", studentId)
+      .eq("courses.teacher_id", secondTeacherId);
+    assert.ifError(secondTeacherRemainingError);
+    assert.equal(secondTeacherRemaining, 1);
   },
 });

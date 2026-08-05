@@ -1,4 +1,4 @@
-import { BookOpen, Building2, GraduationCap, LogOut, Menu, Settings, Users, X } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, Menu, Settings, Users, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -6,7 +6,7 @@ import type { AppRole } from "../../types/contracts";
 import { Button } from "../ui";
 
 const links: Record<AppRole, Array<{ to: string; label: string; icon: typeof Users }>> = {
-  admin: [{ to: "/admin/usuarios", label: "Usuarios", icon: Users }, { to: "/admin/colegios", label: "Colegios", icon: Building2 }],
+  admin: [{ to: "/admin/usuarios", label: "Usuarios", icon: Users }, { to: "/admin/colegios", label: "Colegios", icon: Building2 }, { to: "/admin/asignaciones", label: "Asignaciones", icon: ListChecks }],
   teacher: [{ to: "/profesor/cursos", label: "Cursos", icon: BookOpen }, { to: "/profesor/estudiantes", label: "Estudiantes", icon: Users }],
   student: [{ to: "/estudiante", label: "Mi progreso", icon: GraduationCap }],
 };

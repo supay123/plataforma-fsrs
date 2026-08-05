@@ -1887,6 +1887,10 @@ export type Database = {
       };
     };
     Functions: {
+      admin_sync_teacher_students: {
+        Args: { p_student_ids?: string[]; p_teacher_id: string };
+        Returns: undefined;
+      };
       edge_apply_answer: {
         Args: {
           p_card: Json;

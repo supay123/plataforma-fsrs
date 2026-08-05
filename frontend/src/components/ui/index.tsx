@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import clsx from "clsx";
 
@@ -22,3 +23,45 @@ export function Alert({ children, tone = "info" }: { children: ReactNode; tone?:
 export function Spinner() { return <div role="status" className="mx-auto my-12 h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"><span className="sr-only">Cargando</span></div>; }
 export function EmptyState({ children }: { children: ReactNode }) { return <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">{children}</div>; }
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" }) { return <span className={clsx("rounded-full px-2.5 py-1 text-xs font-semibold", tone === "neutral" && "bg-slate-100 text-slate-700", tone === "success" && "bg-emerald-100 text-emerald-700", tone === "warning" && "bg-amber-100 text-amber-700")}>{children}</span>; }
+
+export function ConfirmDialog({
+  open,
+  title,
+  children,
+  confirmLabel = "Continuar",
+  cancelLabel = "Cancelar",
+  pending = false,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  pending?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !pending) onCancel();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, pending, onCancel]);
+
+  if (!open) return null;
+  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
+    <button aria-label="Cerrar diálogo" className="absolute inset-0 bg-slate-950/55" disabled={pending} onClick={onCancel} />
+    <section aria-modal="true" aria-labelledby="confirm-dialog-title" className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" role="dialog">
+      <h2 id="confirm-dialog-title" className="text-lg font-bold text-slate-950">{title}</h2>
+      <div className="mt-3 text-sm leading-6 text-slate-600">{children}</div>
+      <div className="mt-6 flex justify-end gap-3">
+        <Button autoFocus type="button" variant="secondary" disabled={pending} onClick={onCancel}>{cancelLabel}</Button>
+        <Button type="button" disabled={pending} onClick={onConfirm}>{pending ? "Guardando…" : confirmLabel}</Button>
+      </div>
+    </section>
+  </div>;
+}
