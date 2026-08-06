@@ -13,14 +13,14 @@ export function StudentDashboardPage() {
   );
   return <>
     <PageHeader title="Mi aprendizaje" description="Cursos activos y progreso observado." />
-    <Card className="mb-6 border-indigo-200 bg-gradient-to-r from-indigo-50 to-white">
-      <span className="text-sm font-semibold text-indigo-700">Acierto total</span>
-      <strong className="mt-2 block text-4xl text-indigo-700">
+    <Card className="mb-6 border-purple-600 bg-purple-700 text-white">
+      <span className="text-sm font-semibold text-purple-200">Acierto total</span>
+      <strong className="mt-2 block text-4xl text-white">
         {totalScore === null
           ? "—"
           : `${formatPercentage(totalScore)}% (${Number((totalScore / 5).toFixed(1))})`}
       </strong>
-      <p className="mt-1 text-xs text-slate-500">Promedio de los cursos con sesiones completadas.</p>
+      <p className="mt-1 text-xs text-purple-200">Promedio de los cursos con sesiones completadas.</p>
     </Card>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{courses.data?.length ? courses.data.map((course) => {
       const result = progress.data?.find((row) => row.course_id === course.id);

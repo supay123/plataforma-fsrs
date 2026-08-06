@@ -36,7 +36,7 @@ export function ReviewPage() {
     <PageHeader
       title={`${session.course_name} · ${session.topic_name}`}
       description="Revisión del examen completado."
-      actions={<Link to={returnTo}><Button variant="secondary">{returnLabel}</Button></Link>}
+      actions={<Link to={returnTo}><Button variant="primary">{returnLabel}</Button></Link>}
     />
     <div className="mb-6 grid gap-4 sm:grid-cols-3">
       <Card><span className="text-sm text-slate-500">Aciertos</span><strong className="block text-3xl text-emerald-600">{session.correct_count}</strong></Card>
