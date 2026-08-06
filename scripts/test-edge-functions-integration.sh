@@ -42,6 +42,8 @@ function_names=(
   recover-password
   account-security
   admin-create-user
+  admin-delete-college
+  admin-delete-user
   admin-update-user
   admin-reset-user-credentials
   admin-renew-access

@@ -665,5 +665,42 @@ Deno.test({
       .eq("courses.teacher_id", secondTeacherId);
     assert.ifError(secondTeacherRemainingError);
     assert.equal(secondTeacherRemaining, 1);
+
+    const teacherWithoutCoursesId =
+      (teacherWithoutCourses.user as { id: string }).id;
+    await jsonResponse(
+      "admin-delete-user",
+      { user_id: teacherWithoutCoursesId },
+      { token: adminToken },
+    );
+    const { data: deletedTeacherProfile, error: deletedTeacherProfileError } =
+      await adminClient.from(TABLES.profiles).select("id")
+        .eq("id", teacherWithoutCoursesId).maybeSingle();
+    assert.ifError(deletedTeacherProfileError);
+    assert.equal(deletedTeacherProfile, null);
+
+    const collegeDeletion = await jsonResponse(
+      "admin-delete-college",
+      { college_id: college.id },
+      { token: adminToken },
+    );
+    assert.equal(collegeDeletion.college_id, college.id);
+    assert.equal(collegeDeletion.deleted_users, 3);
+    const [{ data: deletedCollege, error: deletedCollegeError }, {
+      count: remainingCollegeProfiles,
+      error: remainingCollegeProfilesError,
+    }] = await Promise.all([
+      adminClient.from(TABLES.colleges).select("id").eq("id", college.id)
+        .maybeSingle(),
+      adminClient.from(TABLES.profiles).select("id", {
+        count: "exact",
+        head: true,
+      })
+        .eq("college_id", college.id),
+    ]);
+    assert.ifError(deletedCollegeError);
+    assert.ifError(remainingCollegeProfilesError);
+    assert.equal(deletedCollege, null);
+    assert.equal(remainingCollegeProfiles, 0);
   },
 });

@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, ConfirmDialog, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
 import { listColleges } from "../../features/colleges/api";
-import { createUser, listUsers, roleLabel, updateUser } from "../../features/users/api";
+import { createUser, deleteUser, listUsers, roleLabel, updateUser } from "../../features/users/api";
 import type { Credentials } from "../../types/contracts";
 
 const emptyForm = {
@@ -21,6 +21,8 @@ export function UsersPage() {
   const users = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const colleges = useQuery({ queryKey: ["colleges"], queryFn: listColleges });
   const [filter, setFilter] = useState("");
+  const [collegeFilter, setCollegeFilter] = useState("");
+  const [userToDelete, setUserToDelete] = useState<Awaited<ReturnType<typeof listUsers>>[number] | null>(null);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [form, setForm] = useState(emptyForm);
   const create = useMutation({
@@ -36,10 +38,20 @@ export function UsersPage() {
       updateUser({ user_id: id, is_active: active }),
     onSuccess: () => client.invalidateQueries({ queryKey: ["users"] }),
   });
+  const remove = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: () => {
+      setUserToDelete(null);
+      void client.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
   const visible = useMemo(
-    () => users.data?.filter((user) =>
-      `${user.full_name} ${user.user_code}`.toLowerCase().includes(filter.toLowerCase())),
-    [users.data, filter],
+    () => users.data?.filter((user) => {
+      const matchesText = `${user.full_name} ${user.user_code}`.toLowerCase().includes(filter.toLowerCase());
+      const matchesCollege = !collegeFilter || user.college_id === collegeFilter;
+      return matchesText && matchesCollege;
+    }),
+    [users.data, filter, collegeFilter],
   );
 
   if (users.isLoading) return <Spinner />;
@@ -47,12 +59,20 @@ export function UsersPage() {
     <PageHeader title="Usuarios" description="Profesores, estudiantes y vigencias de acceso." />
     <div className="grid gap-6 xl:grid-cols-[1fr_23rem]">
       <Card>
-        <Input aria-label="Buscar usuarios" placeholder="Buscar por nombre o código…" value={filter} onChange={(event) => setFilter(event.target.value)} />
+        {remove.error && <Alert tone="error">{remove.error.message}</Alert>}
+        <div className="grid gap-3 sm:grid-cols-[1fr_16rem]">
+          <Input aria-label="Buscar usuarios" placeholder="Buscar por nombre o código…" value={filter} onChange={(event) => setFilter(event.target.value)} />
+          <Select aria-label="Filtrar por colegio" value={collegeFilter} onChange={(event) => setCollegeFilter(event.target.value)}>
+            <option value="">Todos los colegios</option>
+            {colleges.data?.map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}
+          </Select>
+        </div>
         <div className="table-wrap mt-4"><table>
-          <thead><tr><th>Usuario</th><th>Rol</th><th>Acceso</th><th /></tr></thead>
+          <thead><tr><th>Usuario</th><th>Rol</th><th>Colegio</th><th>Acceso</th><th /></tr></thead>
           <tbody>{visible?.map((user) => <tr key={user.id}>
             <td><strong>{user.full_name}</strong><br /><span className="text-xs text-slate-500">{user.user_code}</span></td>
             <td>{roleLabel(user.role)}</td>
+            <td>{colleges.data?.find((college) => college.id === user.college_id)?.name ?? "—"}</td>
             <td><Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Activo" : "Inactivo"}</Badge></td>
             <td className="space-x-2">
               <Link className="text-sm font-semibold text-indigo-600" to={`/admin/usuarios/${user.id}`}>Editar</Link>
@@ -60,6 +80,7 @@ export function UsersPage() {
               <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: user.id, active: !user.is_active })}>
                 {user.is_active ? "Desactivar" : "Activar"}
               </Button>
+              <Button variant="danger" disabled={remove.isPending} onClick={() => setUserToDelete(user)}>Eliminar</Button>
             </td>
           </tr>)}</tbody>
         </table></div>
@@ -93,5 +114,18 @@ export function UsersPage() {
         </form>
       </Card>
     </div>
+    <ConfirmDialog
+      open={Boolean(userToDelete)}
+      title="Eliminar usuario"
+      confirmLabel="Eliminar definitivamente"
+      confirmVariant="danger"
+      pendingLabel="Eliminando…"
+      pending={remove.isPending}
+      onCancel={() => { if (!remove.isPending) setUserToDelete(null); }}
+      onConfirm={() => { if (userToDelete) remove.mutate(userToDelete.id); }}
+    >
+      <p><strong>Esta acción no se puede deshacer.</strong></p>
+      <p className="mt-2">Se eliminará a {userToDelete?.full_name} y toda la información relacionada con este usuario, incluyendo cursos, matrículas, sesiones, resultados y accesos asociados.</p>
+    </ConfirmDialog>
   </>;
 }

@@ -4,6 +4,8 @@ set -euo pipefail
 function_dirs=(
   account-security
   admin-create-user
+  admin-delete-college
+  admin-delete-user
   admin-renew-access
   admin-reset-user-credentials
   admin-update-user

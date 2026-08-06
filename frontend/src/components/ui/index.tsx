@@ -30,6 +30,8 @@ export function ConfirmDialog({
   children,
   confirmLabel = "Continuar",
   cancelLabel = "Cancelar",
+  confirmVariant = "primary",
+  pendingLabel = "Guardando…",
   pending = false,
   onConfirm,
   onCancel,
@@ -39,6 +41,8 @@ export function ConfirmDialog({
   children: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  confirmVariant?: "primary" | "danger";
+  pendingLabel?: string;
   pending?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -60,7 +64,7 @@ export function ConfirmDialog({
       <div className="mt-3 text-sm leading-6 text-slate-600">{children}</div>
       <div className="mt-6 flex justify-end gap-3">
         <Button autoFocus type="button" variant="secondary" disabled={pending} onClick={onCancel}>{cancelLabel}</Button>
-        <Button type="button" disabled={pending} onClick={onConfirm}>{pending ? "Guardando…" : confirmLabel}</Button>
+        <Button type="button" variant={confirmVariant} disabled={pending} onClick={onConfirm}>{pending ? pendingLabel : confirmLabel}</Button>
       </div>
     </section>
   </div>;

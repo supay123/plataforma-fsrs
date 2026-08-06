@@ -136,8 +136,8 @@ Perfil de aplicación relacionado uno a uno con `auth.users`. Contiene rol, cole
 ### Relaciones
 
 - `id → auth.users.id` con `ON DELETE CASCADE`.
-- `college_id → public.colleges.id` con `ON DELETE RESTRICT`.
-- `created_by → public.profiles.id` con `ON DELETE SET NULL`.
+- `college_id → public.colleges.id` con `ON DELETE CASCADE`.
+- `created_by → public.profiles.id` con `ON DELETE CASCADE`.
 - Es referenciada por cursos, inscripciones, bloqueos, importaciones, preguntas, sesiones, tarjetas FSRS, logs y auditoría.
 
 ### Constraints
@@ -178,9 +178,9 @@ Cursos pertenecientes a un solo profesor y a un solo colegio.
 
 ### Relaciones
 
-- `college_id → public.colleges.id` con `ON DELETE RESTRICT`.
-- `teacher_id → public.profiles.id` con `ON DELETE RESTRICT`.
-- `created_by → public.profiles.id` con `ON DELETE SET NULL`.
+- `college_id → public.colleges.id` con `ON DELETE CASCADE`.
+- `teacher_id → public.profiles.id` con `ON DELETE CASCADE`.
+- `created_by → public.profiles.id` con `ON DELETE CASCADE`.
 - Es referenciada por `course_enrollments`, `topics` y `assessment_sessions`.
 
 ### Constraints
@@ -219,9 +219,9 @@ Relaciona estudiantes con cursos. Un estudiante puede pertenecer a varios cursos
 
 ### Relaciones
 
-- `course_id → public.courses.id` con `ON DELETE RESTRICT`.
-- `student_id → public.profiles.id` con `ON DELETE RESTRICT`.
-- `enrolled_by → public.profiles.id` con `ON DELETE SET NULL`.
+- `course_id → public.courses.id` con `ON DELETE CASCADE`.
+- `student_id → public.profiles.id` con `ON DELETE CASCADE`.
+- `enrolled_by → public.profiles.id` con `ON DELETE CASCADE`.
 
 ### Constraints
 
@@ -236,7 +236,20 @@ Relaciona estudiantes con cursos. Un estudiante puede pertenecer a varios cursos
 - `course_enrollments_select`: administrador, estudiante dueño de la inscripción o profesor propietario del curso.
 - `course_enrollments_insert`: administrador o profesor autorizado para ese curso y estudiante.
 - `course_enrollments_update`: administrador o profesor propietario del curso.
-- No existe política de eliminación; la baja se representa mediante `status = inactive`.
+- `course_enrollments_delete`: únicamente el administrador puede eliminar matrículas; para bloqueos temporales se utiliza `status = inactive`.
+
+### Eliminación de un profesor
+
+La eliminación administrativa de un profesor comienza eliminando su cuenta de `auth.users`. La relación `profiles.id → auth.users.id` elimina su perfil y `courses.teacher_id → profiles.id` elimina en cascada todos los cursos que le pertenecen. A partir de esos cursos también se eliminan sus temas, preguntas, matrículas, sesiones, resultados, tarjetas FSRS, bloqueos y demás registros académicos dependientes.
+
+Los perfiles de los estudiantes matriculados en esos cursos **no se eliminan**. La cascada elimina las filas de `course_enrollments` que apuntan a los cursos del profesor, pero no se propaga en sentido inverso desde una matrícula hacia el perfil del estudiante. El alumno conserva su cuenta y sus relaciones con otros profesores.
+
+Existen dos campos de auditoría que actualmente usan `ON DELETE CASCADE` y deben considerarse:
+
+- `profiles.created_by`: si un perfil tuviera al profesor eliminado como creador, ese perfil también sería eliminado. En el flujo administrativo actual los profesores y estudiantes son creados por un administrador, por lo que un estudiante no debería tener un profesor en este campo.
+- `course_enrollments.enrolled_by`: eliminar un profesor también elimina cualquier matrícula registrada por él, incluso si excepcionalmente perteneciera a un curso de otro profesor.
+
+Para garantizar estructuralmente que la eliminación se limite exclusivamente a los cursos propiedad del profesor, estos dos campos de auditoría deberían utilizar `ON DELETE SET NULL`. La cascada académica principal debe originarse en `courses.teacher_id`.
 
 ---
 
@@ -261,8 +274,8 @@ Temas o unidades dentro de un curso.
 
 ### Relaciones
 
-- `course_id → public.courses.id` con `ON DELETE RESTRICT`.
-- `created_by → public.profiles.id` con `ON DELETE SET NULL`.
+- `course_id → public.courses.id` con `ON DELETE CASCADE`.
+- `created_by → public.profiles.id` con `ON DELETE CASCADE`.
 - Es referenciada por bloqueos, lotes de importación, preguntas y sesiones.
 
 ### Constraints
@@ -302,7 +315,7 @@ Controla el bloqueo individual de un tema para un estudiante. El bloqueo no tien
 
 - `student_id → public.profiles.id` con `ON DELETE CASCADE`.
 - `topic_id → public.topics.id` con `ON DELETE CASCADE`.
-- `updated_by → public.profiles.id` con `ON DELETE SET NULL`.
+- `updated_by → public.profiles.id` con `ON DELETE CASCADE`.
 
 ### Constraints
 
@@ -340,8 +353,8 @@ Registra cada carga de preguntas desde Excel y su reporte de validación.
 
 ### Relaciones
 
-- `topic_id → public.topics.id` con `ON DELETE RESTRICT`.
-- `uploaded_by → public.profiles.id` con `ON DELETE RESTRICT`.
+- `topic_id → public.topics.id` con `ON DELETE CASCADE`.
+- `uploaded_by → public.profiles.id` con `ON DELETE CASCADE`.
 - Es referenciada por `public.questions.import_batch_id`.
 
 ### Constraints
@@ -384,10 +397,10 @@ Banco de preguntas de cuatro alternativas, compatible con texto LaTeX y explicac
 
 ### Relaciones
 
-- `topic_id → public.topics.id` con `ON DELETE RESTRICT`.
+- `topic_id → public.topics.id` con `ON DELETE CASCADE`.
 - `import_batch_id → public.question_import_batches.id` con `ON DELETE SET NULL`.
 - `supersedes_question_id → public.questions.id` con `ON DELETE SET NULL`.
-- `created_by → public.profiles.id` con `ON DELETE RESTRICT`.
+- `created_by → public.profiles.id` con `ON DELETE CASCADE`.
 - Es referenciada por preguntas de sesión, tarjetas FSRS y logs FSRS.
 
 ### Constraints
@@ -470,9 +483,9 @@ Representa una sesión de evaluación de un estudiante sobre un único tema, con
 
 ### Relaciones
 
-- `student_id → public.profiles.id` con `ON DELETE RESTRICT`.
-- `course_id → public.courses.id` con `ON DELETE RESTRICT`.
-- `topic_id → public.topics.id` con `ON DELETE RESTRICT`.
+- `student_id → public.profiles.id` con `ON DELETE CASCADE`.
+- `course_id → public.courses.id` con `ON DELETE CASCADE`.
+- `topic_id → public.topics.id` con `ON DELETE CASCADE`.
 - `fsrs_config_id → public.fsrs_configs.id` con `ON DELETE RESTRICT`.
 - Es referenciada por `assessment_session_questions` con borrado en cascada.
 
@@ -519,7 +532,7 @@ Contiene las preguntas seleccionadas para una sesión y la respuesta del estudia
 ### Relaciones
 
 - `session_id → public.assessment_sessions.id` con `ON DELETE CASCADE`.
-- `question_id → public.questions.id` con `ON DELETE RESTRICT`.
+- `question_id → public.questions.id` con `ON DELETE CASCADE`.
 - Es referenciada por `fsrs_review_logs.session_question_id`.
 
 ### Constraints
@@ -569,7 +582,7 @@ Mantiene el estado FSRS actual de cada par estudiante–pregunta.
 ### Relaciones
 
 - `student_id → public.profiles.id` con `ON DELETE CASCADE`.
-- `question_id → public.questions.id` con `ON DELETE RESTRICT`.
+- `question_id → public.questions.id` con `ON DELETE CASCADE`.
 - `fsrs_config_id → public.fsrs_configs.id` con `ON DELETE RESTRICT`.
 - Es referenciada por `fsrs_review_logs.card_id`.
 
@@ -612,10 +625,10 @@ Historial inmutable de cada transición de programación FSRS.
 
 ### Relaciones
 
-- `card_id → public.student_question_cards.id` con `ON DELETE RESTRICT`.
-- `session_question_id → public.assessment_session_questions.id` con `ON DELETE RESTRICT`.
-- `student_id → public.profiles.id` con `ON DELETE RESTRICT`.
-- `question_id → public.questions.id` con `ON DELETE RESTRICT`.
+- `card_id → public.student_question_cards.id` con `ON DELETE CASCADE`.
+- `session_question_id → public.assessment_session_questions.id` con `ON DELETE CASCADE`.
+- `student_id → public.profiles.id` con `ON DELETE CASCADE`.
+- `question_id → public.questions.id` con `ON DELETE CASCADE`.
 - `fsrs_config_id → public.fsrs_configs.id` con `ON DELETE RESTRICT`.
 
 ### Constraints
@@ -651,8 +664,8 @@ Bitácora de acciones administrativas y de profesores.
 
 ### Relaciones
 
-- `actor_user_id → public.profiles.id` con `ON DELETE SET NULL`.
-- `college_id → public.colleges.id` con `ON DELETE SET NULL`.
+- `actor_user_id → public.profiles.id` con `ON DELETE CASCADE`.
+- `college_id → public.colleges.id` con `ON DELETE CASCADE`.
 - `entity_id` es polimórfico y no tiene FK fija.
 
 ### Constraints
