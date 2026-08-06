@@ -16,7 +16,9 @@ export function StudentDashboardPage() {
     <Card className="mb-6 border-indigo-200 bg-gradient-to-r from-indigo-50 to-white">
       <span className="text-sm font-semibold text-indigo-700">Acierto total</span>
       <strong className="mt-2 block text-4xl text-indigo-700">
-        {totalScore === null ? "—" : `${formatPercentage(totalScore)}%`}
+        {totalScore === null
+          ? "—"
+          : `${formatPercentage(totalScore)}% (${Number((totalScore / 5).toFixed(1))})`}
       </strong>
       <p className="mt-1 text-xs text-slate-500">Promedio de los cursos con sesiones completadas.</p>
     </Card>
