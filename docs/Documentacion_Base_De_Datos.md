@@ -270,7 +270,7 @@ Temas o unidades dentro de un curso.
 - `topics_pkey`: `PRIMARY KEY (id)`.
 - `topics_name_not_blank`: nombre no vacío.
 - `topics_position_positive`: posición mayor a cero.
-- Trigger de negocio: máximo 8 temas no archivados por curso.
+- Trigger de negocio: máximo 25 temas no archivados por curso.
 - Índice único parcial por `(course_id, position)` para temas no archivados.
 - Índice único parcial por curso y nombre normalizado para temas no archivados.
 
@@ -792,7 +792,7 @@ Las funciones de `private` son guards de autorización. Todas son `SECURITY DEFI
 
 - **Parámetros:** ninguno; usa `NEW`.
 - **Retorna:** `trigger`.
-- Impide superar 8 temas no archivados dentro de un curso.
+- Impide superar 25 temas no archivados dentro de un curso.
 
 ### public.validate_question_limit
 
