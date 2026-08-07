@@ -18,7 +18,7 @@ export function StudentDashboardPage() {
       <strong className="mt-2 block text-4xl font-bold text-white">
         {totalScore === null
           ? "—"
-          : `${formatPercentage(totalScore)}% (${Number((totalScore / 5).toFixed(1))})`}
+          : `${formatPercentage(totalScore)}% (nota: ${Number((totalScore / 5).toFixed(1))})`}
       </strong>
       <p className="mt-1 text-xs text-purple-200">Promedio de los cursos con sesiones completadas.</p>
     </Card>
