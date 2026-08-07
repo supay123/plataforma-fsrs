@@ -17,7 +17,22 @@ const control = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) { return <input className={clsx(control, props.className)} {...props} />; }
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) { return <select className={clsx(control, props.className)} {...props} />; }
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) { return <textarea className={clsx(control, props.className)} {...props} />; }
-export function Card({ children, className }: { children: ReactNode; className?: string }) { return <section className={clsx("rounded-2xl border border-slate-200 bg-white p-5 shadow-sm", className)}>{children}</section>; }
+export function Card({ children, className }: { children: ReactNode; className?: string }) {
+  const hasBg = className?.includes("bg-");
+  const hasBorder = className?.includes("border-");
+  return (
+    <section
+      className={clsx(
+        "rounded-2xl p-5 shadow-sm",
+        !hasBorder && "border border-slate-200",
+        !hasBg && "bg-white",
+        className
+      )}
+    >
+      {children}
+    </section>
+  );
+}
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) { return <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-bold tracking-tight text-slate-950">{title}</h1>{description && <p className="mt-1 text-sm text-slate-600">{description}</p>}</div>{actions}</header>; }
 export function Alert({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "error" | "success" }) { return <div role="alert" className={clsx("rounded-xl border p-3 text-sm", tone === "error" && "border-rose-200 bg-rose-50 text-rose-800", tone === "success" && "border-emerald-200 bg-emerald-50 text-emerald-800", tone === "info" && "border-indigo-200 bg-indigo-50 text-indigo-800")}>{children}</div>; }
 export function Spinner() { return <div role="status" className="mx-auto my-12 h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"><span className="sr-only">Cargando</span></div>; }

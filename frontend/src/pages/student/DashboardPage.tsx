@@ -13,9 +13,9 @@ export function StudentDashboardPage() {
   );
   return <>
     <PageHeader title="Mi aprendizaje" description="Cursos activos y progreso observado." />
-    <Card className="mb-6 border-purple-600 bg-purple-700 text-white">
-      <span className="text-sm font-semibold text-purple-200">Acierto total</span>
-      <strong className="mt-2 block text-4xl text-white">
+    <Card className="mb-6 border-purple-600 bg-gradient-to-r from-purple-700 to-indigo-800 text-white">
+      <span className="text-sm font-semibold text-purple-100">Acierto total</span>
+      <strong className="mt-2 block text-4xl font-bold text-white">
         {totalScore === null
           ? "—"
           : `${formatPercentage(totalScore)}% (${Number((totalScore / 5).toFixed(1))})`}
