@@ -1,5 +1,6 @@
 # Aula FSRS — frontend
 
+El producto se llama Aula Repaso
 SPA responsive para los portales de administrador, profesor y estudiante.
 
 ## Configuración

@@ -36,7 +36,7 @@ export function LoginPage({ role }: { role: AppRole }) {
   });
   return <main className="grid min-h-screen place-items-center bg-gradient-to-br from-indigo-950 via-indigo-800 to-sky-700 p-4">
     <Card className="w-full max-w-md border-0 p-7 shadow-2xl">
-      <Link to="/" className="mb-7 flex items-center gap-3 text-indigo-700"><GraduationCap size={32} /><span className="font-bold">Aula FSRS</span></Link>
+      <Link to="/" className="mb-7 flex items-center gap-3 text-indigo-700"><GraduationCap size={32} /><span className="font-bold">Aula Repaso</span></Link>
       {recovering
         ? <RecoveryForm role={role} onBack={() => setRecovering(false)} />
         : <>
