@@ -18,7 +18,7 @@ frontend/test-results/
 frontend/playwright-report/
 
 # Temporal SQL queries
-supabase/snippet/
+supabase/snippets/
 
 # vscode stuff
 .vscode/
