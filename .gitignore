@@ -17,6 +17,9 @@ node_modules/
 frontend/test-results/
 frontend/playwright-report/
 
+# Temporal SQL queries
+supabase/snippet/
+
 # vscode stuff
 .vscode/
 .codex_build/
