@@ -48,11 +48,12 @@ pnpm exec supabase gen types --local --schema public \
 | `admin-renew-access` | Admin | Replaces a student's inclusive access-date range and optionally reactivates the profile. |
 | `import-questions` | Admin, teacher | Validates or confirms an official-template XLSX/JSON question import. A teacher is restricted to their own courses. |
 | `start-session` | Student | Atomically resumes the student's existing in-progress session for a topic or creates one with up to 20 due-first/new questions. |
-| `get-session` | Student | Reloads an owned session without exposing correct answers or explanations before completion. |
-| `answer-question` | Student | Corrects an answer server-side, maps it to FSRS `Again` or `Good`, atomically persists the answer/card/review log, and is safe to retry. |
+| `get-session` | Student | Reloads an owned session. Answered questions include their `feedback`; pending questions never expose the correct answer or explanation. |
+| `answer-question` | Student | Corrects an answer server-side, maps it to FSRS `Again` or `Good`, atomically persists the answer/card/review log, and returns immediate `feedback` for the stored answer. Safe to retry. |
 | `complete-session` | Student | Closes an owned session only after all questions are answered and returns its summary. Repeated completion is safe. |
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
+| `assign-complaint-number` | Public | Reserves the next correlative number of the Libro de Reclamaciones from `private.complaint_sheet_number_seq` and returns it with the official submission timestamp. Complaints themselves are never stored: the browser fills the official sheet as a PDF and emails it through FormSubmit. |
 
 ## Main request bodies
 
@@ -71,9 +72,15 @@ pnpm exec supabase gen types --local --schema public \
 - `start-session`: `topic_id`.
 - `get-session`, `complete-session`, `get-session-review`: `session_id`.
 - `answer-question`: `session_question_id`, `selected_option` (`A`–`D`),
-  `response_time_ms`.
+  `response_time_ms`. Responds with `status` (`accepted` or
+  `already_answered`), `session_id`, the stored `selected_option`, and
+  `feedback` (`is_correct`, `correct_option`, `explanation`). A retry reports
+  the answer that was stored first, even if it sends a different option.
 - `export-data`: optional `college_id`, `teacher_id`, `course_id`,
   `student_id`, and `topic_id` filters.
+- `assign-complaint-number`: no body. Responds with `sheet_number`
+  (integer) and `submitted_at` (ISO timestamp). A failed email retry must
+  reuse the number already assigned to avoid gaps.
 
 The XLSX importer reads the first worksheet, has a 5 MB limit, and expects:
 `pregunta`, `respuesta_a`, `respuesta_b`, `respuesta_c`, `respuesta_d`,

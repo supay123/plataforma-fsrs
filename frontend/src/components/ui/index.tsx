@@ -11,7 +11,7 @@ export function Button({ className, variant = "primary", ...props }: ButtonHTMLA
   }, className)} {...props} />;
 }
 export function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
-  return <label className="grid gap-1.5 text-sm font-medium text-slate-700"><span>{label}</span>{children}{error && <span className="text-xs text-rose-600">{error}</span>}</label>;
+  return <label className="grid content-start gap-1.5 text-sm font-medium text-slate-700"><span>{label}</span>{children}{error && <span className="text-xs text-rose-600">{error}</span>}</label>;
 }
 const control = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100";
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) { return <input className={clsx(control, props.className)} {...props} />; }

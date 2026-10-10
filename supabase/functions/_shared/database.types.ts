@@ -1934,6 +1934,10 @@ export type Database = {
         };
         Returns: string;
       };
+      edge_next_complaint_sheet_number: {
+        Args: never;
+        Returns: number;
+      };
       edge_start_session: {
         Args: { p_limit?: number; p_student_id: string; p_topic_id: string };
         Returns: string;

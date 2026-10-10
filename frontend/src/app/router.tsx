@@ -5,6 +5,12 @@ import { Spinner } from "../components/ui";
 import { LoginPage } from "../features/auth/LoginPage";
 import { HomePage, NotFoundPage } from "../pages/HomePage";
 import { RoleGuard } from "./guards";
+const PricingPage = lazy(() => import("../pages/public/PricingPage").then((m) => ({ default: m.PricingPage })));
+const SubscribePage = lazy(() => import("../pages/public/PricingPage").then((m) => ({ default: m.SubscribePage })));
+const TermsPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
+const RefundPolicyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.RefundPolicyPage })));
+const ComplaintsBookPage = lazy(() => import("../pages/public/ComplaintsBookPage").then((m) => ({ default: m.ComplaintsBookPage })));
 const CollegesPage = lazy(() => import("../pages/admin/CollegesPage").then((m) => ({ default: m.CollegesPage })));
 const AssignmentsPage = lazy(() => import("../pages/admin/AssignmentsPage").then((m) => ({ default: m.AssignmentsPage })));
 const TeacherDetailPage = lazy(() => import("../pages/admin/UserDetailPage").then((m) => ({ default: m.TeacherDetailPage })));
@@ -24,6 +30,12 @@ const TopicsPage = lazy(() => import("../pages/teacher/TopicsPage").then((m) => 
 export function AppRouter() {
   return <Suspense fallback={<Spinner />}><Routes>
     <Route path="/" element={<HomePage />} />
+    <Route path="/precios" element={<PricingPage />} />
+    <Route path="/suscribirse" element={<SubscribePage />} />
+    <Route path="/terminos" element={<TermsPage />} />
+    <Route path="/privacidad" element={<PrivacyPage />} />
+    <Route path="/reembolsos" element={<RefundPolicyPage />} />
+    <Route path="/libro-reclamaciones" element={<ComplaintsBookPage />} />
     <Route path="/admin/login" element={<LoginPage role="admin" />} />
     <Route path="/profesor/login" element={<LoginPage role="teacher" />} />
     <Route path="/estudiante/login" element={<LoginPage role="student" />} />

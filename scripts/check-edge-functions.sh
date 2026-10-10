@@ -10,6 +10,7 @@ function_dirs=(
   admin-reset-user-credentials
   admin-update-user
   answer-question
+  assign-complaint-number
   complete-session
   export-data
   get-session-review

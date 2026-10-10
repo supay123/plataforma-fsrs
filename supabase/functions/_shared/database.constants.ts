@@ -30,6 +30,7 @@ export const RPCS = {
   completeSession: "edge_complete_session",
   findProfileByCode: "edge_find_profile_by_code",
   importQuestions: "edge_import_questions",
+  nextComplaintSheetNumber: "edge_next_complaint_sheet_number",
   startSession: "edge_start_session",
   submitAndCompleteSession: "edge_submit_and_complete_session",
 } as const;

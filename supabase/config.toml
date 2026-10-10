@@ -418,3 +418,6 @@ verify_jwt = false
 
 [functions.recover-password]
 verify_jwt = false
+
+[functions.assign-complaint-number]
+verify_jwt = false

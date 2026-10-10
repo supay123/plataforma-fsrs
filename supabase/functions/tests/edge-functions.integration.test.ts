@@ -340,13 +340,18 @@ Deno.test({
       questions.slice(0, 16).map((question) => question.session_question_id),
       preservedIds,
     );
-    await jsonResponse(
+    const pending = await jsonResponse(
       "get-session",
       { session_id: session.id },
       { token: studentToken },
     );
+    assert.ok(
+      (pending.questions as Array<{ feedback: unknown }>).every((question) =>
+        question.feedback === null
+      ),
+    );
 
-    await jsonResponse(
+    const answered = await jsonResponse(
       "answer-question",
       {
         session_question_id: questions[0]!.session_question_id,
@@ -355,16 +360,47 @@ Deno.test({
       },
       { token: studentToken },
     );
+    const answeredFeedback = answered.feedback as Record<string, unknown>;
+    assert.equal(answered.status, "accepted");
+    assert.equal(answered.selected_option, "A");
+    assert.equal(answeredFeedback.is_correct, true);
+    assert.equal(answeredFeedback.correct_option, "A");
+    assert.ok("explanation" in answeredFeedback);
+
+    // A retry with a different option must report the stored answer.
     const retry = await jsonResponse(
       "answer-question",
       {
         session_question_id: questions[0]!.session_question_id,
-        selected_option: "A",
+        selected_option: "B",
         response_time_ms: 1200,
       },
       { token: studentToken },
     );
     assert.equal(retry.status, "already_answered");
+    assert.equal(retry.selected_option, "A");
+    assert.equal((retry.feedback as { is_correct: boolean }).is_correct, true);
+
+    const reloaded = await jsonResponse(
+      "get-session",
+      { session_id: session.id },
+      { token: studentToken },
+    );
+    const reloadedQuestions = reloaded.questions as Array<{
+      session_question_id: string;
+      feedback: { correct_option: string } | null;
+      question: Record<string, unknown>;
+    }>;
+    const reloadedAnswered = reloadedQuestions.find((question) =>
+      question.session_question_id === questions[0]!.session_question_id
+    )!;
+    assert.equal(reloadedAnswered.feedback?.correct_option, "A");
+    assert.equal("correct_option" in reloadedAnswered.question, false);
+    assert.ok(
+      reloadedQuestions
+        .filter((question) => question !== reloadedAnswered)
+        .every((question) => question.feedback === null),
+    );
 
     const completed = await jsonResponse(
       "complete-session",
