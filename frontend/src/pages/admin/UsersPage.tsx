@@ -30,6 +30,13 @@ function expiredLabel(user: ListedUser) {
   return `Plan vencido hace ${access.daysSinceExpiry} ${access.daysSinceExpiry === 1 ? "día" : "días"}`;
 }
 
+/** Estado de la columna Acceso: la cuenta desactivada manda; luego, el plan vencido del estudiante. */
+function accessBadge(user: ListedUser) {
+  if (!user.is_active) return <Badge tone="warning">Inactivo</Badge>;
+  if (user.role === "student" && studentAccess(user).state === "expired") return <Badge tone="danger">Vencido</Badge>;
+  return <Badge tone="success">Activo</Badge>;
+}
+
 export function UsersPage() {
   const client = useQueryClient();
   const users = useQuery({ queryKey: ["users"], queryFn: listUsers });
@@ -93,7 +100,7 @@ export function UsersPage() {
             <td><strong>{user.full_name}</strong><br /><span className="text-xs text-slate-500">{user.user_code}</span></td>
             <td>{roleLabel(user.role)}</td>
             <td>{colleges.data?.find((college) => college.id === user.college_id)?.name ?? "—"}</td>
-            <td><Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Activo" : "Inactivo"}</Badge>{expiredLabel(user) && <span className="mt-1 block text-xs text-slate-500">{expiredLabel(user)}</span>}</td>
+            <td>{accessBadge(user)}{expiredLabel(user) && <span className="mt-1 block text-xs text-slate-500">{expiredLabel(user)}</span>}</td>
             <td className="space-x-2">
               <Link className="text-sm font-semibold text-indigo-600" to={`/admin/usuarios/${user.id}`}>Editar</Link>
               {user.role === "teacher" && <Link className="text-sm font-semibold text-indigo-600" to={`/admin/asignaciones?profesor=${user.id}`}>Asignaciones</Link>}

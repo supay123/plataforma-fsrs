@@ -171,8 +171,8 @@ Aviso dentro de la página. `tone`: `"info"` (por defecto), `"success"` o
 
 ### Badge
 
-Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"` o
-`"warning"`.
+Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
+`"warning"` o `"danger"` (por ejemplo, el plan vencido de un estudiante).
 
 ### Spinner y EmptyState
 

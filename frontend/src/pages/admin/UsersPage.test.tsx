@@ -83,6 +83,22 @@ describe("UsersPage", () => {
     await waitFor(() => expect(mocks.deleteUser.mock.calls[0]?.[0]).toBe("teacher-1"));
   });
 
+  it("shows students with an expired plan as expired instead of active", async () => {
+    mocks.listUsers.mockResolvedValue([
+      { id: "student-1", college_id: "college-2", role: "student", user_code: "ALUMNA-1", full_name: "Ana Torres", is_active: true, access_valid_from: "2020-01-01", access_valid_until: "2020-01-31" },
+      { id: "student-2", college_id: "college-2", role: "student", user_code: "ALUMNO-2", full_name: "Beto Ruiz", is_active: true, access_valid_from: "2020-01-01", access_valid_until: "2999-12-31" },
+      { id: "student-3", college_id: "college-2", role: "student", user_code: "ALUMNO-3", full_name: "Cira Paz", is_active: false, access_valid_from: "2020-01-01", access_valid_until: "2020-01-31" },
+    ]);
+    renderPage();
+
+    const row = (name: string) => within(screen.getByText(name).closest("tr")!);
+    await screen.findByText("Ana Torres");
+    expect(row("Ana Torres").getByText("Vencido")).toBeInTheDocument();
+    expect(row("Ana Torres").queryByText("Activo")).not.toBeInTheDocument();
+    expect(row("Beto Ruiz").getByText("Activo")).toBeInTheDocument();
+    expect(row("Cira Paz").getByText("Inactivo")).toBeInTheDocument();
+  });
+
   it("invites students by email instead of creating them directly", async () => {
     const user = userEvent.setup();
     renderPage();
