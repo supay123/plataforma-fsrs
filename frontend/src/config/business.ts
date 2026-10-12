@@ -15,7 +15,7 @@ export const BUSINESS = {
 // El precio se cobra en soles con Yape, a través de Kuti.
 export const PLAN = {
   name: "Plan Estudiante",
-  priceSoles: 15,
+  priceSoles: 14.90,
   period: "mes",
   features: [
     "Acceso a todos los cursos y temas que tengas asignados",

@@ -64,7 +64,7 @@ export function PrivacyPage() {
     <p>Esta política explica cómo {owner} (en adelante, «{BUSINESS.brand}») trata tus datos personales, conforme a la Ley N.° 29733, Ley de Protección de Datos Personales, y su reglamento.</p>
     <h2>1. Datos que tratamos</h2>
     <ul>
-      <li><strong>Identificación y contacto:</strong> nombre, código de usuario y los datos que nos brindes al registrarte, como teléfono o correo.</li>
+      <li><strong>Identificación y contacto:</strong> nombres, apellidos, correo electrónico, teléfono, tipo y número de documento de identidad, colegio y código de usuario.</li>
       <li><strong>Uso académico:</strong> cursos asignados, respuestas, resultados, tiempos de respuesta y progreso.</li>
       <li><strong>Pagos:</strong> los procesa Kuti mediante Yape. Solo recibimos la información necesaria para identificar el pago, como la fecha, el monto y el número de operación. Nunca recibimos tu clave de Yape.</li>
       <li><strong>Reclamos:</strong> los datos que registres en el Libro de reclamaciones, que se envían a nuestro correo electrónico.</li>
@@ -81,13 +81,19 @@ export function PrivacyPage() {
     <h2>3. Con quién los compartimos</h2>
     <ul>
       <li>Los profesores y la institución a la que perteneces pueden ver tus resultados y progreso en los cursos que te asignan.</li>
-      <li>Proveedores que nos ayudan a operar el servicio: Kuti (pagos), Supabase (base de datos y autenticación), Netlify (alojamiento web) y FormSubmit (envío del Libro de reclamaciones a nuestro correo). Algunos de ellos almacenan la información en servidores fuera del Perú, con medidas de seguridad adecuadas.</li>
+      <li>Proveedores que nos ayudan a operar el servicio: Kuti (pagos), Supabase (base de datos y autenticación), Netlify (alojamiento web), Google (envío de correos de verificación mediante Gmail) y FormSubmit (envío del Libro de reclamaciones a nuestro correo). Algunos de ellos almacenan la información en servidores fuera del Perú, con medidas de seguridad adecuadas.</li>
       <li>Autoridades competentes, cuando la ley lo exija.</li>
     </ul>
     <h2>4. Menores de edad</h2>
     <p>Para tratar los datos de menores de 14 años necesitamos el consentimiento de su padre, madre o apoderado, que se otorga al realizar la suscripción.</p>
     <h2>5. Conservación</h2>
-    <p>Conservamos tus datos mientras tu cuenta esté activa y, después, durante el tiempo necesario para cumplir obligaciones legales. Los reclamos se conservan por al menos dos años, como exige la normativa de protección al consumidor.</p>
+    <ul>
+      <li>Si te registras y no completas el pago, eliminamos tus datos a las 24 horas.</li>
+      <li>Mientras tu suscripción esté vigente, conservamos tus datos y tu progreso.</li>
+      <li>Si tu suscripción termina, porque la cancelaste o porque no se pudo realizar el cobro, y no la renuevas en los 7 días siguientes, eliminamos tu cuenta, tu progreso y tus datos personales. Si vuelves a suscribirte después, empiezas con una cuenta nueva.</li>
+      <li>Las cuentas creadas por tu institución se conservan mientras la institución mantenga el servicio.</li>
+    </ul>
+    <p>Además, conservamos la información necesaria para cumplir obligaciones legales. Los reclamos se conservan por al menos dos años, como exige la normativa de protección al consumidor.</p>
     <h2>6. Seguridad</h2>
     <p>Toda la comunicación con la plataforma viaja cifrada (HTTPS). Las contraseñas y respuestas de seguridad se guardan cifradas mediante funciones hash, y el acceso a los datos está restringido según el rol de cada usuario.</p>
     <h2>7. Almacenamiento en tu navegador</h2>

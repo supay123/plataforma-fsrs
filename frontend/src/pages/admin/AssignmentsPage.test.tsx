@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ModalProvider } from "../../components/ui/modal";
 import { AssignmentsPage } from "./AssignmentsPage";
 
 const mocks = vi.hoisted(() => ({
@@ -29,7 +30,7 @@ vi.mock("../../features/auth/AuthProvider", () => ({ useAuth: () => ({ profile: 
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={client}><MemoryRouter><AssignmentsPage /></MemoryRouter></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><ModalProvider><MemoryRouter><AssignmentsPage /></MemoryRouter></ModalProvider></QueryClientProvider>);
 }
 
 describe("AssignmentsPage", () => {

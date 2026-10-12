@@ -6,7 +6,9 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { HomePage, NotFoundPage } from "../pages/HomePage";
 import { RoleGuard } from "./guards";
 const PricingPage = lazy(() => import("../pages/public/PricingPage").then((m) => ({ default: m.PricingPage })));
-const SubscribePage = lazy(() => import("../pages/public/PricingPage").then((m) => ({ default: m.SubscribePage })));
+const SignUpPage = lazy(() => import("../pages/public/SignUpPage").then((m) => ({ default: m.SignUpPage })));
+const InvitationPage = lazy(() => import("../pages/public/InvitationPage").then((m) => ({ default: m.InvitationPage })));
+const ResetPasswordPage = lazy(() => import("../pages/public/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
 const TermsPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const RefundPolicyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.RefundPolicyPage })));
@@ -31,7 +33,6 @@ export function AppRouter() {
   return <Suspense fallback={<Spinner />}><Routes>
     <Route path="/" element={<HomePage />} />
     <Route path="/precios" element={<PricingPage />} />
-    <Route path="/suscribirse" element={<SubscribePage />} />
     <Route path="/terminos" element={<TermsPage />} />
     <Route path="/privacidad" element={<PrivacyPage />} />
     <Route path="/reembolsos" element={<RefundPolicyPage />} />
@@ -39,6 +40,9 @@ export function AppRouter() {
     <Route path="/admin/login" element={<LoginPage role="admin" />} />
     <Route path="/profesor/login" element={<LoginPage role="teacher" />} />
     <Route path="/estudiante/login" element={<LoginPage role="student" />} />
+    <Route path="/estudiante/sign-up" element={<SignUpPage />} />
+    <Route path="/estudiante/reset" element={<ResetPasswordPage />} />
+    <Route path="/estudiante/invitacion" element={<InvitationPage />} />
     <Route path="/admin" element={<RoleGuard role="admin"><PortalLayout role="admin" /></RoleGuard>}>
       <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>

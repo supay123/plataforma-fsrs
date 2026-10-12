@@ -19,6 +19,12 @@ function_dirs=(
   login-with-code
   recover-password
   start-session
+  public
+  registration
+  account
+  password-reset
+  invitations
+  student-invitation
 )
 
 for function_dir in "${function_dirs[@]}"; do

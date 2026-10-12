@@ -1,20 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, Card, ConfirmDialog, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
+import { useModal } from "../../components/ui/use-modal";
 import { listColleges } from "../../features/colleges/api";
+import { InviteStudentForm } from "../../features/invitations/InviteStudentForm";
+import { PendingInvitations } from "../../features/invitations/PendingInvitations";
 import { createUser, deleteUser, listUsers, roleLabel, updateUser } from "../../features/users/api";
 import type { Credentials } from "../../types/contracts";
 
-const emptyForm = {
-  role: "student" as "student" | "teacher",
-  user_code: "",
-  full_name: "",
-  college_id: "",
-  password: "",
-  access_valid_from: "",
-  access_valid_until: "",
-};
+// Los profesores se crean directamente; los estudiantes, por invitación.
+const emptyForm = { user_code: "", full_name: "", college_id: "", password: "" };
 
 export function UsersPage() {
   const client = useQueryClient();
@@ -22,9 +18,11 @@ export function UsersPage() {
   const colleges = useQuery({ queryKey: ["colleges"], queryFn: listColleges });
   const [filter, setFilter] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("");
-  const [userToDelete, setUserToDelete] = useState<Awaited<ReturnType<typeof listUsers>>[number] | null>(null);
+  const modal = useModal();
   const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [role, setRole] = useState<"student" | "teacher">("student");
   const [form, setForm] = useState(emptyForm);
+  const activeColleges = colleges.data?.filter((college) => college.is_active) ?? [];
   const create = useMutation({
     mutationFn: createUser,
     onSuccess: (data) => {
@@ -41,7 +39,6 @@ export function UsersPage() {
   const remove = useMutation({
     mutationFn: deleteUser,
     onSuccess: () => {
-      setUserToDelete(null);
       void client.invalidateQueries({ queryKey: ["users"] });
     },
   });
@@ -80,52 +77,48 @@ export function UsersPage() {
               <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: user.id, active: !user.is_active })}>
                 {user.is_active ? "Desactivar" : "Activar"}
               </Button>
-              <Button variant="danger" disabled={remove.isPending} onClick={() => setUserToDelete(user)}>Eliminar</Button>
+              <Button variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
+                title: "Eliminar usuario",
+                confirmLabel: "Eliminar definitivamente",
+                body: <>
+                  <p><strong>Esta acción no se puede deshacer.</strong></p>
+                  <p className="mt-2">Se eliminará a {user.full_name} y toda la información relacionada con este usuario, incluyendo cursos, matrículas, sesiones, resultados y accesos asociados.</p>
+                </>,
+                onConfirm: () => remove.mutateAsync(user.id),
+              })}>Eliminar</Button>
             </td>
           </tr>)}</tbody>
         </table></div>
       </Card>
-      <Card>
-        <h2 className="mb-4 font-bold">Registrar usuario</h2>
-        {create.error && <Alert tone="error">{create.error.message}</Alert>}
-        {credentials && <Alert tone="success">
-          <strong>Credencial temporal</strong><br />{credentials.user_code} / {credentials.temporary_password}
-          <Button type="button" variant="ghost" onClick={() => void navigator.clipboard.writeText(`${credentials.user_code}\n${credentials.temporary_password ?? ""}`)}>Copiar</Button>
-        </Alert>}
-        <form className="mt-4 grid gap-3" onSubmit={(event) => {
-          event.preventDefault();
-          create.mutate({
-            ...form,
-            password: form.password || undefined,
-            access_valid_from: form.role === "student" ? form.access_valid_from : undefined,
-            access_valid_until: form.role === "student" ? form.access_valid_until : undefined,
-          });
-        }}>
-          <Field label="Rol"><Select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as "student" | "teacher" })}><option value="student">Estudiante</option><option value="teacher">Profesor</option></Select></Field>
-          <Field label="Colegio"><Select required value={form.college_id} onChange={(event) => setForm({ ...form, college_id: event.target.value })}><option value="">Seleccionar</option>{colleges.data?.filter((college) => college.is_active).map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}</Select></Field>
-          <Field label="Nombre"><Input required value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /></Field>
-          <Field label="Código"><Input required value={form.user_code} onChange={(event) => setForm({ ...form, user_code: event.target.value })} /></Field>
-          <Field label={form.role === "student" ? "PIN o contraseña (opcional)" : "Contraseña (opcional)"}><Input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></Field>
-          {form.role === "student" && <>
-            <Field label="Inicio"><Input required type="date" value={form.access_valid_from} onChange={(event) => setForm({ ...form, access_valid_from: event.target.value })} /></Field>
-            <Field label="Vencimiento"><Input required type="date" value={form.access_valid_until} onChange={(event) => setForm({ ...form, access_valid_until: event.target.value })} /></Field>
-          </>}
-          <Button disabled={create.isPending}>Crear usuario</Button>
-        </form>
-      </Card>
+      <div className="grid content-start gap-6">
+        <Card>
+          <h2 className="mb-4 font-bold">Registrar usuario</h2>
+          <Field label="Rol"><Select value={role} onChange={(event) => setRole(event.target.value as "student" | "teacher")}><option value="student">Estudiante</option><option value="teacher">Profesor</option></Select></Field>
+          <div className="mt-3">
+            {role === "student"
+              ? <InviteStudentForm colleges={activeColleges} />
+              : <>
+                {create.error && <Alert tone="error">{create.error.message}</Alert>}
+                {credentials && <Alert tone="success">
+                  <strong>Credencial temporal</strong><br />{credentials.user_code} / {credentials.temporary_password}
+                  <Button type="button" variant="ghost" onClick={() => void navigator.clipboard.writeText(`${credentials.user_code}
+${credentials.temporary_password ?? ""}`)}>Copiar</Button>
+                </Alert>}
+                <form className="mt-3 grid gap-3" onSubmit={(event) => {
+                  event.preventDefault();
+                  create.mutate({ ...form, role: "teacher", password: form.password || undefined });
+                }}>
+                  <Field label="Colegio"><Select required value={form.college_id} onChange={(event) => setForm({ ...form, college_id: event.target.value })}><option value="">Seleccionar</option>{activeColleges.map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}</Select></Field>
+                  <Field label="Nombre"><Input required value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /></Field>
+                  <Field label="Código"><Input required value={form.user_code} onChange={(event) => setForm({ ...form, user_code: event.target.value })} /></Field>
+                  <Field label="Contraseña (opcional)"><Input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></Field>
+                  <Button disabled={create.isPending}>Crear usuario</Button>
+                </form>
+              </>}
+          </div>
+        </Card>
+        <PendingInvitations />
+      </div>
     </div>
-    <ConfirmDialog
-      open={Boolean(userToDelete)}
-      title="Eliminar usuario"
-      confirmLabel="Eliminar definitivamente"
-      confirmVariant="danger"
-      pendingLabel="Eliminando…"
-      pending={remove.isPending}
-      onCancel={() => { if (!remove.isPending) setUserToDelete(null); }}
-      onConfirm={() => { if (userToDelete) remove.mutate(userToDelete.id); }}
-    >
-      <p><strong>Esta acción no se puede deshacer.</strong></p>
-      <p className="mt-2">Se eliminará a {userToDelete?.full_name} y toda la información relacionada con este usuario, incluyendo cursos, matrículas, sesiones, resultados y accesos asociados.</p>
-    </ConfirmDialog>
   </>;
 }

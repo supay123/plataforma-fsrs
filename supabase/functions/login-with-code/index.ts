@@ -16,15 +16,21 @@ export default {
     (request, context) =>
       handle(async () => {
         const body = await readJson<LoginWithCodeBody>(request);
-        const code = requiredString(body.code, "code", 100);
+        // Los estudiantes con correo pueden entrar con él; todas las cuentas
+        // siguen entrando con su código.
+        const code = requiredString(body.code, "code", 254);
         const password = requiredString(body.password, "password", 200);
         const expectedRole = body.expected_role === undefined
           ? undefined
           : requiredString(body.expected_role, "expected_role", 20);
 
-        const { data: candidates, error: profileError } = await context
-          .supabaseAdmin
-          .rpc(RPCS.findProfileByCode, { p_code: code });
+        const { data: candidates, error: profileError } = code.includes("@")
+          ? await context.supabaseAdmin.rpc(RPCS.findProfileByEmail, {
+            p_email: code,
+          })
+          : await context.supabaseAdmin.rpc(RPCS.findProfileByCode, {
+            p_code: code,
+          });
         if (profileError) {
           throw new AppError(
             500,

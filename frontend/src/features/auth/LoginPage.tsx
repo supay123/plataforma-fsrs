@@ -1,18 +1,21 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { LockKeyhole, Mail, User } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
-import { Logo } from "../../components/layout/Logo";
-import { Alert, Button, Card, Field, Input } from "../../components/ui";
+import { AuthLayout } from "../../components/layout/AuthLayout";
+import { Alert, Button, Field, Input, PasswordInput } from "../../components/ui";
+import { useToast } from "../../components/ui/use-toast";
+import { requestPasswordResetLink } from "../account/api";
+import { EMAIL_PATTERN } from "../registration/rules";
 import { normalizeError } from "../../lib/api/errors";
 import { todayInLima } from "../../lib/dates";
 import type { AppRole, Credentials } from "../../types/contracts";
 import { getRecoveryQuestion, recoverPassword } from "./api";
 import { useAuth } from "./AuthProvider";
 
-const schema = z.object({ code: z.string().trim().min(1, "Ingresa tu código."), password: z.string().min(6, "Debe tener al menos 6 caracteres.") });
+const schema = z.object({ code: z.string().trim().min(1, "Completa este campo."), password: z.string().min(6, "Debe tener al menos 6 caracteres.") });
 type Values = z.infer<typeof schema>;
 const portal = {
   admin: { label: "Administrador", path: "/admin" },
@@ -35,29 +38,73 @@ export function LoginPage({ role }: { role: AppRole }) {
     try { setError(""); await auth.login(values.code, values.password, role); navigate(portal[role].path, { replace: true }); }
     catch (reason) { setError((await normalizeError(reason)).message); }
   });
-  return <main className="grid min-h-screen place-items-center bg-gradient-to-br from-indigo-950 via-indigo-800 to-sky-700 p-4">
-    <Card className="w-full max-w-md border-0 p-7 shadow-2xl">
-      <Link to="/" className="mb-7 inline-flex"><Logo onLight className="h-7" /></Link>
+  return <AuthLayout>
       {recovering
-        ? <RecoveryForm role={role} onBack={() => setRecovering(false)} />
+        ? role === "student"
+          ? <EmailRecoveryForm onBack={() => setRecovering(false)} />
+          : <RecoveryForm role={role} onBack={() => setRecovering(false)} />
         : <>
           <h1 className="text-2xl font-bold">Acceso de {portal[role].label}</h1>
-          <p className="mt-2 text-sm text-slate-600">Ingresa con el código entregado por la institución.</p>
+          <p className="mt-2 text-sm text-slate-600">{role === "student" ? "Ingresa con tu correo, o con el código que te dio tu institución." : "Ingresa con el código entregado por la institución."}</p>
           <form onSubmit={submit} className="mt-6 grid gap-4">
             {(searchParams.get("acceso") === "vencido" || studentAccessExpired) &&
               <Alert tone="error">Tu periodo de acceso no está vigente. Solicita una renovación al administrador.</Alert>}
+            {searchParams.get("password") === "actualizada" && !error &&
+              <Alert tone="success">Tu contraseña se actualizó. Ingresa con tu nueva contraseña.</Alert>}
+            {searchParams.get("invitacion") === "aceptada" && !error &&
+              <Alert tone="success">Tu cuenta está lista. Ingresa con tu correo y tu contraseña.</Alert>}
             {error && <Alert tone="error">{error}</Alert>}
-            <Field label="Código" error={errors.code?.message}><Input autoComplete="username" {...register("code")} /></Field>
-            <Field label={role === "student" ? "Contraseña o PIN" : "Contraseña"} error={errors.password?.message}><Input type="password" autoComplete="current-password" {...register("password")} /></Field>
+            <Field label={role === "student" ? "Correo" : "Código"} error={errors.code?.message}><Input autoComplete="username" icon={role === "student" ? <Mail size={20} /> : <User size={20} />} placeholder={role === "student" ? "tu@correo.com" : "Tu código"} {...register("code")} /></Field>
+            <Field label="Contraseña" error={errors.password?.message}><PasswordInput autoComplete="current-password" icon={<LockKeyhole size={20} />} placeholder="Contraseña" {...register("password")} /></Field>
             <Button disabled={isSubmitting}>{isSubmitting ? "Ingresando…" : "Ingresar"}</Button>
             <button type="button" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800" onClick={() => { setError(""); setRecovering(true); }}>¿Olvidaste tu contraseña?</button>
+            {role === "student" && <p className="text-center text-sm text-slate-600">¿No tienes una cuenta? <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante/sign-up">Regístrate</Link></p>}
             {auth.session && <Button type="button" variant="secondary" onClick={() => void auth.logout()}>Cerrar sesión guardada</Button>}
           </form>
         </>}
-    </Card>
-  </main>;
+  </AuthLayout>;
 }
 
+function BackToLogin({ onBack }: { onBack: () => void }) {
+  return <p className="text-center text-sm text-slate-600">¿Ya recordaste tu contraseña? <button type="button" className="font-semibold text-indigo-600 hover:text-indigo-800" onClick={onBack}>Inicia sesión</button></p>;
+}
+
+/** Estudiantes: reciben en su correo un link para crear una nueva contraseña. */
+function EmailRecoveryForm({ onBack }: { onBack: () => void }) {
+  const toast = useToast();
+  const [email, setEmail] = useState("");
+  const [sentTo, setSentTo] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const send = async (event: FormEvent) => {
+    event.preventDefault();
+    const value = email.trim();
+    if (!EMAIL_PATTERN.test(value)) return setError("Ingresa un correo válido.");
+    try {
+      setBusy(true); setError("");
+      await requestPasswordResetLink(value);
+      setSentTo(value);
+    } catch (reason) { toast.error((await normalizeError(reason)).message); }
+    finally { setBusy(false); }
+  };
+
+  return <>
+    <h1 className="text-2xl font-bold">Recuperar contraseña</h1>
+    <p className="mt-2 text-sm text-slate-600">Escribe el correo de tu cuenta y te enviaremos un link para crear una nueva contraseña.</p>
+    <form onSubmit={(event) => void send(event)} className="mt-6 grid gap-4" noValidate>
+      {sentTo
+        ? <Alert tone="success">Si <strong>{sentTo}</strong> tiene una cuenta, te enviamos un link para crear una nueva contraseña. Vence en 1 hora; si no lo ves, revisa la carpeta de spam.</Alert>
+        : <>
+          <Field label="Correo" error={error}><Input type="email" autoComplete="email" icon={<Mail size={20} />} placeholder="tu@correo.com" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+          <Button disabled={busy}>{busy ? "Enviando…" : "Enviar link"}</Button>
+        </>}
+      <BackToLogin onBack={onBack} />
+    </form>
+  </>;
+}
+
+/** Administradores y profesores: recuperan su credencial con la pregunta de seguridad. */
 function RecoveryForm({ role, onBack }: { role: AppRole; onBack: () => void }) {
   const [code, setCode] = useState("");
   const [question, setQuestion] = useState("");
@@ -84,7 +131,6 @@ function RecoveryForm({ role, onBack }: { role: AppRole; onBack: () => void }) {
   };
 
   return <>
-    <button type="button" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600" onClick={onBack}><ArrowLeft size={16} />Volver al acceso</button>
     <h1 className="text-2xl font-bold">Restablecer contraseña</h1>
     <p className="mt-2 text-sm text-slate-600">Confirma tu respuesta de seguridad para generar una nueva credencial.</p>
     <div className="mt-6 grid gap-4">
@@ -97,6 +143,7 @@ function RecoveryForm({ role, onBack }: { role: AppRole; onBack: () => void }) {
             ? <><div className="rounded-xl bg-slate-100 p-3 text-sm font-medium text-slate-800">{question}</div><Field label="Respuesta"><Input type="password" value={answer} onChange={(event) => setAnswer(event.target.value)} autoComplete="off" /></Field><Button type="button" disabled={busy || answer.trim().length < 2} onClick={() => void reset()}>{busy ? "Restableciendo…" : "Generar nueva credencial"}</Button></>
             : <Button type="button" disabled={busy || !code.trim()} onClick={() => void findQuestion()}>{busy ? "Consultando…" : "Continuar"}</Button>}
         </>}
+      <BackToLogin onBack={onBack} />
     </div>
   </>;
 }

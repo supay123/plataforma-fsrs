@@ -4,9 +4,12 @@ The backend exposes twelve Edge Functions. Shared authentication, validation,
 error handling, CSV, XLSX, session serialization, and FSRS scheduling live in
 `supabase/functions/_shared`.
 
-All endpoints accept `POST`. Except for `login-with-code`, callers must send a
-valid user access token in `Authorization: Bearer <token>`. The login endpoint
-requires the project's publishable key. Service-role credentials are never
+Endpoints accept `POST` unless noted (`GET public/colleges`). Except for the
+public ones (`login-with-code`, `recover-password`, `assign-complaint-number`,
+`public`, and `registration`), callers must send a valid user access token in
+`Authorization: Bearer <token>`. Public endpoints require the project's
+publishable key. A function can expose several endpoints as sub-paths
+(`/functions/v1/<function>/<path>`), dispatched by `_shared/router.ts`. Service-role credentials are never
 accepted from, or returned to, a client.
 
 ## Code organization
@@ -54,10 +57,18 @@ pnpm exec supabase gen types --local --schema public \
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `assign-complaint-number` | Public | Reserves the next correlative number of the Libro de Reclamaciones from `private.complaint_sheet_number_seq` and returns it with the official submission timestamp. Complaints themselves are never stored: the browser fills the official sheet as a PDF and emails it through FormSubmit. |
+| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges a new student can choose. |
+| `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it. No account exists until the first payment is confirmed. |
+| `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
+| `password-reset` | Public | `POST /password-reset/request-link` emails the link from the student login ("¿Olvidaste tu contraseña?"); `GET /password-reset?code=...` says whether it is still valid without using it; `POST /password-reset` uses it once, saves the new password, and closes every session of that user only. |
+| `invitations` | Admin | Student invitations: `GET /invitations` lists the ones not accepted yet (pending or expired), `POST /invitations` invites a student by email, `POST /invitations/resend` sends a new link, and `DELETE /invitations?id=...` cancels one. Students are no longer created directly from the admin screen. |
+| `student-invitation` | Public | The invited student uses the emailed link: `GET /student-invitation?code=...` returns the fixed data (email, college, access period) and `POST /student-invitation` completes the profile and creates the account. |
 
 ## Main request bodies
 
-- `login-with-code`: `code`, `password`, optional `expected_role`.
+- `login-with-code`: `code`, `password`, optional `expected_role`. A `code`
+  containing `@` is looked up as the email of a student (`profiles.email`);
+  otherwise it is the application code.
 - `admin-create-user`: `role`, `user_code`, `full_name`, `college_id`,
   optional `password`; students also require `access_valid_from` and
   `access_valid_until`.
@@ -81,6 +92,94 @@ pnpm exec supabase gen types --local --schema public \
 - `assign-complaint-number`: no body. Responds with `sheet_number`
   (integer) and `submitted_at` (ISO timestamp). A failed email retry must
   reuse the number already assigned to avoid gaps.
+- `GET public/colleges`: no body. Responds with `colleges` (`id`, `name`).
+  Creates `Chancón – Particular` once if no college is active.
+- `POST registration/student/validate`: `college_id`,
+  `given_names`, `family_names`, `email`, `phone` (Peruvian mobile only: 9
+  digits starting with 9, with or without `+51`; stored without the prefix),
+  `identity_document_type`
+  (`DNI`, `CE`, `PASAPORTE`, `RUC`), `identity_document_number`, `password`
+  (6+ characters with upper, lower, and digit; no PIN),
+  `accepted_terms: true`, and optional `replaces_registration_id` (the
+  previous registration of the same browser, sent when the user goes back to
+  fix the data). Stores the pending registration and responds `201` with
+  `registration_id` and the masked `email`. It does not send the code. Field
+  errors carry `details.field`; an email that already has an account returns
+  `409 email_taken`.
+- `POST registration/request-code`: `registration_id`. Sends the first code
+  and every resend: at most 5 codes, 60 seconds apart. Responds with the
+  masked `email`, `code_expires_at`, and `resend_available_at`.
+- `POST registration/validateCode`: `registration_id`, `code`. Codes last 10
+  minutes and allow 5 wrong attempts. Responds with `status: "verified"`.
+- `GET account/profile`: no body. Responds with `profile` (`given_names`,
+  `family_names`, `email`, `phone`, `identity_document_type`,
+  `identity_document_number`, `college_id`, `college_name`). Fields the
+  student has not filled yet are null (for example, `email` in accounts
+  created by an administrator).
+- `PUT account/profile`: `given_names`, `family_names`, `phone`,
+  `identity_document_type`, `identity_document_number` (same rules as the
+  sign-up). The college is read-only for the student (only an administrator
+  changes it). Responds with the updated `profile`; `full_name` is recomposed
+  by the profiles trigger.
+- `POST account/email-change`: `email`. Emails a 6-digit code to the new
+  address (10 minutes, 5 wrong attempts, at most 5 codes per day, 60 seconds
+  apart). The account email does not change yet. A student without email
+  adds one the same way; they keep signing in with their code too. `409 email_taken` if another
+  account or verified registration uses it.
+- `POST account/email-change/confirm`: `code`. Deletes the request (single
+  use), then updates `profiles.email` and the Auth email together. Responds
+  with `email`.
+- `POST account/password-reset`: no body. Emails a link to
+  `<site>/estudiante/reset?code=...` that lasts 1 hour; a new link (at most
+  one per minute) invalidates the previous one. The site is the request
+  origin when it is in `_shared/app-url.ts`, otherwise production. Responds
+  with the masked `email`, `expires_at`, and `resend_available_at`.
+- `DELETE account/password-reset`: no body. Deletes the student's pending
+  link so it stops working; another one can be requested right away.
+  Responds with `status: "cancelled"`.
+- `POST password-reset/request-link`: `email`. Sends the reset link if the
+  email belongs to an active student (same 1-hour link, at most one per
+  minute). Always responds `200 { status: "requested" }`, so it never reveals
+  which emails have an account.
+- `POST invitations`: `email`, `college_id`, `access_valid_from`,
+  `access_valid_until` (the end cannot be in the past). Emails a link to
+  `<site>/estudiante/invitacion?code=...` that lasts 7 days, never beyond the
+  last day of access. Inviting the same email again replaces the previous
+  invitation. `409 email_taken` if the email already has an account. Responds
+  `201` with `invitation`.
+- `POST invitations/resend`: `invitation_id`. New link and validity; the old
+  link stops working. `409 invitation_access_ended` if the access period
+  already ended.
+- `DELETE invitations?id=...`: deletes the invitation (its link stops working).
+- `GET student-invitation?code=...`: responds with `invitation` (`email`,
+  `college_name`, `access_valid_from`, `access_valid_until`, `expires_at`) or
+  `404 invalid_invitation`.
+- `POST student-invitation`: `code`, `given_names`, `family_names`, `phone`,
+  `identity_document_type`, `identity_document_number`, `password` (sign-up
+  rules) and `accepted_terms: true`. Invalid data does not spend the link.
+  Creates the student with the invitation's email, college and access period
+  (the email is already proven by the link), deletes the invitation, and
+  responds `201 { status: "accepted" }`.
+- `GET password-reset?code=...`: responds `200 { status: "valid", expires_at }`
+  or `404 invalid_reset_code`.
+- `POST password-reset`: `code`, `password` (sign-up password rule). The
+  password is validated before the link is used, so a weak password does not
+  spend it. Responds with `status: "password_updated"`.
+
+  Every code (registration, email change, password reset) is stored only as a
+  SHA-256 hash and deleted when used; expired rows are removed by the hourly
+  pg_cron jobs `purge-expired-student-registrations` and
+  `purge-expired-account-codes`. Expired invitations stay listed so they can be
+  resent and are purged 30 days after expiring
+  (`purge-expired-student-invitations`).
+
+  Unknown paths return `404 not_found`; a known path with another method
+  returns `405 method_not_allowed` (`_shared/router.ts`).
+
+  Secrets: `EMAIL_FROM` and `EMAIL_DELIVERY`:
+  `gmail` (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`;
+  scope `gmail.send` only), `resend` (`RESEND_API_KEY`), or, locally only,
+  `log`. See `supabase/functions/.env.example`.
 
 The XLSX importer reads the first worksheet, has a 5 MB limit, and expects:
 `pregunta`, `respuesta_a`, `respuesta_b`, `respuesta_c`, `respuesta_d`,
@@ -105,9 +204,23 @@ performed by service-role-only PostgreSQL RPCs:
 These functions lock the relevant rows and enforce ownership, state, limits,
 and retry safety inside the same transaction.
 
-The indexed `edge_find_profile_by_code` helper is also restricted to the
-service role and prevents the public login flow from retrieving the profile
-table.
+The indexed `edge_find_profile_by_code` and `edge_find_profile_by_email`
+helpers are also restricted to the service role and prevent the public login
+flow from retrieving the profile table.
+
+Student self-registration uses the service-role-only RPCs
+`edge_registration_colleges`, `edge_taken_user_codes`,
+`edge_create_student_registration`, and
+`edge_activate_student_registration`. A pending registration reserves its
+email for 24 hours and is replaced when the same person submits again, and an
+hourly `pg_cron` job deletes expired rows. Self-registered students sign in
+with their email; when the first payment is confirmed,
+`_shared/registration-activation.ts` generates a free application code from
+the email (admins and teachers still identify students by code), creates the
+Auth user from the stored bcrypt hash and the profile, with access from that
+day until the next charge date plus `RENEWAL_GRACE_DAYS`
+(`_shared/subscription.ts`). A cancelled subscription ends on the last paid
+day instead.
 
 ## Implemented behavioral assumptions
 

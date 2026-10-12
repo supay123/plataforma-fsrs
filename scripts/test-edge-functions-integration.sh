@@ -14,7 +14,16 @@ export SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE_KEY"
 export SUPABASE_SECRET_KEY="$SECRET_KEY"
 
 log_file="${TMPDIR:-/tmp}/fsrs-platform-edge-functions.log"
-pnpm exec supabase functions serve >"$log_file" 2>&1 &
+
+# The tests register made-up email addresses, so emails are only logged,
+# whatever supabase/functions/.env says.
+test_env_file="$(mktemp)"
+if [[ -f supabase/functions/.env ]]; then
+  grep -v -E '^EMAIL_DELIVERY=' supabase/functions/.env >"$test_env_file" || true
+fi
+printf 'EMAIL_DELIVERY=log\n' >>"$test_env_file"
+
+pnpm exec supabase functions serve --env-file "$test_env_file" >"$log_file" 2>&1 &
 functions_pid=$!
 functions_cli_pid=""
 
@@ -23,6 +32,10 @@ cleanup() {
     kill "$functions_cli_pid" >/dev/null 2>&1 || true
   fi
   kill "$functions_pid" >/dev/null 2>&1 || true
+  rm -f "$test_env_file"
+  # The local Edge Runtime keeps the test settings (emails only logged) until
+  # the function server is started again with supabase/functions/.env.
+  echo "Restart 'pnpm exec supabase functions serve' to use supabase/functions/.env again." >&2
 }
 trap cleanup EXIT
 
@@ -54,6 +67,12 @@ function_names=(
   complete-session
   get-session-review
   export-data
+  public
+  registration
+  account
+  password-reset
+  invitations
+  student-invitation
 )
 
 for function_name in "${function_names[@]}"; do

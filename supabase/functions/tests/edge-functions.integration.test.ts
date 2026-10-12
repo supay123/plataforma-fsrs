@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { TABLES } from "../_shared/database.constants.ts";
+import type { Database } from "../_shared/database.types.ts";
+import { hashEmailCode } from "../_shared/email-code.ts";
+import { generateLinkCode, hashLinkCode } from "../_shared/link-code.ts";
+import { activateStudentRegistration } from "../_shared/registration-activation.ts";
 import type { InvokeOptions } from "./interfaces.ts";
+import { TestData } from "./test-data.ts";
 
 const url = Deno.env.get("SUPABASE_URL");
 const publishableKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ??
@@ -25,6 +30,8 @@ Deno.test({
     const adminClient = createClient(testUrl, testSecretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    // Todo lo que crea el test se borra al terminar, pase o falle.
+    await using created = new TestData(adminClient);
     const suffix = crypto.randomUUID().slice(0, 8);
     const adminPassword = "AdminPass9!";
     const teacherPassword = "TeacherPass9!";
@@ -74,6 +81,7 @@ Deno.test({
       });
     assert.ifError(authAdminError);
     assert.ok(authAdmin.user);
+    created.user(authAdmin.user.id);
 
     const { error: adminProfileError } = await adminClient.from(TABLES.profiles)
       .insert({
@@ -95,6 +103,7 @@ Deno.test({
       .select("id")
       .single();
     assert.ifError(collegeError);
+    created.college(college.id);
 
     const adminLogin = await jsonResponse("login-with-code", {
       code: `ADMIN-${suffix}`,
@@ -116,7 +125,7 @@ Deno.test({
       { token: adminToken },
       201,
     );
-    const teacherId = (teacherCreate.user as { id: string }).id;
+    const teacherId = created.user((teacherCreate.user as { id: string }).id);
 
     const studentCreate = await jsonResponse(
       "admin-create-user",
@@ -131,7 +140,7 @@ Deno.test({
       { token: adminToken },
       201,
     );
-    const studentId = (studentCreate.user as { id: string }).id;
+    const studentId = created.user((studentCreate.user as { id: string }).id);
     const studentPin =
       (studentCreate.credentials as { temporary_password: string })
         .temporary_password;
@@ -621,7 +630,9 @@ Deno.test({
       { token: adminToken },
       201,
     );
-    const secondTeacherId = (secondTeacherCreate.user as { id: string }).id;
+    const secondTeacherId = created.user(
+      (secondTeacherCreate.user as { id: string }).id,
+    );
     const { data: secondTeacherCourse, error: secondTeacherCourseError } =
       await adminClient.from(TABLES.courses).insert({
         college_id: college.id,
@@ -664,6 +675,7 @@ Deno.test({
       { token: adminToken },
       201,
     );
+    created.user((teacherWithoutCourses.user as { id: string }).id);
     const { error: emptyTeacherError } = await adminSessionClient.rpc(
       "admin_sync_teacher_students",
       {
@@ -738,5 +750,766 @@ Deno.test({
     assert.ifError(remainingCollegeProfilesError);
     assert.equal(deletedCollege, null);
     assert.equal(remainingCollegeProfiles, 0);
+  },
+});
+
+Deno.test({
+  name: "student self-registration verifies the email and activates on payment",
+  ignore: !enabled,
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
+    const testUrl = url as string;
+    const testPublishableKey = publishableKey as string;
+    const adminClient = createClient<Database>(testUrl, secretKey as string, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    await using created = new TestData(adminClient);
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const password = "Registro9";
+
+    async function call(
+      path: string,
+      body: Record<string, unknown> | null,
+      expectedStatus = 200,
+    ): Promise<Record<string, unknown>> {
+      const response = await fetch(`${testUrl}/functions/v1/${path}`, {
+        method: body === null ? "GET" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": testPublishableKey,
+        },
+        body: body === null ? undefined : JSON.stringify(body),
+      });
+      const payload = await response.json();
+      assert.equal(
+        response.status,
+        expectedStatus,
+        `${path}: ${JSON.stringify(payload)}`,
+      );
+      return payload;
+    }
+
+    const { data: college, error: collegeError } = await adminClient
+      .from(TABLES.colleges)
+      .insert({ code: `REG-${suffix}`, name: `Registro ${suffix}` })
+      .select("id")
+      .single();
+    assert.ifError(collegeError);
+    created.college(college.id);
+
+    const listed = await call("public/colleges", null);
+    assert.ok(
+      (listed.colleges as Array<{ id: string }>).some((item) =>
+        item.id === college.id
+      ),
+    );
+    // Cada endpoint responde solo a su método y ruta.
+    await call("public/colleges", {}, 405);
+    await call("registration/unknown", {}, 404);
+
+    const form = {
+      college_id: college.id,
+      given_names: "Ana María",
+      family_names: "Quispe",
+      email: `ana.${suffix}@example.com`,
+      phone: "987654321",
+      identity_document_type: "DNI",
+      identity_document_number: "12345678",
+      password,
+      accepted_terms: true,
+    };
+    const invalidDocument = await call(
+      "registration/student/validate",
+      { ...form, identity_document_number: "123" },
+      400,
+    );
+    assert.equal(
+      (invalidDocument.error as { details: { field: string } }).details.field,
+      "identity_document_number",
+    );
+
+    const firstStart = await call("registration/student/validate", form, 201);
+    assert.match(firstStart.email as string, /^an\*+@example\.com$/);
+
+    // El usuario vuelve a corregir su correo: el registro anterior se reemplaza
+    // en lugar de bloquear el nuevo envío.
+    const correctedEmail = `ana.maria.${suffix}@example.com`;
+    const started = await call(
+      "registration/student/validate",
+      {
+        ...form,
+        email: correctedEmail,
+        replaces_registration_id: firstStart.registration_id,
+      },
+      201,
+    );
+    const registrationId = started.registration_id as string;
+    const { count: previousRegistrations, error: previousError } =
+      await adminClient
+        .from(TABLES.studentRegistrations)
+        .select("id", { count: "exact", head: true })
+        .eq("id", firstStart.registration_id as string);
+    assert.ifError(previousError);
+    assert.equal(previousRegistrations, 0);
+
+    // Validar los datos no envía el código: se pide aparte.
+    const { data: unsent, error: unsentError } = await adminClient
+      .from(TABLES.studentRegistrations)
+      .select("email_code_send_count")
+      .eq("id", registrationId)
+      .single();
+    assert.ifError(unsentError);
+    assert.equal(unsent.email_code_send_count, 0);
+
+    const delivery = await call("registration/request-code", {
+      registration_id: registrationId,
+    });
+    assert.match(delivery.email as string, /^an\*+@example\.com$/);
+    assert.ok(delivery.resend_available_at);
+    await call(
+      "registration/request-code",
+      { registration_id: registrationId },
+      429,
+    );
+    const wrong = await call(
+      "registration/validateCode",
+      { registration_id: registrationId, code: "000000" },
+      400,
+    );
+    assert.equal((wrong.error as { code: string }).code, "invalid_email_code");
+
+    // El código real solo llega por correo: el test fija uno conocido.
+    const { error: codeError } = await adminClient
+      .from(TABLES.studentRegistrations)
+      .update({
+        email_code_hash: await hashEmailCode(registrationId, "135790"),
+      })
+      .eq("id", registrationId);
+    assert.ifError(codeError);
+    const verified = await call("registration/validateCode", {
+      registration_id: registrationId,
+      code: "135790",
+    });
+    assert.equal(verified.status, "verified");
+
+    const activated = await activateStudentRegistration(
+      adminClient,
+      registrationId,
+    );
+    created.user(activated.user_id);
+    const { data: profile, error: profileError } = await adminClient
+      .from(TABLES.profiles)
+      .select(
+        "full_name,email,phone,identity_document_type,identity_document_number,access_valid_from,access_valid_until",
+      )
+      .eq("id", activated.user_id)
+      .single();
+    assert.ifError(profileError);
+    assert.equal(profile.full_name, "Ana María Quispe");
+    assert.equal(profile.email, correctedEmail);
+    assert.equal(profile.identity_document_type, "DNI");
+    assert.equal(
+      profile.access_valid_until,
+      activated.period.access_valid_until,
+    );
+    assert.ok(activated.user_code.startsWith(`ana.maria.${suffix}`));
+
+    // Entra con su correo (sin importar mayúsculas) y también con el código
+    // generado, que es lo que ven el administrador y los profesores.
+    for (
+      const identifier of [correctedEmail.toUpperCase(), activated.user_code]
+    ) {
+      const login = await fetch(`${testUrl}/functions/v1/login-with-code`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": testPublishableKey,
+        },
+        body: JSON.stringify({
+          code: identifier,
+          password,
+          expected_role: "student",
+        }),
+      });
+      assert.equal(login.status, 200, await login.clone().text());
+      await login.body?.cancel();
+    }
+  },
+});
+
+Deno.test({
+  name: "student profile edits, email change and password reset by link",
+  ignore: !enabled,
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
+    const testUrl = url as string;
+    const testPublishableKey = publishableKey as string;
+    const adminClient = createClient<Database>(testUrl, secretKey as string, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    await using created = new TestData(adminClient);
+    const newClient = () =>
+      createClient<Database>(testUrl, testPublishableKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+    const suffix = crypto.randomUUID().slice(0, 8);
+    // Fecha fija en el pasado: no depende de la zona horaria de Lima.
+    const accessFrom = "2026-01-01";
+
+    async function call(
+      path: string,
+      init: { method?: string; body?: unknown; token?: string },
+      expectedStatus = 200,
+    ): Promise<Record<string, unknown>> {
+      const response = await fetch(`${testUrl}/functions/v1/${path}`, {
+        method: init.method ?? "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": testPublishableKey,
+          ...(init.token ? { "Authorization": `Bearer ${init.token}` } : {}),
+        },
+        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      });
+      const payload = await response.json();
+      assert.equal(
+        response.status,
+        expectedStatus,
+        `${path}: ${JSON.stringify(payload)}`,
+      );
+      return payload;
+    }
+    const errorCode = (payload: Record<string, unknown>) =>
+      (payload.error as { code: string }).code;
+
+    const { data: college, error: collegeError } = await adminClient
+      .from(TABLES.colleges)
+      .insert({ code: `PRF-${suffix}`, name: `Perfil ${suffix}` })
+      .select("id")
+      .single();
+    assert.ifError(collegeError);
+    created.college(college.id);
+    const collegeId = college.id;
+
+    async function createStudent(
+      label: string,
+      email: string | null,
+    ): Promise<{ id: string; authEmail: string; password: string }> {
+      const authEmail = email ?? `${label}.${suffix}@students.invalid`;
+      const password = "Inicial9";
+      const { data, error } = await adminClient.auth.admin.createUser({
+        email: authEmail,
+        password,
+        email_confirm: true,
+      });
+      assert.ifError(error);
+      created.user(data.user.id);
+      const { error: profileError } = await adminClient
+        .from(TABLES.profiles)
+        .insert({
+          id: data.user.id,
+          college_id: collegeId,
+          role: "student",
+          user_code: `${label}${suffix}`,
+          full_name: "Ana Quispe",
+          ...(email
+            ? {
+              given_names: "Ana",
+              family_names: "Quispe",
+              email,
+              phone: "987654321",
+              identity_document_type: "DNI" as const,
+              identity_document_number: "12345678",
+            }
+            : {}),
+          is_active: true,
+          access_valid_from: accessFrom,
+          access_valid_until: "2099-12-31",
+        });
+      assert.ifError(profileError);
+      return { id: data.user.id, authEmail, password };
+    }
+
+    const student = await createStudent(
+      "perfil",
+      `perfil.${suffix}@example.com`,
+    );
+    const bystander = await createStudent("otro", `otro.${suffix}@example.com`);
+    const collegeStudent = await createStudent("colegio", null);
+
+    const studentClient = newClient();
+    const { data: signedIn, error: signInError } = await studentClient.auth
+      .signInWithPassword({
+        email: student.authEmail,
+        password: student.password,
+      });
+    assert.ifError(signInError);
+    const token = signedIn.session!.access_token;
+    const bystanderClient = newClient();
+    const { error: bystanderError } = await bystanderClient.auth
+      .signInWithPassword({
+        email: bystander.authEmail,
+        password: bystander.password,
+      });
+    assert.ifError(bystanderError);
+
+    // Perfil: lectura y edición; full_name se recompone con nombres y apellidos.
+    await call("account/profile", { method: "GET" }, 401);
+    const loaded = await call("account/profile", { method: "GET", token });
+    assert.equal(
+      (loaded.profile as { email: string }).email,
+      `perfil.${suffix}@example.com`,
+    );
+    assert.equal(
+      (loaded.profile as { college_name: string }).college_name,
+      `Perfil ${suffix}`,
+    );
+    const updated = await call("account/profile", {
+      method: "PUT",
+      token,
+      body: {
+        given_names: "Ana Lucía",
+        family_names: "Quispe Mamani",
+        phone: "+51 912 345 678",
+        identity_document_type: "CE",
+        identity_document_number: "abc123456",
+      },
+    });
+    const updatedProfile = updated.profile as {
+      phone: string;
+      identity_document_number: string;
+    };
+    assert.equal(updatedProfile.phone, "912345678");
+    assert.equal(updatedProfile.identity_document_number, "ABC123456");
+    const { data: renamed } = await adminClient
+      .from(TABLES.profiles)
+      .select("full_name")
+      .eq("id", student.id)
+      .single();
+    assert.equal(renamed?.full_name, "Ana Lucía Quispe Mamani");
+
+    // Un estudiante creado por el administrador (sin correo real) también
+    // tiene perfil: lo completa y agrega un correo verificado.
+    const { data: collegeSession, error: collegeSignInError } =
+      await newClient()
+        .auth.signInWithPassword({
+          email: collegeStudent.authEmail,
+          password: collegeStudent.password,
+        });
+    assert.ifError(collegeSignInError);
+    const collegeToken = collegeSession.session!.access_token;
+    const emptyProfile = await call("account/profile", {
+      method: "GET",
+      token: collegeToken,
+    });
+    assert.equal((emptyProfile.profile as { email: null }).email, null);
+    await call("account/profile", {
+      method: "PUT",
+      token: collegeToken,
+      body: {
+        given_names: "Luis",
+        family_names: "Tinoco",
+        phone: "967799163",
+        identity_document_type: "DNI",
+        identity_document_number: "87654321",
+      },
+    });
+    const withoutEmail = await call("account/password-reset", {
+      token: collegeToken,
+    }, 409);
+    assert.equal(errorCode(withoutEmail), "email_required");
+    const collegeEmail = `colegio.real.${suffix}@example.com`;
+    await call("account/email-change", {
+      token: collegeToken,
+      body: { email: collegeEmail },
+    });
+    await adminClient
+      .from(TABLES.emailChangeRequests)
+      .update({ code_hash: await hashEmailCode(collegeStudent.id, "135791") })
+      .eq("user_id", collegeStudent.id);
+    await call("account/email-change/confirm", {
+      token: collegeToken,
+      body: { code: "135791" },
+    });
+    // Sigue entrando con su código y ahora también con su correo.
+    for (const identifier of [`colegio${suffix}`, collegeEmail]) {
+      await call("login-with-code", {
+        body: {
+          code: identifier,
+          password: collegeStudent.password,
+          expected_role: "student",
+        },
+      });
+    }
+
+    // Restablecer contraseña: el link sirve una sola vez.
+    const sent = await call("account/password-reset", { token });
+    assert.match(sent.email as string, /^pe\*+@example\.com$/);
+    await call("account/password-reset", { token }, 429);
+    // Anular un link pedido por error lo borra y permite pedir otro enseguida.
+    assert.equal(
+      (await call("account/password-reset", { method: "DELETE", token }))
+        .status,
+      "cancelled",
+    );
+    const { count: cancelledLinks } = await adminClient
+      .from(TABLES.passwordResetCodes)
+      .select("user_id", { count: "exact", head: true })
+      .eq("user_id", student.id);
+    assert.equal(cancelledLinks, 0);
+    await call("account/password-reset", { token });
+
+    // "¿Olvidaste tu contraseña?" del login: responde igual exista o no el
+    // correo, y solo crea el link para un estudiante real.
+    await adminClient.from(TABLES.passwordResetCodes).delete().eq(
+      "user_id",
+      student.id,
+    );
+    for (
+      const email of [student.authEmail, `nadie.${suffix}@example.com`]
+    ) {
+      const requested = await call("password-reset/request-link", {
+        body: { email },
+      });
+      assert.deepEqual(requested, { status: "requested" });
+    }
+    const { count: requestedLinks } = await adminClient
+      .from(TABLES.passwordResetCodes)
+      .select("user_id", { count: "exact", head: true })
+      .eq("user_id", student.id);
+    assert.equal(requestedLinks, 1);
+    // Pedirlo de nuevo enseguida tampoco revela nada.
+    await call("password-reset/request-link", {
+      body: { email: student.authEmail },
+    });
+
+    // El link real solo llega por correo: el test fija uno conocido.
+    const resetCode = generateLinkCode();
+    await adminClient.from(TABLES.passwordResetCodes).delete().eq(
+      "user_id",
+      student.id,
+    );
+    const { error: codeError } = await adminClient
+      .from(TABLES.passwordResetCodes)
+      .insert({
+        code_hash: await hashLinkCode(resetCode),
+        user_id: student.id,
+        expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+    assert.ifError(codeError);
+    const query = `password-reset?code=${resetCode}`;
+    assert.equal((await call(query, { method: "GET" })).status, "valid");
+    const unknownLink = await call(
+      `password-reset?code=${generateLinkCode()}`,
+      { method: "GET" },
+      404,
+    );
+    assert.equal(errorCode(unknownLink), "invalid_reset_code");
+    // Una contraseña que no cumple las reglas no gasta el link.
+    const weak = await call("password-reset", {
+      body: { code: resetCode, password: "debil" },
+    }, 400);
+    assert.equal(errorCode(weak), "weak_password");
+    await call(query, { method: "GET" });
+
+    const newPassword = "Nueva123";
+    const reset = await call("password-reset", {
+      body: { code: resetCode, password: newPassword },
+    });
+    assert.equal(reset.status, "password_updated");
+    const reused = await call("password-reset", {
+      body: { code: resetCode, password: newPassword },
+    }, 404);
+    assert.equal(errorCode(reused), "invalid_reset_code");
+    await call(query, { method: "GET" }, 404);
+
+    // Solo se cierran las sesiones de quien restableció.
+    const { error: revokedError } = await studentClient.auth.refreshSession();
+    assert.ok(revokedError, "the student session should be revoked");
+    const { error: bystanderRefreshError } = await bystanderClient.auth
+      .refreshSession();
+    assert.ifError(bystanderRefreshError);
+    const { error: oldPasswordError } = await newClient().auth
+      .signInWithPassword({
+        email: student.authEmail,
+        password: student.password,
+      });
+    assert.ok(oldPasswordError);
+    const { data: relogged, error: reloggedError } = await newClient().auth
+      .signInWithPassword({ email: student.authEmail, password: newPassword });
+    assert.ifError(reloggedError);
+    const newToken = relogged.session!.access_token;
+
+    // Cambio de correo: el código va al correo nuevo y se borra al usarse.
+    const taken = await call("account/email-change", {
+      token: newToken,
+      body: { email: bystander.authEmail },
+    }, 409);
+    assert.equal(errorCode(taken), "email_taken");
+    const newEmail = `ana.nueva.${suffix}@example.com`;
+    const delivery = await call("account/email-change", {
+      token: newToken,
+      body: { email: newEmail.toUpperCase() },
+    });
+    assert.match(delivery.email as string, /^an\*+@example\.com$/);
+    await call("account/email-change", {
+      token: newToken,
+      body: { email: newEmail },
+    }, 429);
+    const wrong = await call("account/email-change/confirm", {
+      token: newToken,
+      body: { code: "000000" },
+    }, 400);
+    assert.equal(errorCode(wrong), "invalid_email_code");
+    const { error: emailCodeError } = await adminClient
+      .from(TABLES.emailChangeRequests)
+      .update({ code_hash: await hashEmailCode(student.id, "246810") })
+      .eq("user_id", student.id);
+    assert.ifError(emailCodeError);
+    const changed = await call("account/email-change/confirm", {
+      token: newToken,
+      body: { code: "246810" },
+    });
+    assert.equal(changed.email, newEmail);
+    const { count: leftover } = await adminClient
+      .from(TABLES.emailChangeRequests)
+      .select("user_id", { count: "exact", head: true })
+      .eq("user_id", student.id);
+    assert.equal(leftover, 0);
+    await call("account/email-change/confirm", {
+      token: newToken,
+      body: { code: "246810" },
+    }, 404);
+    const { error: newEmailLoginError } = await newClient().auth
+      .signInWithPassword({ email: newEmail, password: newPassword });
+    assert.ifError(newEmailLoginError);
+  },
+});
+
+Deno.test({
+  name: "admin invites a student who completes the account from the link",
+  ignore: !enabled,
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
+    const testUrl = url as string;
+    const testPublishableKey = publishableKey as string;
+    const adminClient = createClient<Database>(testUrl, secretKey as string, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    await using created = new TestData(adminClient);
+    const suffix = crypto.randomUUID().slice(0, 8);
+
+    async function call(
+      path: string,
+      init: { method?: string; body?: unknown; token?: string },
+      expectedStatus = 200,
+    ): Promise<Record<string, unknown>> {
+      const response = await fetch(`${testUrl}/functions/v1/${path}`, {
+        method: init.method ?? "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": testPublishableKey,
+          ...(init.token ? { "Authorization": `Bearer ${init.token}` } : {}),
+        },
+        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      });
+      const payload = await response.json();
+      assert.equal(
+        response.status,
+        expectedStatus,
+        `${path}: ${JSON.stringify(payload)}`,
+      );
+      return payload;
+    }
+    const errorCode = (payload: Record<string, unknown>) =>
+      (payload.error as { code: string }).code;
+
+    const { data: college, error: collegeError } = await adminClient
+      .from(TABLES.colleges)
+      .insert({ code: `INV-${suffix}`, name: `Invitaciones ${suffix}` })
+      .select("id")
+      .single();
+    assert.ifError(collegeError);
+    created.college(college.id);
+
+    const adminEmail = `admin.${suffix}@example.com`;
+    const { data: adminUser, error: adminError } = await adminClient.auth.admin
+      .createUser({
+        email: adminEmail,
+        password: "Admin1234",
+        email_confirm: true,
+      });
+    assert.ifError(adminError);
+    created.user(adminUser.user.id);
+    const { error: adminProfileError } = await adminClient
+      .from(TABLES.profiles)
+      .insert({
+        id: adminUser.user.id,
+        role: "admin",
+        user_code: `ADMIN-INV-${suffix}`,
+        full_name: "Admin Invitaciones",
+        is_active: true,
+      });
+    assert.ifError(adminProfileError);
+    const { data: adminSession, error: adminSignInError } = await createClient(
+      testUrl,
+      testPublishableKey,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    ).auth.signInWithPassword({ email: adminEmail, password: "Admin1234" });
+    assert.ifError(adminSignInError);
+    const token = adminSession.session!.access_token;
+
+    // Solo el administrador invita, y no a un correo que ya tiene cuenta.
+    await call("invitations", { method: "GET" }, 401);
+    const studentEmail = `invitada.${suffix}@example.com`;
+    const invitationBody = {
+      email: studentEmail.toUpperCase(),
+      college_id: college.id,
+      access_valid_from: "2026-01-01",
+      access_valid_until: "2099-12-31",
+    };
+    const taken = await call("invitations", {
+      token,
+      body: { ...invitationBody, email: adminEmail },
+    }, 409);
+    assert.equal(errorCode(taken), "email_taken");
+    const pastAccess = await call("invitations", {
+      token,
+      body: { ...invitationBody, access_valid_until: "2026-01-02" },
+    }, 400);
+    assert.equal(errorCode(pastAccess), "validation_error");
+
+    const createdInvitation = await call("invitations", {
+      token,
+      body: invitationBody,
+    }, 201);
+    const invitation = createdInvitation.invitation as {
+      id: string;
+      email: string;
+      college_name: string;
+    };
+    assert.equal(invitation.email, studentEmail);
+    assert.equal(invitation.college_name, `Invitaciones ${suffix}`);
+    const listed = await call("invitations", { method: "GET", token });
+    assert.ok(
+      (listed.invitations as Array<{ id: string }>).some((item) =>
+        item.id === invitation.id
+      ),
+    );
+
+    // Reenviar cambia el link: el anterior deja de servir.
+    const { data: beforeResend } = await adminClient
+      .from(TABLES.studentInvitations)
+      .select("code_hash")
+      .eq("id", invitation.id)
+      .single();
+    await call("invitations/resend", {
+      token,
+      body: { invitation_id: invitation.id },
+    });
+    const { data: afterResend } = await adminClient
+      .from(TABLES.studentInvitations)
+      .select("code_hash")
+      .eq("id", invitation.id)
+      .single();
+    assert.notEqual(afterResend?.code_hash, beforeResend?.code_hash);
+
+    // El link real solo llega por correo: el test fija uno conocido.
+    const linkCode = generateLinkCode();
+    const { error: codeError } = await adminClient
+      .from(TABLES.studentInvitations)
+      .update({ code_hash: await hashLinkCode(linkCode) })
+      .eq("id", invitation.id);
+    assert.ifError(codeError);
+    assert.equal(
+      errorCode(
+        await call(`student-invitation?code=${generateLinkCode()}`, {
+          method: "GET",
+        }, 404),
+      ),
+      "invalid_invitation",
+    );
+    const checked = await call(`student-invitation?code=${linkCode}`, {
+      method: "GET",
+    });
+    assert.deepEqual(
+      {
+        email: (checked.invitation as { email: string }).email,
+        college: (checked.invitation as { college_name: string }).college_name,
+      },
+      { email: studentEmail, college: `Invitaciones ${suffix}` },
+    );
+
+    const form = {
+      code: linkCode,
+      given_names: "Lucía",
+      family_names: "Mamani",
+      phone: "987654321",
+      identity_document_type: "DNI",
+      identity_document_number: "12345678",
+      password: "Invitada9",
+      accepted_terms: true,
+    };
+    // Datos inválidos no gastan el link.
+    const weak = await call("student-invitation", {
+      body: { ...form, password: "debil" },
+    }, 400);
+    assert.equal(errorCode(weak), "weak_password");
+    await call(`student-invitation?code=${linkCode}`, { method: "GET" });
+
+    assert.equal(
+      (await call("student-invitation", { body: form }, 201)).status,
+      "accepted",
+    );
+    const { data: student, error: studentError } = await adminClient
+      .from(TABLES.profiles)
+      .select(
+        "id,full_name,email,college_id,role,access_valid_from,access_valid_until",
+      )
+      .eq("email", studentEmail)
+      .single();
+    assert.ifError(studentError);
+    created.user(student.id);
+    assert.deepEqual(
+      {
+        full_name: student.full_name,
+        college_id: student.college_id,
+        role: student.role,
+        access_valid_from: student.access_valid_from,
+        access_valid_until: student.access_valid_until,
+      },
+      {
+        full_name: "Lucía Mamani",
+        college_id: college.id,
+        role: "student",
+        access_valid_from: "2026-01-01",
+        access_valid_until: "2099-12-31",
+      },
+    );
+    // El link se borró al usarse.
+    await call("student-invitation", { body: form }, 404);
+    const { count: leftover } = await adminClient
+      .from(TABLES.studentInvitations)
+      .select("id", { count: "exact", head: true })
+      .eq("id", invitation.id);
+    assert.equal(leftover, 0);
+    await call("login-with-code", {
+      body: {
+        code: studentEmail,
+        password: "Invitada9",
+        expected_role: "student",
+      },
+    });
+
+    // Anular una invitación la borra.
+    const toCancel = await call("invitations", {
+      token,
+      body: { ...invitationBody, email: `anulada.${suffix}@example.com` },
+    }, 201);
+    const cancelId = (toCancel.invitation as { id: string }).id;
+    await call(`invitations?id=${cancelId}`, { method: "DELETE", token });
+    await call(`invitations?id=${cancelId}`, { method: "DELETE", token }, 404);
   },
 });

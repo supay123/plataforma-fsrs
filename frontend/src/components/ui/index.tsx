@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import clsx from "clsx";
 
@@ -10,13 +11,37 @@ export function Button({ className, variant = "primary", ...props }: ButtonHTMLA
     "text-slate-600 hover:bg-slate-100": variant === "ghost",
   }, className)} {...props} />;
 }
-export function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
-  return <label className="grid content-start gap-1.5 text-sm font-medium text-slate-700"><span>{label}</span>{children}{error && <span className="text-xs text-rose-600">{error}</span>}</label>;
+/** Con `hideLabel` la etiqueta queda solo para lectores de pantalla (el control muestra un placeholder). */
+export function Field({ label, error, hint, hideLabel, children }: { label: string; error?: string; hint?: ReactNode; hideLabel?: boolean; children: ReactNode }) {
+  return <label className="grid content-start gap-1.5 text-sm font-medium text-slate-700"><span className={clsx(hideLabel && "sr-only")}>{label}</span>{children}{hint && <span className="text-xs font-normal text-slate-500">{hint}</span>}{error && <span className="text-xs text-rose-600">{error}</span>}</label>;
 }
 const control = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100";
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) { return <input className={clsx(control, props.className)} {...props} />; }
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) { return <select className={clsx(control, props.className)} {...props} />; }
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) { return <textarea className={clsx(control, props.className)} {...props} />; }
+// Variante "soft": campos con fondo suave y placeholder, sin etiqueta visible.
+// Tamaño y peso van con `!` porque `font: inherit` de styles.css (sin capa) gana a las utilidades.
+const softControl = "min-h-12 w-full rounded-2xl border border-indigo-100 bg-indigo-50/50 px-3 py-2 text-base! font-normal! text-slate-900 outline-none placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100";
+interface ControlProps { variant?: "default" | "soft"; /** Ícono a la izquierda del control. */ icon?: ReactNode }
+const controlClass = ({ variant, icon }: ControlProps, ...extra: Array<string | false | undefined>) =>
+  clsx(variant === "soft" ? softControl : control, icon && "peer pl-11", ...extra);
+// El ícono va después del control para poder resaltarlo con `peer-focus`.
+const ControlIcon = ({ icon }: { icon: ReactNode }) =>
+  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 grid w-11 place-items-center text-slate-500 peer-focus:text-indigo-600">{icon}</span>;
+function WithIcon({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
+  return icon ? <span className="relative block">{children}<ControlIcon icon={icon} /></span> : children;
+}
+export function Input({ variant, icon, ...props }: InputHTMLAttributes<HTMLInputElement> & ControlProps) { return <WithIcon icon={icon}><input {...props} className={controlClass({ variant, icon }, props.className)} /></WithIcon>; }
+/** Campo de contraseña con un botón para mostrar u ocultar lo escrito. */
+export function PasswordInput({ className, variant, icon, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & ControlProps) {
+  const [visible, setVisible] = useState(false);
+  return <span className="relative block">
+    <input {...props} type={visible ? "text" : "password"} className={controlClass({ variant, icon }, "pr-11", className)} />
+    {icon && <ControlIcon icon={icon} />}
+    <button type="button" aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={visible} className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-xl text-slate-500 hover:text-slate-800" onClick={() => setVisible((current) => !current)}>
+      {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+    </button>
+  </span>;
+}
+export function Select({ variant, icon, ...props }: SelectHTMLAttributes<HTMLSelectElement> & ControlProps) { return <WithIcon icon={icon}><select {...props} className={controlClass({ variant, icon }, props.className)} /></WithIcon>; }
+export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) { return <textarea {...props} className={clsx(control, props.className)} />; }
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   const hasBg = className?.includes("bg-");
   const hasBorder = className?.includes("border-");
@@ -38,49 +63,3 @@ export function Alert({ children, tone = "info" }: { children: ReactNode; tone?:
 export function Spinner() { return <div role="status" className="mx-auto my-12 h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"><span className="sr-only">Cargando</span></div>; }
 export function EmptyState({ children }: { children: ReactNode }) { return <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">{children}</div>; }
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" }) { return <span className={clsx("rounded-full px-2.5 py-1 text-xs font-semibold", tone === "neutral" && "bg-slate-100 text-slate-700", tone === "success" && "bg-emerald-100 text-emerald-700", tone === "warning" && "bg-amber-100 text-amber-700")}>{children}</span>; }
-
-export function ConfirmDialog({
-  open,
-  title,
-  children,
-  confirmLabel = "Continuar",
-  cancelLabel = "Cancelar",
-  confirmVariant = "primary",
-  pendingLabel = "Guardando…",
-  pending = false,
-  onConfirm,
-  onCancel,
-}: {
-  open: boolean;
-  title: string;
-  children: ReactNode;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  confirmVariant?: "primary" | "danger";
-  pendingLabel?: string;
-  pending?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !pending) onCancel();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, pending, onCancel]);
-
-  if (!open) return null;
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
-    <button aria-label="Cerrar diálogo" className="absolute inset-0 bg-slate-950/55" disabled={pending} onClick={onCancel} />
-    <section aria-modal="true" aria-labelledby="confirm-dialog-title" className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" role="dialog">
-      <h2 id="confirm-dialog-title" className="text-lg font-bold text-slate-950">{title}</h2>
-      <div className="mt-3 text-sm leading-6 text-slate-600">{children}</div>
-      <div className="mt-6 flex justify-end gap-3">
-        <Button autoFocus type="button" variant="secondary" disabled={pending} onClick={onCancel}>{cancelLabel}</Button>
-        <Button type="button" variant={confirmVariant} disabled={pending} onClick={onConfirm}>{pending ? pendingLabel : confirmLabel}</Button>
-      </div>
-    </section>
-  </div>;
-}

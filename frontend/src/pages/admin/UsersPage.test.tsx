@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ModalProvider } from "../../components/ui/modal";
+import { ToastProvider } from "../../components/ui/toast";
 import { UsersPage } from "./UsersPage";
 
 const mocks = vi.hoisted(() => ({
@@ -11,10 +13,21 @@ const mocks = vi.hoisted(() => ({
   listColleges: vi.fn(),
   listUsers: vi.fn(),
   updateUser: vi.fn(),
+  listInvitations: vi.fn(),
+  createInvitation: vi.fn(),
+  resendInvitation: vi.fn(),
+  cancelInvitation: vi.fn(),
 }));
 
 vi.mock("../../features/colleges/api", () => ({
   listColleges: mocks.listColleges,
+}));
+vi.mock("../../features/invitations/api", () => ({
+  invitationsQueryKey: ["invitations"],
+  listInvitations: mocks.listInvitations,
+  createInvitation: mocks.createInvitation,
+  resendInvitation: mocks.resendInvitation,
+  cancelInvitation: mocks.cancelInvitation,
 }));
 vi.mock("../../features/users/api", () => ({
   createUser: mocks.createUser,
@@ -26,7 +39,7 @@ vi.mock("../../features/users/api", () => ({
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={client}><MemoryRouter><UsersPage /></MemoryRouter></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><ToastProvider><ModalProvider><MemoryRouter><UsersPage /></MemoryRouter></ModalProvider></ToastProvider></QueryClientProvider>);
 }
 
 describe("UsersPage", () => {
@@ -43,6 +56,14 @@ describe("UsersPage", () => {
       { id: "student-1", college_id: "college-2", role: "student", user_code: "ALUMNA-1", full_name: "Ana Torres", is_active: true },
     ]);
     mocks.deleteUser.mockResolvedValue({ user_id: "teacher-1" });
+    mocks.listInvitations.mockResolvedValue([{
+      id: "invitation-1", email: "pendiente@example.com", college_id: "college-1", college_name: "Ciencias",
+      access_valid_from: "2026-03-01", access_valid_until: "2026-12-31",
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(), created_at: new Date().toISOString(),
+    }]);
+    mocks.createInvitation.mockResolvedValue({ id: "invitation-2" });
+    mocks.resendInvitation.mockResolvedValue({ id: "invitation-1" });
+    mocks.cancelInvitation.mockResolvedValue({ invitation_id: "invitation-1" });
   });
 
   it("filters users by college and requires confirmation before deletion", async () => {
@@ -60,5 +81,51 @@ describe("UsersPage", () => {
     await user.click(screen.getByRole("button", { name: "Eliminar definitivamente" }));
 
     await waitFor(() => expect(mocks.deleteUser.mock.calls[0]?.[0]).toBe("teacher-1"));
+  });
+
+  it("invites students by email instead of creating them directly", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Profesor Carlos");
+    expect(screen.getByRole("combobox", { name: "Rol" })).toHaveValue("student");
+    expect(screen.queryByLabelText("Código")).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Colegio" }), "college-2");
+    await user.type(screen.getByLabelText("Correo del estudiante"), "nueva@example.com");
+    await user.type(screen.getByLabelText("Inicio"), "2026-03-01");
+    await user.type(screen.getByLabelText("Vencimiento"), "2026-12-31");
+    await user.click(screen.getByRole("button", { name: "Enviar invitación" }));
+
+    expect(await screen.findByText("Enviamos la invitación a nueva@example.com.")).toBeInTheDocument();
+    expect(mocks.createInvitation.mock.calls[0]?.[0]).toEqual({
+      email: "nueva@example.com", college_id: "college-2", access_valid_from: "2026-03-01", access_valid_until: "2026-12-31",
+    });
+    expect(screen.getByLabelText("Correo del estudiante")).toHaveValue("");
+  });
+
+  it("keeps creating teachers with a code", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Profesor Carlos");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Rol" }), "teacher");
+    expect(screen.getByLabelText("Código")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Correo del estudiante")).not.toBeInTheDocument();
+  });
+
+  it("resends and cancels pending invitations", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("pendiente@example.com")).toBeInTheDocument();
+    expect(screen.getByText(/Acceso del 01\/03\/2026 al 31\/12\/2026/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reenviar" }));
+    expect(await screen.findByText("Reenviamos la invitación a pendiente@example.com.")).toBeInTheDocument();
+    expect(mocks.resendInvitation.mock.calls[0]?.[0]).toBe("invitation-1");
+
+    await user.click(screen.getByRole("button", { name: "Anular" }));
+    expect(mocks.cancelInvitation).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Anular invitación" })).toBeInTheDocument();
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Anular" }));
+    await waitFor(() => expect(mocks.cancelInvitation.mock.calls[0]?.[0]).toBe("invitation-1"));
   });
 });
