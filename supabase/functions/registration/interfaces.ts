@@ -19,3 +19,13 @@ export interface ValidateCodeBody {
   registration_id?: unknown;
   code?: unknown;
 }
+
+export interface CreatePaymentBody {
+  registration_id?: unknown;
+  plan?: unknown;
+}
+
+export interface SimulatePaymentBody {
+  payment_id?: unknown;
+  method?: unknown;
+}

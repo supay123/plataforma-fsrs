@@ -4,7 +4,10 @@ import { handle } from "../_shared/errors.ts";
 import { routeRequest } from "../_shared/router.ts";
 import { cancelPasswordReset } from "./cancel-password-reset.ts";
 import { confirmEmailChange } from "./confirm-email-change.ts";
+import { createPayment } from "./create-payment.ts";
 import { getProfile } from "./get-profile.ts";
+import { paymentStatus } from "./payment-status.ts";
+import { simulateRenewalPayment } from "./simulate-payment.ts";
 import { requestEmailChange } from "./request-email-change.ts";
 import { requestPasswordReset } from "./request-password-reset.ts";
 import { updateProfile } from "./update-profile.ts";
@@ -16,6 +19,9 @@ import { updateProfile } from "./update-profile.ts";
 //   POST   /account/email-change/confirm  verifica el código y cambia el correo
 //   POST   /account/password-reset        envía el link para restablecer la contraseña
 //   DELETE /account/password-reset        anula el link enviado
+//   POST   /account/payment               crea el cobro para renovar el plan
+//   GET    /account/payment               estado del pago; extiende el plan al pagarse
+//   POST   /account/payment/simulate      solo modo prueba: da el cobro por pagado
 export default {
   fetch: withAppSupabase(
     { auth: "user" },
@@ -28,6 +34,9 @@ export default {
           "POST /email-change/confirm": confirmEmailChange,
           "POST /password-reset": requestPasswordReset,
           "DELETE /password-reset": cancelPasswordReset,
+          "POST /payment": createPayment,
+          "GET /payment": paymentStatus,
+          "POST /payment/simulate": simulateRenewalPayment,
         })
       ),
   ),

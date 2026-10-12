@@ -9,6 +9,7 @@ export const TABLES = {
   fsrsConfigs: "fsrs_configs",
   fsrsReviewLogs: "fsrs_review_logs",
   passwordResetCodes: "password_reset_codes",
+  planPayments: "plan_payments",
   profiles: "profiles",
   questionImportBatches: "question_import_batches",
   questions: "questions",
@@ -31,6 +32,7 @@ export const VIEWS = {
 
 export const RPCS = {
   activateStudentRegistration: "edge_activate_student_registration",
+  applyRenewalPayment: "edge_apply_renewal_payment",
   applyAnswer: "edge_apply_answer",
   completeSession: "edge_complete_session",
   createStudentRegistration: "edge_create_student_registration",
@@ -38,9 +40,11 @@ export const RPCS = {
   findProfileByCode: "edge_find_profile_by_code",
   findProfileByEmail: "edge_find_profile_by_email",
   importQuestions: "edge_import_questions",
+  kutiWebhookSecret: "edge_kuti_webhook_secret",
   nextComplaintSheetNumber: "edge_next_complaint_sheet_number",
   registrationColleges: "edge_registration_colleges",
   revokeUserSessions: "edge_revoke_user_sessions",
+  saveKutiWebhookSecret: "edge_save_kuti_webhook_secret",
   startSession: "edge_start_session",
   submitAndCompleteSession: "edge_submit_and_complete_session",
   takenUserCodes: "edge_taken_user_codes",

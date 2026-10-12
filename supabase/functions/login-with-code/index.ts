@@ -45,13 +45,16 @@ export default {
 
         if (!profile || !profile.is_active) throw invalid();
         if (expectedRole && profile.role !== expectedRole) throw invalid();
+        // Un estudiante con el plan vencido sí entra: solo podrá renovarlo.
         if (
           profile.role === "student" &&
           !isWithinDateRange(
             limaDate(),
             profile.access_valid_from,
             profile.access_valid_until,
-          )
+          ) &&
+          !(profile.access_valid_until &&
+            profile.access_valid_until < limaDate())
         ) {
           throw new AppError(
             403,

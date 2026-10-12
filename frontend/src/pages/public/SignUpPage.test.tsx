@@ -12,13 +12,16 @@ const mocks = vi.hoisted(() => ({
   validateStudentRegistration: vi.fn(),
   requestRegistrationCode: vi.fn(),
   validateRegistrationCode: vi.fn(),
+  createRegistrationPayment: vi.fn(),
+  getRegistrationPaymentStatus: vi.fn(),
+  simulateRegistrationPayment: vi.fn(),
 }));
 
 vi.mock("../../features/registration/api", () => mocks);
 
-function renderPage() {
+function renderPage(path = "/estudiante/sign-up") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}><ToastProvider><MemoryRouter><SignUpPage /></MemoryRouter></ToastProvider></QueryClientProvider>);
+  return render(<QueryClientProvider client={queryClient}><ToastProvider><MemoryRouter initialEntries={[path]}><SignUpPage /></MemoryRouter></ToastProvider></QueryClientProvider>);
 }
 
 async function fillForm(user: ReturnType<typeof userEvent.setup>, overrides: { password?: string } = {}) {
@@ -45,7 +48,27 @@ describe("SignUpPage", () => {
       resend_available_at: new Date(Date.now() + 60_000).toISOString(),
     });
     mocks.validateRegistrationCode.mockReset().mockResolvedValue({ status: "verified", registration_id: "registration-1" });
+    mocks.createRegistrationPayment.mockReset().mockResolvedValue({
+      payment_id: "payment-1", plan: "mensual", amount: 14.9, qr_payload: "000201010212", bank_code: null, checkout_url: null,
+      expires_at: new Date(Date.now() + 1_800_000).toISOString(), livemode: false,
+    });
+    mocks.getRegistrationPaymentStatus.mockReset().mockResolvedValue({ payment_id: "payment-1", status: "pending", expires_at: new Date(Date.now() + 1_800_000).toISOString() });
     window.scrollTo = vi.fn();
+  });
+
+  it("starts with the plan chosen in the pricing page and lets the user switch it", async () => {
+    const user = userEvent.setup();
+    renderPage("/estudiante/sign-up?plan=semestral");
+    expect(screen.getByRole("radio", { name: /Plan Semestral/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /Plan Estudiante/ })).toHaveAttribute("aria-checked", "false");
+
+    await user.click(screen.getByRole("radio", { name: /Plan Estudiante/ }));
+    expect(screen.getByRole("radio", { name: /Plan Estudiante/ })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("falls back to the monthly plan when the URL has no valid plan", () => {
+    renderPage("/estudiante/sign-up?plan=anual");
+    expect(screen.getByRole("radio", { name: /Plan Estudiante/ })).toHaveAttribute("aria-checked", "true");
   });
 
   it("validates the data, verifies the email code and reaches the payment step", async () => {
@@ -76,7 +99,9 @@ describe("SignUpPage", () => {
     // Validar los datos y enviar el código son dos llamadas distintas.
     expect(mocks.requestRegistrationCode).toHaveBeenCalledWith("registration-1");
     await waitFor(() => expect(mocks.validateRegistrationCode).toHaveBeenCalledWith("registration-1", "123456"));
-    expect(await screen.findByText("Muy pronto podrás completar el pago aquí")).toBeInTheDocument();
+    expect(await screen.findByTitle("QR de pago")).toBeInTheDocument();
+    expect(mocks.createRegistrationPayment).toHaveBeenCalledWith("registration-1", "mensual");
+    expect(screen.getByText("S/ 14.90")).toBeInTheDocument();
   });
 
   it("replaces the previous registration when the user goes back to fix the email", async () => {

@@ -6,11 +6,29 @@ import { useModal } from "../../components/ui/use-modal";
 import { listColleges } from "../../features/colleges/api";
 import { InviteStudentForm } from "../../features/invitations/InviteStudentForm";
 import { PendingInvitations } from "../../features/invitations/PendingInvitations";
+import { PaymentsToReview } from "../../features/payments/PaymentsToReview";
 import { createUser, deleteUser, listUsers, roleLabel, updateUser } from "../../features/users/api";
+import { EXPIRED_REVIEW_DAYS, studentAccess } from "../../lib/student-access";
 import type { Credentials } from "../../types/contracts";
 
 // Los profesores se crean directamente; los estudiantes, por invitación.
 const emptyForm = { user_code: "", full_name: "", college_id: "", password: "" };
+
+type ListedUser = Awaited<ReturnType<typeof listUsers>>[number];
+
+/** Estudiante con el plan vencido hace más de EXPIRED_REVIEW_DAYS días: el administrador decide si lo borra. */
+function longExpired(user: ListedUser) {
+  if (user.role !== "student") return false;
+  const access = studentAccess(user);
+  return access.state === "expired" && access.daysSinceExpiry > EXPIRED_REVIEW_DAYS;
+}
+
+function expiredLabel(user: ListedUser) {
+  if (user.role !== "student") return "";
+  const access = studentAccess(user);
+  if (access.state !== "expired") return "";
+  return `Plan vencido hace ${access.daysSinceExpiry} ${access.daysSinceExpiry === 1 ? "día" : "días"}`;
+}
 
 export function UsersPage() {
   const client = useQueryClient();
@@ -18,6 +36,7 @@ export function UsersPage() {
   const colleges = useQuery({ queryKey: ["colleges"], queryFn: listColleges });
   const [filter, setFilter] = useState("");
   const [collegeFilter, setCollegeFilter] = useState("");
+  const [onlyLongExpired, setOnlyLongExpired] = useState(false);
   const modal = useModal();
   const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [role, setRole] = useState<"student" | "teacher">("student");
@@ -46,9 +65,9 @@ export function UsersPage() {
     () => users.data?.filter((user) => {
       const matchesText = `${user.full_name} ${user.user_code}`.toLowerCase().includes(filter.toLowerCase());
       const matchesCollege = !collegeFilter || user.college_id === collegeFilter;
-      return matchesText && matchesCollege;
+      return matchesText && matchesCollege && (!onlyLongExpired || longExpired(user));
     }),
-    [users.data, filter, collegeFilter],
+    [users.data, filter, collegeFilter, onlyLongExpired],
   );
 
   if (users.isLoading) return <Spinner />;
@@ -57,11 +76,15 @@ export function UsersPage() {
     <div className="grid gap-6 xl:grid-cols-[1fr_23rem]">
       <Card>
         {remove.error && <Alert tone="error">{remove.error.message}</Alert>}
-        <div className="grid gap-3 sm:grid-cols-[1fr_16rem]">
+        <div className="grid gap-3 sm:grid-cols-[1fr_14rem_14rem]">
           <Input aria-label="Buscar usuarios" placeholder="Buscar por nombre o código…" value={filter} onChange={(event) => setFilter(event.target.value)} />
           <Select aria-label="Filtrar por colegio" value={collegeFilter} onChange={(event) => setCollegeFilter(event.target.value)}>
             <option value="">Todos los colegios</option>
             {colleges.data?.map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}
+          </Select>
+          <Select aria-label="Filtrar por vigencia" value={onlyLongExpired ? "expired" : ""} onChange={(event) => setOnlyLongExpired(event.target.value === "expired")}>
+            <option value="">Cualquier vigencia</option>
+            <option value="expired">Vencidos hace más de {EXPIRED_REVIEW_DAYS} días</option>
           </Select>
         </div>
         <div className="table-wrap mt-4"><table>
@@ -70,7 +93,7 @@ export function UsersPage() {
             <td><strong>{user.full_name}</strong><br /><span className="text-xs text-slate-500">{user.user_code}</span></td>
             <td>{roleLabel(user.role)}</td>
             <td>{colleges.data?.find((college) => college.id === user.college_id)?.name ?? "—"}</td>
-            <td><Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Activo" : "Inactivo"}</Badge></td>
+            <td><Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Activo" : "Inactivo"}</Badge>{expiredLabel(user) && <span className="mt-1 block text-xs text-slate-500">{expiredLabel(user)}</span>}</td>
             <td className="space-x-2">
               <Link className="text-sm font-semibold text-indigo-600" to={`/admin/usuarios/${user.id}`}>Editar</Link>
               {user.role === "teacher" && <Link className="text-sm font-semibold text-indigo-600" to={`/admin/asignaciones?profesor=${user.id}`}>Asignaciones</Link>}
@@ -117,6 +140,7 @@ ${credentials.temporary_password ?? ""}`)}>Copiar</Button>
               </>}
           </div>
         </Card>
+        <PaymentsToReview />
         <PendingInvitations />
       </div>
     </div>

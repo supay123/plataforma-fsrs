@@ -1,4 +1,6 @@
 import { invokeFunction } from "../../lib/api/functions";
+import type { PlanId } from "../../config/business";
+import type { PlanPayment, PlanPaymentState, SimulatedMethod } from "../payments/api";
 import type { DocumentType } from "../complaints/model";
 
 export interface RegistrationCollege { id: string; name: string }
@@ -43,4 +45,24 @@ export function validateRegistrationCode(registrationId: string, code: string) {
     "registration/validateCode",
     { registration_id: registrationId, code },
   );
+}
+
+/** POST /registration/payment: crea (o reutiliza) el cobro del plan elegido. */
+export function createRegistrationPayment(registrationId: string, plan: PlanId) {
+  return invokeFunction<PlanPayment, { registration_id: string; plan: PlanId }>(
+    "registration/payment",
+    { registration_id: registrationId, plan },
+  );
+}
+
+/** GET /registration/payment?payment_id=...: estado del pago; al pagarse activa la cuenta. */
+export function getRegistrationPaymentStatus(paymentId: string) {
+  return invokeFunction<PlanPaymentState, Record<string, never>>(
+    `registration/payment?payment_id=${encodeURIComponent(paymentId)}`, {}, { method: "GET" },
+  );
+}
+
+/** POST /registration/payment/simulate: solo modo prueba, da por pagado el cobro y activa la cuenta. */
+export function simulateRegistrationPayment(paymentId: string, method: SimulatedMethod) {
+  return invokeFunction<PlanPaymentState, { payment_id: string; method: SimulatedMethod }>("registration/payment/simulate", { payment_id: paymentId, method });
 }

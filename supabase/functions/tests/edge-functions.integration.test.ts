@@ -4,6 +4,7 @@ import { TABLES } from "../_shared/database.constants.ts";
 import type { Database } from "../_shared/database.types.ts";
 import { hashEmailCode } from "../_shared/email-code.ts";
 import { generateLinkCode, hashLinkCode } from "../_shared/link-code.ts";
+import { planPeriod } from "../_shared/plans.ts";
 import { activateStudentRegistration } from "../_shared/registration-activation.ts";
 import type { InvokeOptions } from "./interfaces.ts";
 import { TestData } from "./test-data.ts";
@@ -893,11 +894,44 @@ Deno.test({
     });
     assert.equal(verified.status, "verified");
 
+    // Kuti confirmó el pago del plan semestral (no se llama a Kuti en el test).
+    const paymentId = crypto.randomUUID();
+    const { error: paymentError } = await adminClient
+      .from(TABLES.planPayments)
+      .insert({
+        id: paymentId,
+        kuti_payment_intent_id: `pi_test_${suffix}`,
+        livemode: false,
+        plan: "semestral",
+        amount: 77.4,
+        registration_id: registrationId,
+        email: correctedEmail,
+        status: "succeeded",
+        qr_payload: "000201",
+        expires_at: new Date(Date.now() + 1_800_000).toISOString(),
+        paid_at: new Date().toISOString(),
+      });
+    assert.ifError(paymentError);
+
     const activated = await activateStudentRegistration(
       adminClient,
-      registrationId,
+      paymentId,
     );
     created.user(activated.user_id);
+
+    const { data: payment, error: appliedError } = await adminClient
+      .from(TABLES.planPayments)
+      .select("profile_id,period_start,period_end,registration_id")
+      .eq("id", paymentId)
+      .single();
+    assert.ifError(appliedError);
+    assert.equal(payment.profile_id, activated.user_id);
+    assert.equal(payment.period_end, activated.period.period_end);
+    assert.equal(payment.registration_id, null);
+    // Un aviso repetido no vuelve a activar.
+    await assert.rejects(
+      activateStudentRegistration(adminClient, paymentId),
+    );
     const { data: profile, error: profileError } = await adminClient
       .from(TABLES.profiles)
       .select(
@@ -909,9 +943,10 @@ Deno.test({
     assert.equal(profile.full_name, "Ana María Quispe");
     assert.equal(profile.email, correctedEmail);
     assert.equal(profile.identity_document_type, "DNI");
+    assert.equal(profile.access_valid_until, activated.period.period_end);
     assert.equal(
-      profile.access_valid_until,
-      activated.period.access_valid_until,
+      activated.period.period_end,
+      planPeriod(activated.access_valid_from, "semestral").period_end,
     );
     assert.ok(activated.user_code.startsWith(`ana.maria.${suffix}`));
 

@@ -52,12 +52,13 @@ En tests, envuelve el componente con `<ToastProvider>`.
 
 ## Modal
 
-Ventana de confirmación con título y cuerpo. Tiene dos variantes:
+Ventana de confirmación con título y cuerpo. Tiene tres variantes:
 
 | Método | Botón principal | Uso |
 | --- | --- | --- |
 | `modal.delete(opciones)` | Rojo, "Eliminar" | Acciones destructivas. |
 | `modal.create(opciones)` | Morado, "Crear" | Crear o confirmar algo. |
+| `modal.warning(opciones)` | Ámbar, "Confirmar" (con ícono de advertencia) | Acciones que afectan directamente a otro usuario (cambiar sus datos, su credencial o su vigencia). |
 
 - Archivos: `components/ui/modal.tsx` (`ModalProvider`) y
   `components/ui/use-modal.ts` (`useModal`).
@@ -75,7 +76,7 @@ Opciones:
 Comportamiento:
 
 - Mientras la promesa de `onConfirm` está pendiente, los botones se desactivan
-  y muestran "Eliminando…" o "Creando…"; no se puede cerrar con Escape ni con
+  y muestran "Eliminando…", "Creando…" o "Aplicando…"; no se puede cerrar con Escape ni con
   un clic fuera.
 - Si la promesa se resuelve, el modal se cierra solo. Si falla, sigue abierto
   para reintentar o cancelar; quien lo llama muestra el error (por ejemplo, con
@@ -94,8 +95,8 @@ modal.delete({
 });
 ```
 
-Ejemplos reales: `pages/admin/CollegesPage.tsx`, `UsersPage.tsx` y
-`AssignmentsPage.tsx`. En tests, envuelve el componente con `<ModalProvider>`.
+Ejemplos reales: `pages/admin/CollegesPage.tsx`, `UsersPage.tsx`,
+`AssignmentsPage.tsx` y `UserAccountPage.tsx` (variante `warning`). En tests, envuelve el componente con `<ModalProvider>`.
 
 ---
 
@@ -210,6 +211,22 @@ con las validaciones del backend: si cambias una, cambia la otra.
 Los tipos de documento (`DNI`, `CE`, `PASAPORTE`, `RUC`) están en
 `features/complaints/model.ts` (`DOCUMENT_TYPES`).
 
+## Pagos de planes (`features/payments/`)
+
+Cobros con Kuti para el registro y la renovación. El monto lo fija el servidor
+según el plan; el navegador solo dice qué plan eligió.
+
+| Archivo | Qué ofrece |
+| --- | --- |
+| `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. |
+| `PaymentPanel.tsx` | Cobro de un plan: QR, código de pago de servicios (si el monto lo permite), cuenta regresiva y espera de la confirmación. Recibe `createPayment`, `fetchStatus`, `simulatePayment` y `onPaid`, así sirve para el registro y la renovación. En modo prueba muestra el botón «Simular pago». Sin Kuti configurado muestra el contacto por WhatsApp. |
+| `PlanExpiryBanner.tsx` | Aviso en el portal del estudiante cuando a su plan le quedan `RENEWAL_NOTICE_DAYS` días o menos. |
+| `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos que Kuti confirmó pero no se pudieron aplicar. Solo aparece si hay alguno. |
+| `api.ts` | `createRenewalPayment`, `getRenewalPaymentStatus`, `listPaymentsToReview`, `resolvePayment` y los tipos `PlanPayment` y `PlanPaymentStatus`. Los cobros del registro están en `features/registration/api.ts`. |
+
+Los planes y precios están en `config/business.ts` (`PLANS`, `findPlan`,
+`planPriceLabel`) y deben coincidir con `supabase/functions/_shared/plans.ts`.
+
 ## Utilidades (`lib/`)
 
 | Utilidad | Archivo | Descripción |
@@ -218,6 +235,7 @@ Los tipos de documento (`DNI`, `CE`, `PASAPORTE`, `RUC`) están en
 | `normalizeError(error)` y `AppError` | `lib/api/errors.ts` | Convierte cualquier error en un `AppError` con `code`, `message` en español y `details`. Los textos en español de cada código de error están en `translatedMessages`. |
 | `useNow()` y `secondsUntil(fecha, ahora)` | `lib/use-now.ts` | Hora actual que se actualiza cada segundo y segundos que faltan para una fecha (cuentas regresivas como "Reenviar en 45 s"). |
 | `formatDate(valor)` y `todayInLima()` | `lib/dates.ts` | Fecha y hora legible en español (para fechas con hora, como `created_at`) y fecha de hoy en Lima (`AAAA-MM-DD`). |
+| `studentAccess(perfil)` | `lib/student-access.ts` | Situación del plan del estudiante hoy en Lima: `active` (con `daysLeft`), `expired` (con `daysSinceExpiry`) o `not_started`. Úsala en lugar de comparar fechas a mano. También exporta `RENEWAL_NOTICE_DAYS` (3) y `EXPIRED_REVIEW_DAYS` (7). |
 | `formatDay(valor)` | `lib/dates.ts` | Fecha sin hora (`AAAA-MM-DD`, como las vigencias de acceso) en `DD/MM/AAAA`. Úsala en lugar de `formatDate` para esas fechas: `formatDate` las mostraría un día antes. |
 | `MathText` | `lib/math.tsx` | Muestra texto con fórmulas LaTeX (`$...$` y `$$...$$`) usando KaTeX. |
 | `roleLabel(rol)` | `features/users/api.ts` | Nombre en español del nivel de acceso: "Administrador", "Profesor" o "Estudiante". |

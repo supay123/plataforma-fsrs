@@ -10,7 +10,7 @@ import { useToast } from "../../components/ui/use-toast";
 import { requestPasswordResetLink } from "../account/api";
 import { EMAIL_PATTERN } from "../registration/rules";
 import { normalizeError } from "../../lib/api/errors";
-import { todayInLima } from "../../lib/dates";
+import { studentAccess } from "../../lib/student-access";
 import type { AppRole, Credentials } from "../../types/contracts";
 import { getRecoveryQuestion, recoverPassword } from "./api";
 import { useAuth } from "./AuthProvider";
@@ -30,10 +30,9 @@ export function LoginPage({ role }: { role: AppRole }) {
   const [recovering, setRecovering] = useState(false);
   const [error, setError] = useState("");
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({ resolver: zodResolver(schema) });
-  const studentAccessExpired = auth.profile?.role === "student" &&
-    (!auth.profile.access_valid_from || !auth.profile.access_valid_until ||
-      todayInLima() < auth.profile.access_valid_from || todayInLima() > auth.profile.access_valid_until);
-  if (!auth.loading && auth.profile?.is_active && !studentAccessExpired) return <Navigate to={portal[auth.profile.role].path} replace />;
+  const access = auth.profile?.role === "student" ? studentAccess(auth.profile).state : "active";
+  if (!auth.loading && auth.profile?.is_active && access === "expired") return <Navigate to="/estudiante/renovar" replace />;
+  if (!auth.loading && auth.profile?.is_active && access === "active") return <Navigate to={portal[auth.profile.role].path} replace />;
   const submit = handleSubmit(async (values) => {
     try { setError(""); await auth.login(values.code, values.password, role); navigate(portal[role].path, { replace: true }); }
     catch (reason) { setError((await normalizeError(reason)).message); }
@@ -47,10 +46,12 @@ export function LoginPage({ role }: { role: AppRole }) {
           <h1 className="text-2xl font-bold">Acceso de {portal[role].label}</h1>
           <p className="mt-2 text-sm text-slate-600">{role === "student" ? "Ingresa con tu correo, o con el código que te dio tu institución." : "Ingresa con el código entregado por la institución."}</p>
           <form onSubmit={submit} className="mt-6 grid gap-4">
-            {(searchParams.get("acceso") === "vencido" || studentAccessExpired) &&
-              <Alert tone="error">Tu periodo de acceso no está vigente. Solicita una renovación al administrador.</Alert>}
+            {(searchParams.get("acceso") === "vencido" || access === "not_started") &&
+              <Alert tone="error">Tu periodo de acceso todavía no empieza. Consulta con tu institución.</Alert>}
             {searchParams.get("password") === "actualizada" && !error &&
               <Alert tone="success">Tu contraseña se actualizó. Ingresa con tu nueva contraseña.</Alert>}
+            {searchParams.get("pago") === "confirmado" && !error &&
+              <Alert tone="success">¡Pago confirmado! Tu cuenta está lista. Ingresa con tu correo y tu contraseña.</Alert>}
             {searchParams.get("invitacion") === "aceptada" && !error &&
               <Alert tone="success">Tu cuenta está lista. Ingresa con tu correo y tu contraseña.</Alert>}
             {error && <Alert tone="error">{error}</Alert>}

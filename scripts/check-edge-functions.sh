@@ -25,6 +25,7 @@ function_dirs=(
   password-reset
   invitations
   student-invitation
+  kuti
 )
 
 for function_dir in "${function_dirs[@]}"; do

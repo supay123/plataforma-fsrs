@@ -58,7 +58,8 @@ pnpm exec supabase gen types --local --schema public \
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `assign-complaint-number` | Public | Reserves the next correlative number of the Libro de Reclamaciones from `private.complaint_sheet_number_seq` and returns it with the official submission timestamp. Complaints themselves are never stored: the browser fills the official sheet as a PDF and emails it through FormSubmit. |
 | `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges a new student can choose. |
-| `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it. No account exists until the first payment is confirmed. |
+| `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` creates the Kuti charge (QR, plus a bank code from S/ 50) of the chosen plan; `GET /registration/payment` reports its status and activates the account once Kuti confirms it. No account exists until the first payment is confirmed. |
+| `kuti` | Kuti signature | `POST /kuti/webhook` receives Kuti payment events (`payment.succeeded`, `failed`, `expired`, `cancelled`), verifies `X-Kuti-Signature` with the signing secret stored in Vault, and applies the payment. Called by Kuti, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
 | `password-reset` | Public | `POST /password-reset/request-link` emails the link from the student login ("¿Olvidaste tu contraseña?"); `GET /password-reset?code=...` says whether it is still valid without using it; `POST /password-reset` uses it once, saves the new password, and closes every session of that user only. |
 | `invitations` | Admin | Student invitations: `GET /invitations` lists the ones not accepted yet (pending or expired), `POST /invitations` invites a student by email, `POST /invitations/resend` sends a new link, and `DELETE /invitations?id=...` cancels one. Students are no longer created directly from the admin screen. |
@@ -111,6 +112,38 @@ pnpm exec supabase gen types --local --schema public \
   masked `email`, `code_expires_at`, and `resend_available_at`.
 - `POST registration/validateCode`: `registration_id`, `code`. Codes last 10
   minutes and allow 5 wrong attempts. Responds with `status: "verified"`.
+- `POST registration/payment`: `registration_id`, `plan` (`mensual` or
+  `semestral`). Requires a verified email. The amount comes from
+  `_shared/plans.ts`, never from the request. Creates a Kuti charge that
+  expires in 30 minutes and stores it in `plan_payments`; responds with
+  `payment_id`, `plan`, `amount`, `qr_payload` (EMVCo text the page draws as a
+  QR), `bank_code` (service-payment code at KUTI; only for amounts of S/ 50 or
+  more, null otherwise), `checkout_url`, `expires_at` and `livemode` (`false`
+  with a `kuti_test_` key). A still-valid QR of the same plan is returned again; a QR
+  of another plan is cancelled in Kuti. Without `KUTI_SECRET_KEY` it returns
+  `503 payments_unavailable` and the page falls back to WhatsApp. The first
+  charge on a deployed project (HTTPS) also registers the Kuti webhook and
+  saves its signing secret in Vault.
+- `GET registration/payment?payment_id=…`: responds with `status`:
+  `pending`, `processing` (paid, account being created), `paid` (account
+  created; access runs from the payment day for the plan's months),
+  `failed`, `expired`, `cancelled`, or `needs_support` (paid after the
+  registration was deleted; listed to the administrator). While pending it
+  asks Kuti directly, so payments are confirmed even without the webhook
+  (local development). A registration with a charge from the last 24 hours is
+  not purged.
+- `POST registration/payment/simulate` and `POST account/payment/simulate`:
+  `payment_id`, `method` (`qr` or `code`). Test mode only: Kuti marks the
+  charge as paid without real money and it is applied at once, like a real
+  payment. Responds like the `GET` status endpoints; a live charge returns
+  `403 test_mode_only` (Kuti also refuses to simulate with a live key).
+- `POST account/payment`: `plan`. Signed-in student, with the plan active or
+  expired (expired students can sign in, but the app only shows the renewal
+  page). Same response as `registration/payment`. Once paid, the months are
+  added after the current end date or, if the plan already expired, start on
+  the payment day (`edge_apply_renewal_payment`).
+- `GET account/payment?payment_id=…`: same statuses as
+  `registration/payment`, only for the student's own payments.
 - `GET account/profile`: no body. Responds with `profile` (`given_names`,
   `family_names`, `email`, `phone`, `identity_document_type`,
   `identity_document_number`, `college_id`, `college_name`). Fields the

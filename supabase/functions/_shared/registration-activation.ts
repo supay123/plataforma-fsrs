@@ -1,7 +1,7 @@
 import { RPCS, TABLES } from "./database.constants.ts";
 import { AppError } from "./errors.ts";
 import { userCodeBaseFromEmail, userCodeCandidates } from "./registration.ts";
-import { type SubscriptionPeriod, subscriptionPeriod } from "./subscription.ts";
+import { planId, type PlanPeriod, planPeriod } from "./plans.ts";
 import type { EdgeContext } from "./types.ts";
 import { limaDate } from "./validation.ts";
 
@@ -11,7 +11,7 @@ export interface ActivatedStudent {
   user_id: string;
   user_code: string;
   access_valid_from: string;
-  period: SubscriptionPeriod;
+  period: PlanPeriod;
 }
 
 /**
@@ -35,18 +35,34 @@ export async function freeUserCode(
 }
 
 /**
- * Crea la cuenta y el perfil de un registro con el correo ya verificado. Se
- * llama cuando se confirma el primer pago: el acceso empieza ese mismo día.
+ * Crea la cuenta y el perfil del registro que pagó. Se llama cuando Kuti
+ * confirma el pago: el acceso empieza el día del pago y dura los meses del
+ * plan pagado. El pago queda aplicado en la misma transacción que el perfil.
  */
 export async function activateStudentRegistration(
   supabaseAdmin: EdgeContext["supabaseAdmin"],
-  registrationId: string,
-  paidAt = new Date(),
+  paymentId: string,
 ): Promise<ActivatedStudent> {
+  const { data: payment, error: paymentError } = await supabaseAdmin
+    .from(TABLES.planPayments)
+    .select("id,plan,paid_at,registration_id")
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (paymentError) {
+    throw new AppError(500, "payment_lookup_failed", paymentError.message);
+  }
+  if (!payment?.paid_at || !payment.registration_id) {
+    throw new AppError(
+      409,
+      "payment_not_applicable",
+      "The payment is not paid or has no pending registration.",
+    );
+  }
+
   const { data: registration, error } = await supabaseAdmin
     .from(TABLES.studentRegistrations)
     .select("id,email,password_hash,email_verified_at")
-    .eq("id", registrationId)
+    .eq("id", payment.registration_id)
     .maybeSingle();
   if (error) {
     throw new AppError(500, "registration_lookup_failed", error.message);
@@ -81,19 +97,19 @@ export async function activateStudentRegistration(
     );
   }
 
-  const accessValidFrom = limaDate(paidAt);
-  const period = subscriptionPeriod(accessValidFrom, { autoRenew: true });
+  const accessValidFrom = limaDate(new Date(payment.paid_at));
+  const period = planPeriod(accessValidFrom, planId(payment.plan));
   let lastError: { message: string; code?: string } | null = null;
   for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
     const userCode = await freeUserCode(supabaseAdmin, registration.email);
     const { error: activationError } = await supabaseAdmin.rpc(
       RPCS.activateStudentRegistration,
       {
-        p_registration_id: registration.id,
+        p_payment_id: payment.id,
         p_user_id: created.user.id,
         p_user_code: userCode,
         p_access_valid_from: accessValidFrom,
-        p_access_valid_until: period.access_valid_until,
+        p_access_valid_until: period.period_end,
       },
     );
     if (!activationError) {

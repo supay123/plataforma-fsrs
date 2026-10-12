@@ -22,6 +22,7 @@ const ReviewPage = lazy(() => import("../pages/shared/ReviewPage").then((m) => (
 const SecurityPage = lazy(() => import("../pages/shared/SecurityPage").then((m) => ({ default: m.SecurityPage })));
 const StudentCoursePage = lazy(() => import("../pages/student/CoursePage").then((m) => ({ default: m.StudentCoursePage })));
 const StudentDashboardPage = lazy(() => import("../pages/student/DashboardPage").then((m) => ({ default: m.StudentDashboardPage })));
+const RenewPage = lazy(() => import("../pages/student/RenewPage").then((m) => ({ default: m.RenewPage })));
 const SessionPage = lazy(() => import("../pages/student/SessionPage").then((m) => ({ default: m.SessionPage })));
 const CoursesPage = lazy(() => import("../pages/teacher/CoursesPage").then((m) => ({ default: m.CoursesPage })));
 const ImportPage = lazy(() => import("../pages/teacher/ImportPage").then((m) => ({ default: m.ImportPage })));
@@ -43,6 +44,7 @@ export function AppRouter() {
     <Route path="/estudiante/sign-up" element={<SignUpPage />} />
     <Route path="/estudiante/reset" element={<ResetPasswordPage />} />
     <Route path="/estudiante/invitacion" element={<InvitationPage />} />
+    <Route path="/estudiante/renovar" element={<RoleGuard role="student" allowExpired><RenewPage /></RoleGuard>} />
     <Route path="/admin" element={<RoleGuard role="admin"><PortalLayout role="admin" /></RoleGuard>}>
       <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>

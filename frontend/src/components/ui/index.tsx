@@ -3,11 +3,12 @@ import { useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import clsx from "clsx";
 
-export function Button({ className, variant = "primary", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
+export function Button({ className, variant = "primary", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "warning" | "ghost" }) {
   return <button className={clsx("inline-flex min-h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50", {
     "bg-indigo-600 text-white hover:bg-indigo-700": variant === "primary",
     "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50": variant === "secondary",
     "bg-rose-600 text-white hover:bg-rose-700": variant === "danger",
+    "bg-amber-600 text-white hover:bg-amber-700": variant === "warning",
     "text-slate-600 hover:bg-slate-100": variant === "ghost",
   }, className)} {...props} />;
 }

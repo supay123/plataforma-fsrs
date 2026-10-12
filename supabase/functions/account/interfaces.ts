@@ -13,3 +13,12 @@ export interface RequestEmailChangeBody {
 export interface ConfirmEmailChangeBody {
   code?: unknown;
 }
+
+export interface CreatePaymentBody {
+  plan?: unknown;
+}
+
+export interface SimulatePaymentBody {
+  payment_id?: unknown;
+  method?: unknown;
+}

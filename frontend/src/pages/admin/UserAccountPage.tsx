@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Spinner } from "../../components/ui";
+import { useModal } from "../../components/ui/use-modal";
 import { listUsers, renewAccess, resetCredentials, roleLabel, updateUser } from "../../features/users/api";
 import type { Credentials } from "../../types/contracts";
 
@@ -16,6 +17,7 @@ export function UserAccountPage() {
 
 function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof listUsers>>>[number] }) {
   const client = useQueryClient();
+  const modal = useModal();
   const [name, setName] = useState(user.full_name);
   const [code, setCode] = useState(user.user_code);
   const [validFrom, setValidFrom] = useState(user.access_valid_from ?? "");
@@ -57,7 +59,18 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
           <Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Activo" : "Inactivo"}</Badge>
         </div>
         {error && <Alert tone="error">{error.message}</Alert>}
-        <form className="mt-4 grid gap-4" onSubmit={(event) => { event.preventDefault(); update.mutate(); }}>
+        <form className="mt-4 grid gap-4" onSubmit={(event) => {
+          event.preventDefault();
+          modal.warning({
+            title: "Guardar cambios",
+            confirmLabel: "Guardar cambios",
+            body: <>
+              <p>Se actualizarán el nombre y el código de acceso de {user.full_name}.</p>
+              {code !== user.user_code && <p className="mt-2"><strong>El código cambiará de {user.user_code} a {code}.</strong> Deberá usar el nuevo código para iniciar sesión.</p>}
+            </>,
+            onConfirm: () => update.mutateAsync(),
+          });
+        }}>
           <Field label="Nombre completo"><Input required value={name} onChange={(event) => setName(event.target.value)} /></Field>
           <Field label="Código de acceso"><Input required value={code} onChange={(event) => setCode(event.target.value)} /></Field>
           <Button disabled={update.isPending}>Guardar cambios</Button>
@@ -72,13 +85,32 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
           <strong>Nueva credencial</strong><br />{credentials.user_code} / {credentials.temporary_password}
           <Button type="button" variant="ghost" onClick={() => void navigator.clipboard.writeText(`${credentials.user_code}\n${credentials.temporary_password ?? ""}`)}>Copiar</Button>
         </Alert>}
-        <Button className="mt-4" variant="secondary" disabled={reset.isPending} onClick={() => reset.mutate()}>
+        <Button className="mt-4" variant="secondary" disabled={reset.isPending} onClick={() => modal.warning({
+          title: "Restablecer credencial",
+          confirmLabel: "Restablecer credencial",
+          body: <>
+            <p><strong>La credencial actual de {user.full_name} dejará de funcionar.</strong></p>
+            <p className="mt-2">Se generará una nueva, que se mostrará una sola vez y deberás entregársela para que pueda volver a iniciar sesión.</p>
+          </>,
+          onConfirm: () => reset.mutateAsync(),
+        })}>
           Restablecer credencial
         </Button>
       </Card>
       {user.role === "student" && <Card className="lg:col-span-2">
         <h2 className="font-bold">Vigencia de acceso</h2>
-        <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); renew.mutate(); }}>
+        <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={(event) => {
+          event.preventDefault();
+          modal.warning({
+            title: "Renovar y reactivar",
+            confirmLabel: "Renovar y reactivar",
+            body: <>
+              <p>El acceso de {user.full_name} quedará vigente desde el {validFrom} hasta el {validUntil} y la cuenta se reactivará.</p>
+              <p className="mt-2">Esta vigencia reemplaza a la actual.</p>
+            </>,
+            onConfirm: () => renew.mutateAsync(),
+          });
+        }}>
           <Field label="Desde"><Input required type="date" value={validFrom} onChange={(event) => setValidFrom(event.target.value)} /></Field>
           <Field label="Hasta"><Input required type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></Field>
           <Button className="sm:col-span-2" disabled={renew.isPending}>Renovar y reactivar</Button>

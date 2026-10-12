@@ -1,18 +1,21 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { LockKeyhole, Mail, MessageCircle, Phone, School, User } from "lucide-react";
+import { LockKeyhole, Mail, Phone, School, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { AuthLayout } from "../../components/layout/AuthLayout";
 import { Alert, Button, Field, Input, PasswordInput, Select } from "../../components/ui";
 import { useToast } from "../../components/ui/use-toast";
-import { BUSINESS, PLAN, formatSoles } from "../../config/business";
+import { findPlan } from "../../config/business";
 import { DOCUMENT_TYPES } from "../../features/complaints/model";
+import { PaymentPanel } from "../../features/payments/PaymentPanel";
+import { PlanPicker } from "../../features/payments/PlanPicker";
 import {
-  listRegistrationColleges, requestRegistrationCode, validateRegistrationCode, validateStudentRegistration,
+  createRegistrationPayment, getRegistrationPaymentStatus, listRegistrationColleges, requestRegistrationCode, simulateRegistrationPayment,
+  validateRegistrationCode, validateStudentRegistration,
   type EmailCodeDelivery, type ValidatedRegistration,
 } from "../../features/registration/api";
 import {
@@ -39,7 +42,7 @@ type ServerField = "given_names" | "family_names" | "email" | "phone" | "identit
 const STEPS = ["Tus datos", "Verifica tu correo", "Pago"];
 
 function Steps({ current }: { current: number }) {
-  return <ol className="mb-6 grid grid-cols-3 gap-2 text-xs font-semibold sm:text-sm">
+  return <ol className="mb-5 grid grid-cols-3 gap-2 text-xs font-semibold sm:text-sm">
     {STEPS.map((label, index) => <li key={label} aria-current={index === current ? "step" : undefined} className={clsx("flex items-center gap-2 border-t-4 pt-2", index <= current ? "border-indigo-500 text-indigo-700" : "border-slate-200 text-slate-400")}>
       <span className="hidden sm:inline">{index + 1}.</span>{label}
     </li>)}
@@ -102,21 +105,14 @@ function VerifyEmail({ registration, firstCode, onVerified, onBack }: { registra
   </form>;
 }
 
-function PaymentComingSoon() {
-  return <div className="grid gap-4">
-    <Alert tone="success">¡Listo! Verificamos tu correo y tus datos están completos.</Alert>
-    <h2 className="text-lg font-bold text-slate-950">Muy pronto podrás completar el pago aquí</h2>
-    <p className="text-sm text-slate-600">Estamos terminando el pago en línea con Yape a través de Kuti. Mientras tanto, escríbenos y te ayudamos a activar tu {PLAN.name.toLowerCase()}.</p>
-    <a href={`https://wa.me/${BUSINESS.whatsapp}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 font-semibold text-white hover:bg-indigo-500"><MessageCircle size={18} />Escribir por WhatsApp</a>
-    <p className="text-xs text-slate-500">Guardamos tus datos durante {PENDING_HOURS} horas para que completes el pago. Si no se completa, los eliminamos.</p>
-  </div>;
-}
-
 export function SignUpPage() {
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [registration, setRegistration] = useState<ValidatedRegistration | null>(null);
   const [firstCode, setFirstCode] = useState<FirstCode>({ delivery: null, error: "" });
   const [formError, setFormError] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const plan = findPlan(searchParams.get("plan"));
   const toast = useToast();
   const colleges = useQuery({ queryKey: ["registration-colleges"], queryFn: listRegistrationColleges });
   const { register, handleSubmit, control, setValue, getValues, setError, formState: { errors, isSubmitting } } = useForm<Values>({
@@ -174,13 +170,18 @@ export function SignUpPage() {
   });
 
   return <AuthLayout wide>
-    <div className="mb-6">
+    <div className="mb-4">
       <h1 className="text-2xl font-bold">Crea tu cuenta</h1>
-      <p className="mt-2 text-sm text-slate-600">{PLAN.name} · {formatSoles(PLAN.priceSoles)} / {PLAN.period}</p>
       <p className="mt-2 text-sm text-slate-600">¿Ya tienes una cuenta? <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante/login">Inicia sesión</Link></p>
     </div>
+    <div className="mb-4"><PlanPicker plan={plan} onChange={(id) => setSearchParams({ plan: id }, { replace: true })} /></div>
     <Steps current={step} />
-    {step === 2 && <PaymentComingSoon />}
+    {step === 2 && registration && <PaymentPanel plan={plan} payerKey={registration.registration_id}
+      createPayment={(planId) => createRegistrationPayment(registration.registration_id, planId)}
+      fetchStatus={getRegistrationPaymentStatus}
+      simulatePayment={simulateRegistrationPayment}
+      onPaid={() => navigate("/estudiante/login?pago=confirmado", { replace: true })}
+      unavailableNote={`Guardamos tus datos durante ${PENDING_HOURS} horas para que completes el pago. Si no se completa, los eliminamos.`} />}
     {step === 1 && registration && <VerifyEmail key={registration.registration_id} registration={registration} firstCode={firstCode} onVerified={() => setStep(2)} onBack={() => setStep(0)} />}
     {step === 0 && <form onSubmit={submit} className="grid gap-4" noValidate>
       {formError && <Alert tone="error">{formError}</Alert>}

@@ -782,6 +782,101 @@ export type Database = {
         };
         Relationships: [];
       };
+      plan_payments: {
+        Row: {
+          amount: number;
+          applied_at: string | null;
+          bank_code: string | null;
+          checkout_url: string | null;
+          created_at: string;
+          email: string | null;
+          expires_at: string;
+          id: string;
+          kuti_payment_intent_id: string;
+          livemode: boolean;
+          paid_at: string | null;
+          period_end: string | null;
+          period_start: string | null;
+          plan: string;
+          profile_id: string | null;
+          qr_payload: string;
+          registration_id: string | null;
+          resolved_at: string | null;
+          status: string;
+        };
+        Insert: {
+          amount: number;
+          applied_at?: string | null;
+          bank_code?: string | null;
+          checkout_url?: string | null;
+          created_at?: string;
+          email?: string | null;
+          expires_at: string;
+          id: string;
+          kuti_payment_intent_id: string;
+          livemode: boolean;
+          paid_at?: string | null;
+          period_end?: string | null;
+          period_start?: string | null;
+          plan: string;
+          profile_id?: string | null;
+          qr_payload: string;
+          registration_id?: string | null;
+          resolved_at?: string | null;
+          status?: string;
+        };
+        Update: {
+          amount?: number;
+          applied_at?: string | null;
+          bank_code?: string | null;
+          checkout_url?: string | null;
+          created_at?: string;
+          email?: string | null;
+          expires_at?: string;
+          id?: string;
+          kuti_payment_intent_id?: string;
+          livemode?: boolean;
+          paid_at?: string | null;
+          period_end?: string | null;
+          period_start?: string | null;
+          plan?: string;
+          profile_id?: string | null;
+          qr_payload?: string;
+          registration_id?: string | null;
+          resolved_at?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "plan_payments_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "plan_payments_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["student_id"];
+          },
+          {
+            foreignKeyName: "plan_payments_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["teacher_id"];
+          },
+          {
+            foreignKeyName: "plan_payments_registration_id_fkey";
+            columns: ["registration_id"];
+            isOneToOne: false;
+            referencedRelation: "student_registrations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           access_valid_from: string | null;
@@ -2126,7 +2221,7 @@ export type Database = {
         Args: {
           p_access_valid_from: string;
           p_access_valid_until: string;
-          p_registration_id: string;
+          p_payment_id: string;
           p_user_code: string;
           p_user_id: string;
         };
@@ -2142,6 +2237,13 @@ export type Database = {
           p_student_id: string;
         };
         Returns: Json;
+      };
+      edge_apply_renewal_payment: {
+        Args: { p_months: number; p_payment_id: string };
+        Returns: {
+          period_end: string;
+          period_start: string;
+        }[];
       };
       edge_complete_session: {
         Args: { p_session_id: string; p_student_id: string };
@@ -2203,6 +2305,7 @@ export type Database = {
         };
         Returns: string;
       };
+      edge_kuti_webhook_secret: { Args: { p_mode: string }; Returns: string };
       edge_next_complaint_sheet_number: { Args: never; Returns: number };
       edge_registration_colleges: {
         Args: never;
@@ -2213,6 +2316,10 @@ export type Database = {
       };
       edge_revoke_user_sessions: {
         Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      edge_save_kuti_webhook_secret: {
+        Args: { p_mode: string; p_secret: string };
         Returns: undefined;
       };
       edge_start_session: {

@@ -2,14 +2,14 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModalProvider } from "./modal";
-import { useModal, type ModalOptions } from "./use-modal";
+import { useModal, type ModalOptions, type ModalVariant } from "./use-modal";
 
-function Opener({ variant, options }: { variant: "delete" | "create"; options: ModalOptions }) {
+function Opener({ variant, options }: { variant: ModalVariant; options: ModalOptions }) {
   const modal = useModal();
   return <button type="button" onClick={() => modal[variant](options)}>Abrir</button>;
 }
 
-function renderOpener(variant: "delete" | "create", options: Partial<ModalOptions> = {}) {
+function renderOpener(variant: ModalVariant, options: Partial<ModalOptions> = {}) {
   const onConfirm = options.onConfirm ?? vi.fn();
   render(<ModalProvider><Opener variant={variant} options={{ title: "Título", body: <p>Cuerpo del modal</p>, ...options, onConfirm }} /></ModalProvider>);
   return { onConfirm };
@@ -40,6 +40,14 @@ describe("Modal", () => {
     renderOpener("create", { confirmLabel: "Continuar" });
     await user.click(screen.getByRole("button", { name: "Abrir" }));
     expect(screen.getByRole("button", { name: "Continuar" })).toBeInTheDocument();
+  });
+
+  it("opens a warning modal with Confirmar by default", async () => {
+    const user = userEvent.setup();
+    renderOpener("warning", { title: "Restablecer credencial" });
+    await user.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(screen.getByRole("dialog", { name: "Restablecer credencial" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirmar" })).toHaveClass("bg-amber-600");
   });
 
   it("closes after the action succeeds and blocks the buttons while it runs", async () => {
