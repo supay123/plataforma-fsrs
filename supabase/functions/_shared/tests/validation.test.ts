@@ -53,5 +53,7 @@ Deno.test("supports six-digit student PINs without weakening teacher passwords",
   assert.throws(() => assertCredential("student", "12345"));
   assert.throws(() => assertCredential("teacher", "482731"));
   assert.doesNotThrow(() => assertCredential("teacher", generatePassword()));
-  assert.doesNotThrow(() => assertCredential("admin", generateCredential("admin")));
+  assert.doesNotThrow(() =>
+    assertCredential("admin", generateCredential("admin"))
+  );
 });

@@ -26,12 +26,19 @@ export interface ImportIssue { row: number; code: string; message: string }
 export interface ImportReport { total: number; accepted: number; rejected: number; duplicates: number; issues: ImportIssue[] }
 export interface ImportResponse { batch_id?: string; report: ImportReport; accepted_rows?: ImportRow[] }
 
+export interface AnswerFeedback { is_correct: boolean; correct_option: AnswerOption; explanation: string | null }
+export interface AnswerResult {
+  status: "accepted" | "already_answered"; session_id: string;
+  selected_option: AnswerOption; feedback: AnswerFeedback;
+}
 export interface SessionQuestion {
   session_question_id: string;
   position: number;
   selection_reason: "due" | "new" | "scheduled";
   selected_option: AnswerOption | null;
   answered_at: string | null;
+  /** Only present once the question has been answered. */
+  feedback: AnswerFeedback | null;
   question: { id: string; statement: string; option_a: string; option_b: string; option_c: string; option_d: string };
 }
 export interface SessionPayload {

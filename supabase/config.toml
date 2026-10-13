@@ -173,7 +173,9 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = true
+# Las cuentas solo se crean desde Edge Functions con la API de administrador
+# (admin-create-user y el autorregistro tras el pago), que no dependen de esto.
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
@@ -417,4 +419,22 @@ enabled = true
 verify_jwt = false
 
 [functions.recover-password]
+verify_jwt = false
+
+[functions.assign-complaint-number]
+verify_jwt = false
+
+[functions.registration]
+verify_jwt = false
+
+[functions.public]
+verify_jwt = false
+
+[functions.password-reset]
+verify_jwt = false
+
+[functions.student-invitation]
+verify_jwt = false
+
+[functions.kuti]
 verify_jwt = false

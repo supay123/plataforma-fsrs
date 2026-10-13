@@ -33,7 +33,7 @@ export async function sessionPayload(
   const { data: rows, error: questionError } = await context.supabaseAdmin
     .from(TABLES.assessmentSessionQuestions)
     .select(
-      "id,position,selection_reason,selected_option,answered_at,questions!inner(id,statement,option_a,option_b,option_c,option_d)",
+      "id,position,selection_reason,selected_option,answered_at,questions!inner(id,statement,option_a,option_b,option_c,option_d,correct_option,explanation)",
     )
     .eq("session_id", sessionId)
     .order("position");
@@ -46,13 +46,19 @@ export async function sessionPayload(
     const nested = Array.isArray(row.questions)
       ? row.questions[0]
       : row.questions;
+    const { correct_option, explanation, ...question } = nested;
     return {
       session_question_id: row.id,
       position: row.position,
       selection_reason: row.selection_reason,
       selected_option: row.selected_option,
       answered_at: row.answered_at,
-      question: nested,
+      feedback: row.selected_option === null ? null : {
+        is_correct: row.selected_option === correct_option,
+        correct_option,
+        explanation,
+      },
+      question,
     } as QuestionPayload;
   });
 

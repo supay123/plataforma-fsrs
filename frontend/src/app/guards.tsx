@@ -2,25 +2,22 @@ import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spinner } from "../components/ui";
 import { useAuth } from "../features/auth/AuthProvider";
-import { todayInLima } from "../lib/dates";
+import { studentAccess } from "../lib/student-access";
 import type { AppRole } from "../types/contracts";
 
 const home: Record<AppRole, string> = { admin: "/admin", teacher: "/profesor", student: "/estudiante" };
-export function RoleGuard({ role, children }: { role: AppRole; children: ReactNode }) {
+/** allowExpired: la página también la ve un estudiante con el plan vencido (renovación). */
+export function RoleGuard({ role, children, allowExpired = false }: { role: AppRole; children: ReactNode; allowExpired?: boolean }) {
   const { loading, profile } = useAuth();
   const location = useLocation();
   if (loading) return <Spinner />;
   if (!profile) return <Navigate to={`${home[role]}/login`} state={{ from: location.pathname }} replace />;
   if (!profile.is_active) return <Navigate to={`${home[role]}/login`} replace />;
   if (profile.role !== role) return <Navigate to={home[profile.role]} replace />;
-  if (
-    role === "student" &&
-    (!profile.access_valid_from ||
-      !profile.access_valid_until ||
-      todayInLima() < profile.access_valid_from ||
-      todayInLima() > profile.access_valid_until)
-  ) {
-    return <Navigate to="/estudiante/login?acceso=vencido" replace />;
+  if (role === "student") {
+    const access = studentAccess(profile);
+    if (access.state === "not_started") return <Navigate to="/estudiante/login?acceso=vencido" replace />;
+    if (access.state === "expired" && !allowExpired) return <Navigate to="/estudiante/renovar" replace />;
   }
   return children;
 }

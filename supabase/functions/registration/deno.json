@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "imports": {
+    "@supabase/functions-js": "jsr:@supabase/functions-js@2.110.8",
+    "@supabase/server": "npm:@supabase/server@1.4.1",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.110.8",
+    "bcryptjs": "npm:bcryptjs@3.0.2"
+  },
+  "nodeModulesDir": "auto"
+}

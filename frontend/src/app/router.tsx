@@ -5,6 +5,14 @@ import { Spinner } from "../components/ui";
 import { LoginPage } from "../features/auth/LoginPage";
 import { HomePage, NotFoundPage } from "../pages/HomePage";
 import { RoleGuard } from "./guards";
+const PricingPage = lazy(() => import("../pages/public/PricingPage").then((m) => ({ default: m.PricingPage })));
+const SignUpPage = lazy(() => import("../pages/public/SignUpPage").then((m) => ({ default: m.SignUpPage })));
+const InvitationPage = lazy(() => import("../pages/public/InvitationPage").then((m) => ({ default: m.InvitationPage })));
+const ResetPasswordPage = lazy(() => import("../pages/public/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
+const TermsPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
+const RefundPolicyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.RefundPolicyPage })));
+const ComplaintsBookPage = lazy(() => import("../pages/public/ComplaintsBookPage").then((m) => ({ default: m.ComplaintsBookPage })));
 const CollegesPage = lazy(() => import("../pages/admin/CollegesPage").then((m) => ({ default: m.CollegesPage })));
 const AssignmentsPage = lazy(() => import("../pages/admin/AssignmentsPage").then((m) => ({ default: m.AssignmentsPage })));
 const TeacherDetailPage = lazy(() => import("../pages/admin/UserDetailPage").then((m) => ({ default: m.TeacherDetailPage })));
@@ -14,6 +22,7 @@ const ReviewPage = lazy(() => import("../pages/shared/ReviewPage").then((m) => (
 const SecurityPage = lazy(() => import("../pages/shared/SecurityPage").then((m) => ({ default: m.SecurityPage })));
 const StudentCoursePage = lazy(() => import("../pages/student/CoursePage").then((m) => ({ default: m.StudentCoursePage })));
 const StudentDashboardPage = lazy(() => import("../pages/student/DashboardPage").then((m) => ({ default: m.StudentDashboardPage })));
+const RenewPage = lazy(() => import("../pages/student/RenewPage").then((m) => ({ default: m.RenewPage })));
 const SessionPage = lazy(() => import("../pages/student/SessionPage").then((m) => ({ default: m.SessionPage })));
 const CoursesPage = lazy(() => import("../pages/teacher/CoursesPage").then((m) => ({ default: m.CoursesPage })));
 const ImportPage = lazy(() => import("../pages/teacher/ImportPage").then((m) => ({ default: m.ImportPage })));
@@ -24,9 +33,18 @@ const TopicsPage = lazy(() => import("../pages/teacher/TopicsPage").then((m) => 
 export function AppRouter() {
   return <Suspense fallback={<Spinner />}><Routes>
     <Route path="/" element={<HomePage />} />
+    <Route path="/precios" element={<PricingPage />} />
+    <Route path="/terminos" element={<TermsPage />} />
+    <Route path="/privacidad" element={<PrivacyPage />} />
+    <Route path="/reembolsos" element={<RefundPolicyPage />} />
+    <Route path="/libro-reclamaciones" element={<ComplaintsBookPage />} />
     <Route path="/admin/login" element={<LoginPage role="admin" />} />
     <Route path="/profesor/login" element={<LoginPage role="teacher" />} />
     <Route path="/estudiante/login" element={<LoginPage role="student" />} />
+    <Route path="/estudiante/sign-up" element={<SignUpPage />} />
+    <Route path="/estudiante/reset" element={<ResetPasswordPage />} />
+    <Route path="/estudiante/invitacion" element={<InvitationPage />} />
+    <Route path="/estudiante/renovar" element={<RoleGuard role="student" allowExpired><RenewPage /></RoleGuard>} />
     <Route path="/admin" element={<RoleGuard role="admin"><PortalLayout role="admin" /></RoleGuard>}>
       <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>

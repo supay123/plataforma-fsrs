@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, PageHeader, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Spinner } from "../../components/ui";
+import { useModal } from "../../components/ui/use-modal";
 import { createCollege, deleteCollege, listColleges, updateCollege } from "../../features/colleges/api";
 
 const empty = { code: "", name: "", description: "" };
@@ -9,7 +10,7 @@ export function CollegesPage() {
   const client = useQueryClient();
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [collegeToDelete, setCollegeToDelete] = useState<Awaited<ReturnType<typeof listColleges>>[number] | null>(null);
+  const modal = useModal();
   const query = useQuery({ queryKey: ["colleges"], queryFn: listColleges });
   const save = useMutation({
     mutationFn: () => editingId ? updateCollege(editingId, form) : createCollege(form),
@@ -30,7 +31,6 @@ export function CollegesPage() {
         setEditingId(null);
         setForm(empty);
       }
-      setCollegeToDelete(null);
       void client.invalidateQueries({ queryKey: ["colleges"] });
       void client.invalidateQueries({ queryKey: ["users"] });
     },
@@ -53,7 +53,15 @@ export function CollegesPage() {
               setForm({ code: college.code, name: college.name, description: college.description ?? "" });
             }}>Editar</Button>
             <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: college.id, active: !college.is_active })}>{college.is_active ? "Desactivar" : "Activar"}</Button>
-            <Button variant="danger" disabled={remove.isPending} onClick={() => setCollegeToDelete(college)}>Eliminar</Button>
+            <Button variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
+              title: "Eliminar colegio",
+              confirmLabel: "Eliminar definitivamente",
+              body: <>
+                <p><strong>Esta acción no se puede deshacer.</strong></p>
+                <p className="mt-2">Se eliminará el colegio {college.name}, sus usuarios, cursos y toda la información académica relacionada.</p>
+              </>,
+              onConfirm: () => remove.mutateAsync(college.id),
+            })}>Eliminar</Button>
           </td>
         </tr>)}</tbody>
       </table></div> : <EmptyState>No hay colegios registrados.</EmptyState>}</Card>
@@ -69,18 +77,5 @@ export function CollegesPage() {
         </form>
       </Card>
     </div>
-    <ConfirmDialog
-      open={Boolean(collegeToDelete)}
-      title="Eliminar colegio"
-      confirmLabel="Eliminar definitivamente"
-      confirmVariant="danger"
-      pendingLabel="Eliminando…"
-      pending={remove.isPending}
-      onCancel={() => { if (!remove.isPending) setCollegeToDelete(null); }}
-      onConfirm={() => { if (collegeToDelete) remove.mutate(collegeToDelete.id); }}
-    >
-      <p><strong>Esta acción no se puede deshacer.</strong></p>
-      <p className="mt-2">Se eliminará el colegio {collegeToDelete?.name}, sus usuarios, cursos y toda la información académica relacionada.</p>
-    </ConfirmDialog>
   </>;
 }

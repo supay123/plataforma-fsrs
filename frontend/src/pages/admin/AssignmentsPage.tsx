@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
+import { useModal } from "../../components/ui/use-modal";
 import { listTeacherAssignments, setCourseEnrollmentStatus, syncTeacherStudents } from "../../features/assignments/api";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { listColleges } from "../../features/colleges/api";
@@ -36,7 +37,7 @@ export function AssignmentsPage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [courseFilter, setCourseFilter] = useState("");
   const [studentSelection, setStudentSelection] = useState<Set<string> | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const modal = useModal();
 
   const collegeNames = useMemo(() => new Map(colleges.data?.map((college) => [college.id, college.name]) ?? []), [colleges.data]);
   const teachers = useMemo(() => users.data?.filter((user) => user.role === "teacher") ?? [], [users.data]);
@@ -114,7 +115,6 @@ export function AssignmentsPage() {
   const syncMutation = useMutation({
     mutationFn: () => syncTeacherStudents({ teacherId: selectedTeacherId, studentIds: [...selectedStudentIds] }),
     onSuccess: async () => {
-      setConfirmOpen(false);
       setStudentSelection(null);
       await refreshAssignments();
     },
@@ -175,11 +175,12 @@ export function AssignmentsPage() {
 
     {selectedTeacher && activePanel === "topics" && <TopicsPanel courses={teacherCourses} rows={topicRows} studentSearch={studentSearch} courseFilter={courseFilter} pending={topicMutation.isPending} error={topicMutation.error?.message} onStudentSearch={setStudentSearch} onCourseFilter={setCourseFilter} onToggle={(studentId, topicId, blocked) => topicMutation.mutate({ studentId, topicId, blocked })} />}
     {selectedTeacher && activePanel === "courses" && <CoursesPanel courses={teacherCourses} rows={courseRows} studentSearch={studentSearch} courseFilter={courseFilter} pending={courseMutation.isPending} error={courseMutation.error?.message} onStudentSearch={setStudentSearch} onCourseFilter={setCourseFilter} onToggle={(courseId, studentId, status) => courseMutation.mutate({ courseId, studentId, status })} />}
-    {selectedTeacher && activePanel === "students" && <StudentsPanel students={visibleCollegeStudents} selectedStudentIds={selectedStudentIds} studentSearch={studentSearch} hasCourses={teacherCourses.length > 0} pending={syncMutation.isPending} error={syncMutation.error?.message} onStudentSearch={setStudentSearch} onToggle={toggleStudent} onConfirm={() => setConfirmOpen(true)} />}
-
-    <ConfirmDialog open={confirmOpen} title="Confirmar asignaciones" pending={syncMutation.isPending} onCancel={() => setConfirmOpen(false)} onConfirm={() => syncMutation.mutate()}>
-      Los alumnos que se asignen a un profesor serán automáticamente asignados a todos sus cursos, incluso a aquellos que se creen después de confirmar esta operación. Si se desactivan asignaciones en esta pantalla, los alumnos ya no estarán matriculados en los cursos de este profesor.
-    </ConfirmDialog>
+    {selectedTeacher && activePanel === "students" && <StudentsPanel students={visibleCollegeStudents} selectedStudentIds={selectedStudentIds} studentSearch={studentSearch} hasCourses={teacherCourses.length > 0} pending={syncMutation.isPending} error={syncMutation.error?.message} onStudentSearch={setStudentSearch} onToggle={toggleStudent} onConfirm={() => modal.create({
+      title: "Confirmar asignaciones",
+      confirmLabel: "Continuar",
+      body: "Los alumnos que se asignen a un profesor serán automáticamente asignados a todos sus cursos, incluso a aquellos que se creen después de confirmar esta operación. Si se desactivan asignaciones en esta pantalla, los alumnos ya no estarán matriculados en los cursos de este profesor.",
+      onConfirm: () => syncMutation.mutateAsync(),
+    })} />}
   </>;
 }
 

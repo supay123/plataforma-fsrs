@@ -541,6 +541,39 @@ export type Database = {
           },
         ];
       };
+      email_change_requests: {
+        Row: {
+          code_expires_at: string;
+          code_hash: string;
+          code_sent_at: string;
+          created_at: string;
+          failed_attempts: number;
+          new_email: string;
+          send_count: number;
+          user_id: string;
+        };
+        Insert: {
+          code_expires_at: string;
+          code_hash: string;
+          code_sent_at: string;
+          created_at?: string;
+          failed_attempts?: number;
+          new_email: string;
+          send_count?: number;
+          user_id: string;
+        };
+        Update: {
+          code_expires_at?: string;
+          code_hash?: string;
+          code_sent_at?: string;
+          created_at?: string;
+          failed_attempts?: number;
+          new_email?: string;
+          send_count?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       fsrs_configs: {
         Row: {
           created_at: string;
@@ -728,6 +761,122 @@ export type Database = {
           },
         ];
       };
+      password_reset_codes: {
+        Row: {
+          code_hash: string;
+          created_at: string;
+          expires_at: string;
+          user_id: string;
+        };
+        Insert: {
+          code_hash: string;
+          created_at?: string;
+          expires_at: string;
+          user_id: string;
+        };
+        Update: {
+          code_hash?: string;
+          created_at?: string;
+          expires_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      plan_payments: {
+        Row: {
+          amount: number;
+          applied_at: string | null;
+          bank_code: string | null;
+          checkout_url: string | null;
+          created_at: string;
+          email: string | null;
+          expires_at: string;
+          id: string;
+          kuti_payment_intent_id: string;
+          livemode: boolean;
+          paid_at: string | null;
+          period_end: string | null;
+          period_start: string | null;
+          plan: string;
+          profile_id: string | null;
+          qr_payload: string;
+          registration_id: string | null;
+          resolved_at: string | null;
+          status: string;
+        };
+        Insert: {
+          amount: number;
+          applied_at?: string | null;
+          bank_code?: string | null;
+          checkout_url?: string | null;
+          created_at?: string;
+          email?: string | null;
+          expires_at: string;
+          id: string;
+          kuti_payment_intent_id: string;
+          livemode: boolean;
+          paid_at?: string | null;
+          period_end?: string | null;
+          period_start?: string | null;
+          plan: string;
+          profile_id?: string | null;
+          qr_payload: string;
+          registration_id?: string | null;
+          resolved_at?: string | null;
+          status?: string;
+        };
+        Update: {
+          amount?: number;
+          applied_at?: string | null;
+          bank_code?: string | null;
+          checkout_url?: string | null;
+          created_at?: string;
+          email?: string | null;
+          expires_at?: string;
+          id?: string;
+          kuti_payment_intent_id?: string;
+          livemode?: boolean;
+          paid_at?: string | null;
+          period_end?: string | null;
+          period_start?: string | null;
+          plan?: string;
+          profile_id?: string | null;
+          qr_payload?: string;
+          registration_id?: string | null;
+          resolved_at?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "plan_payments_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "plan_payments_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["student_id"];
+          },
+          {
+            foreignKeyName: "plan_payments_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["teacher_id"];
+          },
+          {
+            foreignKeyName: "plan_payments_registration_id_fkey";
+            columns: ["registration_id"];
+            isOneToOne: false;
+            referencedRelation: "student_registrations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           access_valid_from: string | null;
@@ -735,9 +884,17 @@ export type Database = {
           college_id: string | null;
           created_at: string;
           created_by: string | null;
+          email: string | null;
+          family_names: string | null;
           full_name: string;
+          given_names: string | null;
           id: string;
+          identity_document_number: string | null;
+          identity_document_type:
+            | Database["public"]["Enums"]["identity_document_type"]
+            | null;
           is_active: boolean;
+          phone: string | null;
           role: Database["public"]["Enums"]["app_user_role"];
           security_answer_hash: string | null;
           security_failed_attempts: number;
@@ -752,9 +909,17 @@ export type Database = {
           college_id?: string | null;
           created_at?: string;
           created_by?: string | null;
+          email?: string | null;
+          family_names?: string | null;
           full_name: string;
+          given_names?: string | null;
           id: string;
+          identity_document_number?: string | null;
+          identity_document_type?:
+            | Database["public"]["Enums"]["identity_document_type"]
+            | null;
           is_active?: boolean;
+          phone?: string | null;
           role: Database["public"]["Enums"]["app_user_role"];
           security_answer_hash?: string | null;
           security_failed_attempts?: number;
@@ -769,9 +934,17 @@ export type Database = {
           college_id?: string | null;
           created_at?: string;
           created_by?: string | null;
+          email?: string | null;
+          family_names?: string | null;
           full_name?: string;
+          given_names?: string | null;
           id?: string;
+          identity_document_number?: string | null;
+          identity_document_type?:
+            | Database["public"]["Enums"]["identity_document_type"]
+            | null;
           is_active?: boolean;
+          phone?: string | null;
           role?: Database["public"]["Enums"]["app_user_role"];
           security_answer_hash?: string | null;
           security_failed_attempts?: number;
@@ -908,7 +1081,7 @@ export type Database = {
           correct_option: string;
           created_at: string;
           created_by: string;
-          explanation: string;
+          explanation: string | null;
           id: string;
           import_batch_id: string | null;
           option_a: string;
@@ -925,7 +1098,7 @@ export type Database = {
           correct_option: string;
           created_at?: string;
           created_by: string;
-          explanation: string;
+          explanation?: string | null;
           id?: string;
           import_batch_id?: string | null;
           option_a: string;
@@ -942,7 +1115,7 @@ export type Database = {
           correct_option?: string;
           created_at?: string;
           created_by?: string;
-          explanation?: string;
+          explanation?: string | null;
           id?: string;
           import_batch_id?: string | null;
           option_a?: string;
@@ -1025,6 +1198,78 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "v_student_topic_access_status";
             referencedColumns: ["topic_id"];
+          },
+        ];
+      };
+      student_invitations: {
+        Row: {
+          access_valid_from: string;
+          access_valid_until: string;
+          code_hash: string;
+          college_id: string;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invited_by: string | null;
+        };
+        Insert: {
+          access_valid_from: string;
+          access_valid_until: string;
+          code_hash: string;
+          college_id: string;
+          created_at?: string;
+          email: string;
+          expires_at: string;
+          id?: string;
+          invited_by?: string | null;
+        };
+        Update: {
+          access_valid_from?: string;
+          access_valid_until?: string;
+          code_hash?: string;
+          college_id?: string;
+          created_at?: string;
+          email?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_invitations_college_id_fkey";
+            columns: ["college_id"];
+            isOneToOne: false;
+            referencedRelation: "colleges";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_invitations_college_id_fkey";
+            columns: ["college_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["college_id"];
+          },
+          {
+            foreignKeyName: "student_invitations_invited_by_fkey";
+            columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_invitations_invited_by_fkey";
+            columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["student_id"];
+          },
+          {
+            foreignKeyName: "student_invitations_invited_by_fkey";
+            columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["teacher_id"];
           },
         ];
       };
@@ -1135,6 +1380,87 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "v_export_all_data";
             referencedColumns: ["teacher_id"];
+          },
+        ];
+      };
+      student_registrations: {
+        Row: {
+          college_id: string;
+          created_at: string;
+          email: string;
+          email_code_expires_at: string | null;
+          email_code_failed_attempts: number;
+          email_code_hash: string | null;
+          email_code_send_count: number;
+          email_code_sent_at: string | null;
+          email_verified_at: string | null;
+          expires_at: string;
+          family_names: string;
+          given_names: string;
+          id: string;
+          identity_document_number: string;
+          identity_document_type:
+            Database["public"]["Enums"]["identity_document_type"];
+          password_hash: string;
+          phone: string;
+          user_code: string | null;
+        };
+        Insert: {
+          college_id: string;
+          created_at?: string;
+          email: string;
+          email_code_expires_at?: string | null;
+          email_code_failed_attempts?: number;
+          email_code_hash?: string | null;
+          email_code_send_count?: number;
+          email_code_sent_at?: string | null;
+          email_verified_at?: string | null;
+          expires_at?: string;
+          family_names: string;
+          given_names: string;
+          id?: string;
+          identity_document_number: string;
+          identity_document_type:
+            Database["public"]["Enums"]["identity_document_type"];
+          password_hash: string;
+          phone: string;
+          user_code?: string | null;
+        };
+        Update: {
+          college_id?: string;
+          created_at?: string;
+          email?: string;
+          email_code_expires_at?: string | null;
+          email_code_failed_attempts?: number;
+          email_code_hash?: string | null;
+          email_code_send_count?: number;
+          email_code_sent_at?: string | null;
+          email_verified_at?: string | null;
+          expires_at?: string;
+          family_names?: string;
+          given_names?: string;
+          id?: string;
+          identity_document_number?: string;
+          identity_document_type?:
+            Database["public"]["Enums"]["identity_document_type"];
+          password_hash?: string;
+          phone?: string;
+          user_code?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_registrations_college_id_fkey";
+            columns: ["college_id"];
+            isOneToOne: false;
+            referencedRelation: "colleges";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_registrations_college_id_fkey";
+            columns: ["college_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["college_id"];
           },
         ];
       };
@@ -1891,6 +2217,16 @@ export type Database = {
         Args: { p_student_ids?: string[]; p_teacher_id: string };
         Returns: undefined;
       };
+      edge_activate_student_registration: {
+        Args: {
+          p_access_valid_from: string;
+          p_access_valid_until: string;
+          p_payment_id: string;
+          p_user_code: string;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
       edge_apply_answer: {
         Args: {
           p_card: Json;
@@ -1902,16 +2238,51 @@ export type Database = {
         };
         Returns: Json;
       };
+      edge_apply_renewal_payment: {
+        Args: { p_months: number; p_payment_id: string };
+        Returns: {
+          period_end: string;
+          period_start: string;
+        }[];
+      };
       edge_complete_session: {
         Args: { p_session_id: string; p_student_id: string };
         Returns: string;
       };
-      edge_submit_and_complete_session: {
-        Args: { p_results: Json; p_session_id: string; p_student_id: string };
+      edge_create_student_registration: {
+        Args: {
+          p_college_id: string;
+          p_email: string;
+          p_family_names: string;
+          p_given_names: string;
+          p_identity_document_number: string;
+          p_identity_document_type:
+            Database["public"]["Enums"]["identity_document_type"];
+          p_password_hash: string;
+          p_phone: string;
+          p_replaces_registration_id?: string;
+        };
         Returns: string;
+      };
+      edge_email_in_use: {
+        Args: { p_email: string; p_except_user_id?: string };
+        Returns: boolean;
       };
       edge_find_profile_by_code: {
         Args: { p_code: string };
+        Returns: {
+          access_valid_from: string;
+          access_valid_until: string;
+          college_id: string;
+          full_name: string;
+          id: string;
+          is_active: boolean;
+          role: Database["public"]["Enums"]["app_user_role"];
+          user_code: string;
+        }[];
+      };
+      edge_find_profile_by_email: {
+        Args: { p_email: string };
         Returns: {
           access_valid_from: string;
           access_valid_until: string;
@@ -1934,16 +2305,39 @@ export type Database = {
         };
         Returns: string;
       };
+      edge_kuti_webhook_secret: { Args: { p_mode: string }; Returns: string };
+      edge_next_complaint_sheet_number: { Args: never; Returns: number };
+      edge_registration_colleges: {
+        Args: never;
+        Returns: {
+          college_id: string;
+          college_name: string;
+        }[];
+      };
+      edge_revoke_user_sessions: {
+        Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      edge_save_kuti_webhook_secret: {
+        Args: { p_mode: string; p_secret: string };
+        Returns: undefined;
+      };
       edge_start_session: {
         Args: { p_limit?: number; p_student_id: string; p_topic_id: string };
         Returns: string;
       };
+      edge_submit_and_complete_session: {
+        Args: { p_results: Json; p_session_id: string; p_student_id: string };
+        Returns: string;
+      };
+      edge_taken_user_codes: { Args: { p_codes: string[] }; Returns: string[] };
     };
     Enums: {
       app_user_role: "admin" | "teacher" | "student";
       course_status: "active" | "inactive" | "archived";
       enrollment_status: "active" | "inactive";
       fsrs_rating: "Again" | "Good";
+      identity_document_type: "DNI" | "CE" | "PASAPORTE" | "RUC";
       import_status: "validating" | "completed" | "failed";
       question_selection_reason: "due" | "new" | "scheduled";
       question_status: "draft" | "active" | "inactive" | "archived";
@@ -2097,6 +2491,7 @@ export const Constants = {
       course_status: ["active", "inactive", "archived"],
       enrollment_status: ["active", "inactive"],
       fsrs_rating: ["Again", "Good"],
+      identity_document_type: ["DNI", "CE", "PASAPORTE", "RUC"],
       import_status: ["validating", "completed", "failed"],
       question_selection_reason: ["due", "new", "scheduled"],
       question_status: ["draft", "active", "inactive", "archived"],

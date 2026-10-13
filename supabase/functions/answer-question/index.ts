@@ -5,8 +5,25 @@ import { RPCS, TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
 import { scheduleAnswer } from "../_shared/fsrs.ts";
 import type { FsrsConfig, StoredCard } from "../_shared/interfaces/fsrs.interfaces.ts";
+import type { AnswerFeedback } from "../_shared/interfaces/session.interfaces.ts";
 import { nonNegativeInteger, option, uuid } from "../_shared/validation.ts";
 import type { AnswerQuestionBody } from "./interfaces.ts";
+
+interface QuestionKey {
+  correct_option: string;
+  explanation: string | null;
+}
+
+function feedbackFor(
+  selectedOption: string,
+  question: QuestionKey,
+): AnswerFeedback {
+  return {
+    is_correct: selectedOption === question.correct_option,
+    correct_option: question.correct_option,
+    explanation: question.explanation,
+  };
+}
 
 export default {
   fetch: withAppSupabase(
@@ -53,7 +70,26 @@ export default {
           );
         }
         if (sessionQuestion.selected_option !== null) {
-          return json({ status: "already_answered", session_id: session.id });
+          // Retries must still receive the feedback for the stored answer.
+          const { data: question, error: questionError } = await context
+            .supabaseAdmin
+            .from(TABLES.questions)
+            .select("correct_option,explanation")
+            .eq("id", sessionQuestion.question_id)
+            .single();
+          if (questionError || !question) {
+            throw new AppError(
+              500,
+              "question_lookup_failed",
+              questionError?.message,
+            );
+          }
+          return json({
+            status: "already_answered",
+            session_id: session.id,
+            selected_option: sessionQuestion.selected_option,
+            feedback: feedbackFor(sessionQuestion.selected_option, question),
+          });
         }
         if (session.status !== "in_progress") {
           throw new AppError(
@@ -69,7 +105,7 @@ export default {
         }, { data: config, error: configError }] = await Promise.all([
           context.supabaseAdmin
             .from(TABLES.questions)
-            .select("correct_option")
+            .select("correct_option,explanation")
             .eq("id", sessionQuestion.question_id)
             .single(),
           context.supabaseAdmin
@@ -121,7 +157,33 @@ export default {
         if (answerError) {
           throw new AppError(400, "answer_failed", answerError.message);
         }
-        return json(result);
+
+        // A concurrent request may have stored a different option first; the
+        // feedback must describe the answer that was actually persisted.
+        let storedOption: string = selectedOption;
+        if (
+          (result as { status?: string } | null)?.status === "already_answered"
+        ) {
+          const { data: stored, error: storedError } = await context
+            .supabaseAdmin
+            .from(TABLES.assessmentSessionQuestions)
+            .select("selected_option")
+            .eq("id", sessionQuestionId)
+            .single();
+          if (storedError || !stored?.selected_option) {
+            throw new AppError(
+              500,
+              "answer_lookup_failed",
+              storedError?.message ?? "Stored answer not found.",
+            );
+          }
+          storedOption = stored.selected_option;
+        }
+        return json({
+          ...(result as Record<string, unknown>),
+          selected_option: storedOption,
+          feedback: feedbackFor(storedOption, question),
+        });
       }),
   ),
 };

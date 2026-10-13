@@ -10,6 +10,7 @@ function_dirs=(
   admin-reset-user-credentials
   admin-update-user
   answer-question
+  assign-complaint-number
   complete-session
   export-data
   get-session-review
@@ -18,6 +19,13 @@ function_dirs=(
   login-with-code
   recover-password
   start-session
+  public
+  registration
+  account
+  password-reset
+  invitations
+  student-invitation
+  kuti
 )
 
 for function_dir in "${function_dirs[@]}"; do
