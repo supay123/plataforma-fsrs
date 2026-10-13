@@ -115,5 +115,4 @@ La aplicación queda disponible en http://localhost:5173.
   reglas de negocio.
 - [Frontend](frontend/README.md): notas específicas de la SPA.
 - [Componentes reutilizables](docs/Componentes_Reutilizables.md): componentes,
-  hooks y utilidades del frontend que ya existen; revísalo antes de crear uno
-  nuevo.
+  hooks y utilidades del frontend que ya existen; revísalo antes de crear uno nuevo.
