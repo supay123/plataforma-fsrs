@@ -3,6 +3,8 @@ import type { AnswerOption, AnswerResult, ReviewResponse, SessionAnswer, Session
 export const startSession = (topic_id: string) => invokeFunction<SessionPayload, { topic_id: string }>("start-session", { topic_id });
 export const getSession = (session_id: string) => invokeFunction<SessionPayload, { session_id: string }>("get-session", { session_id });
 export const answerQuestion = (body: { session_question_id: string; selected_option: AnswerOption; response_time_ms: number }) => invokeFunction<AnswerResult, typeof body>("answer-question", body);
+/** Despierta la función de corrección para que la primera respuesta no espere su arranque. */
+export const warmAnswerQuestion = () => invokeFunction<{ status: "ready" }, Record<string, never>>("answer-question", {}, { method: "GET" });
 export const completeSession = (session_id: string, answers?: SessionAnswer[]) => invokeFunction<
   { session: SessionSummary; request_id?: string },
   { session_id: string; answers?: SessionAnswer[] }

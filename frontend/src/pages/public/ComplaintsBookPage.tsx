@@ -1,35 +1,35 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import clsx from "clsx";
-import { Download, X } from "lucide-react";
+import { Download, MessageCircle, X } from "lucide-react";
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { ComplaintsBookIcon, PublicPage } from "../../components/layout/PublicLayout";
 import { Alert, Button, Card, Input, Select, Textarea } from "../../components/ui";
-import { EVIDENCE_MAX_BYTES, assignComplaintNumber, sendComplaint, type AssignedComplaintNumber } from "../../features/complaints/api";
-import { DOCUMENT_TYPES, complaintSections, isTestSheet, sheetLabel, type ComplaintData, type ComplaintRecord } from "../../features/complaints/model";
-import { complaintPdfBlob, complaintPdfFilename, downloadComplaintPdf } from "../../features/complaints/pdf";
+import { BUSINESS } from "../../config/business";
+import { EVIDENCE_MAX_BYTES, pdfFromBase64, sendComplaint } from "../../features/complaints/api";
+import { DOCUMENT_TYPES, complaintPdfFilename, complaintSections, isTestSheet, sheetLabel, type ComplaintData, type ComplaintRecord } from "../../features/complaints/model";
 import { normalizeError } from "../../lib/api/errors";
 
 const required = (message: string) => z.string().trim().min(1, message);
 const schema = z.object({
-  consumer_name: required("Ingresa tu nombre completo."),
+  consumer_name: required("Ingresa tu nombre completo.").max(200, "Máximo 200 caracteres."),
   consumer_document_type: z.enum(["DNI", "CE", "PASAPORTE", "RUC"]),
   consumer_document_number: required("Ingresa tu número de documento.").max(20, "Máximo 20 caracteres."),
-  consumer_address: required("Ingresa tu domicilio."),
-  consumer_department: required("Ingresa tu departamento."),
-  consumer_province: required("Ingresa tu provincia."),
-  consumer_district: required("Ingresa tu distrito."),
+  consumer_address: required("Ingresa tu domicilio.").max(300, "Máximo 300 caracteres."),
+  consumer_department: required("Ingresa tu departamento.").max(100, "Máximo 100 caracteres."),
+  consumer_province: required("Ingresa tu provincia.").max(100, "Máximo 100 caracteres."),
+  consumer_district: required("Ingresa tu distrito.").max(100, "Máximo 100 caracteres."),
   consumer_phone: z.string().trim().max(30, "Máximo 30 caracteres."),
-  consumer_email: z.string().trim().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Ingresa un correo válido."),
+  consumer_email: z.string().trim().max(254, "Máximo 254 caracteres.").regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Ingresa un correo válido."),
   is_minor: z.boolean(),
-  guardian_name: z.string().trim(),
+  guardian_name: z.string().trim().max(200, "Máximo 200 caracteres."),
   guardian_document_type: z.enum(["DNI", "CE", "PASAPORTE"]),
   guardian_document_number: z.string().trim().max(20, "Máximo 20 caracteres."),
   item_type: z.enum(["producto", "servicio"]),
   claimed_amount: z.string().trim().regex(/^(\d+(\.\d{1,2})?)?$/, "Ingresa un monto válido, por ejemplo 15.00."),
-  item_description: required("Describe el producto o servicio."),
+  item_description: required("Describe el producto o servicio.").max(1000, "Máximo 1000 caracteres."),
   kind: z.enum(["reclamo", "queja"]),
   detail: required("Describe lo ocurrido.").max(3000, "Máximo 3000 caracteres."),
   consumer_request: required("Indica tu pedido.").max(2000, "Máximo 2000 caracteres."),
@@ -121,15 +121,22 @@ function TestModeSwitch({ checked, onChange }: { checked: boolean; onChange: (va
   </button>;
 }
 
-function Receipt({ record }: { record: ComplaintRecord }) {
-  const [error, setError] = useState("");
-  const download = () => downloadComplaintPdf(record).catch(() => setError("No se pudo generar el PDF. Inténtalo de nuevo."));
+function downloadPdf(pdf: Blob, filename: string) {
+  const url = URL.createObjectURL(pdf);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function Receipt({ record, pdf }: { record: ComplaintRecord; pdf: Blob }) {
   return <Card className="p-6 sm:p-8">
-    {isTestSheet(record) && <div className="mb-3"><Alert>Hoja de prueba: no tiene número correlativo y no cuenta como reclamo real.</Alert></div>}
-    <Alert tone="success">Tu {record.data.kind} fue registrado. Enviamos una copia de la hoja a {record.data.consumer_email}; también puedes descargarla aquí. Guárdala: la necesitarás si nos contactas por este caso.</Alert>
+    {isTestSheet(record)
+      ? <Alert>Hoja de prueba: no tiene número correlativo, no cuenta como reclamo real y solo se envió al correo del negocio.</Alert>
+      : <Alert tone="success">Tu {record.data.kind} fue registrado. Enviamos una copia de la hoja a {record.data.consumer_email}; también puedes descargarla aquí. Guárdala: la necesitarás si nos contactas por este caso.</Alert>}
     <h1 className="mt-6 text-2xl font-bold text-slate-950">Hoja de reclamación N.° {sheetLabel(record)}</h1>
-    <Button type="button" className="mt-4" onClick={() => void download()}><Download size={16} className="mr-2" />Descargar copia (PDF)</Button>
-    {error && <div className="mt-3"><Alert tone="error">{error}</Alert></div>}
+    <Button type="button" className="mt-4" onClick={() => downloadPdf(pdf, complaintPdfFilename(record))}><Download size={16} className="mr-2" />Descargar copia (PDF)</Button>
     {complaintSections(record).map((section) => <section key={section.title} className="mt-6">
       <h2 className="mb-3 border-b border-slate-200 pb-2 text-base font-bold text-slate-950">{section.title}</h2>
       <Rows rows={section.rows} />
@@ -139,9 +146,9 @@ function Receipt({ record }: { record: ComplaintRecord }) {
 
 export function ComplaintsBookPage() {
   const [error, setError] = useState("");
-  const [record, setRecord] = useState<ComplaintRecord | null>(null);
-  // Si el envío falla, el reintento conserva el mismo correlativo para no dejar huecos.
-  const [assigned, setAssigned] = useState<AssignedComplaintNumber | null>(null);
+  const [sent, setSent] = useState<{ record: ComplaintRecord; pdf: Blob } | null>(null);
+  // Si el correo no sale, el servidor devuelve el número ya asignado y el reintento lo reutiliza.
+  const [retrySheetNumber, setRetrySheetNumber] = useState<number | null>(null);
   // El modo prueba solo se ofrece al abrir la página con ?prueba, para que el público no lo vea.
   const [searchParams] = useSearchParams();
   const testModeAvailable = searchParams.has("prueba");
@@ -162,19 +169,16 @@ export function ComplaintsBookPage() {
     try {
       setError("");
       const data = toComplaintData(values);
-      let next: ComplaintRecord;
-      if (testMode) {
-        // Las hojas de prueba no piden número al servidor, así que no afectan la numeración.
-        next = { sheetNumber: null, createdAt: new Date().toISOString(), data };
-      } else {
-        const number = assigned ?? await assignComplaintNumber();
-        setAssigned(number);
-        next = { sheetNumber: number.sheet_number, createdAt: number.submitted_at, data };
-      }
-      await sendComplaint(next, await complaintPdfBlob(next), complaintPdfFilename(next), evidence);
-      setRecord(next);
+      // Las hojas de prueba no reciben número, así que no afectan la numeración.
+      const result = await sendComplaint(data, { test: testMode, evidence, retrySheetNumber: testMode ? null : retrySheetNumber });
+      setSent({ record: { sheetNumber: result.sheet_number, createdAt: result.submitted_at, data }, pdf: pdfFromBase64(result.pdf) });
       window.scrollTo({ top: 0 });
-    } catch (reason) { setError((await normalizeError(reason)).message); }
+    } catch (reason) {
+      const failure = await normalizeError(reason);
+      const assigned = (failure.details as { sheet_number?: unknown } | undefined)?.sheet_number;
+      if (typeof assigned === "number") setRetrySheetNumber(assigned);
+      setError(failure.message);
+    }
   });
   const radio = "inline-flex items-center gap-2 text-slate-800";
   const radioInput = "h-4 w-4 accent-indigo-600";
@@ -182,12 +186,12 @@ export function ComplaintsBookPage() {
   return <PublicPage>
     <section className="mx-auto max-w-5xl px-4 py-12">
       <div className="mb-8 flex items-center justify-center gap-4"><ComplaintsBookIcon className="h-14" /><div><h1 className="text-3xl font-bold">Libro de reclamaciones</h1><p className="mt-1 text-sm text-slate-300">Conforme al Código de Protección y Defensa del Consumidor.</p></div></div>
-      {record ? <Receipt record={record} /> : <Card className="p-6 sm:p-8">
+      {sent ? <Receipt record={sent.record} pdf={sent.pdf} /> : <Card className="p-6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-slate-950">Hoja de reclamación virtual</h2>
           {testModeAvailable && <TestModeSwitch checked={testMode} onChange={setTestMode} />}
         </div>
-        {testMode && <div className="mt-4"><Alert>Modo prueba activado: la hoja se enviará marcada como PRUEBA y sin número correlativo. No cuenta como un reclamo real.</Alert></div>}
+        {testMode && <div className="mt-4"><Alert>Modo prueba activado: la hoja se enviará marcada como PRUEBA, sin número correlativo y solo al correo del negocio. No cuenta como un reclamo real.</Alert></div>}
         <form onSubmit={submit} className="grid gap-4" noValidate>
           <SectionTitle number={1}>Identificación del consumidor reclamante</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -245,7 +249,10 @@ export function ComplaintsBookPage() {
 
           <label className="mt-2 flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-indigo-600" {...register("accepted_terms")} />Declaro que la información consignada es veraz y acepto ser notificado en el correo electrónico brindado.</label>
           {errors.accepted_terms && <span className="text-xs text-rose-600">{errors.accepted_terms.message}</span>}
-          {error && <Alert tone="error">{error}</Alert>}
+          {error && <Alert tone="error">
+            {error} Si el problema continúa, escríbenos por WhatsApp y te ayudamos a registrar tu {kind}.
+            <a href={`https://wa.me/${BUSINESS.whatsapp}`} target="_blank" rel="noreferrer" className="mt-2 flex w-fit items-center gap-2 font-semibold underline"><MessageCircle size={16} />Escribir al {BUSINESS.phone}</a>
+          </Alert>}
           <Button disabled={isSubmitting}>{isSubmitting ? "Enviando…" : "Enviar"}</Button>
         </form>
       </Card>}

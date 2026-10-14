@@ -1,11 +1,20 @@
 import { AppError } from "./errors.ts";
-import { sendWithGmail } from "./gmail.ts";
+import { encodeBase64, sendWithGmail } from "./gmail.ts";
 
-interface EmailMessage {
+export interface EmailAttachment {
+  filename: string;
+  contentType: string;
+  content: Uint8Array;
+}
+
+export interface EmailMessage {
   to: string;
+  cc?: string;
+  replyTo?: string;
   subject: string;
   text: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
 /**
@@ -21,8 +30,10 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
       JSON.stringify({
         event: "email.logged",
         to: message.to,
+        cc: message.cc,
         subject: message.subject,
         text: message.text,
+        attachments: message.attachments?.map((file) => file.filename),
       }),
     );
     return;
@@ -55,7 +66,19 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, ...message, to: [message.to] }),
+      body: JSON.stringify({
+        from,
+        to: [message.to],
+        cc: message.cc ? [message.cc] : undefined,
+        reply_to: message.replyTo,
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
+        attachments: message.attachments?.map((file) => ({
+          filename: file.filename,
+          content: encodeBase64(file.content),
+        })),
+      }),
     });
   } catch (error) {
     console.error("Email delivery request failed", error);
@@ -182,7 +205,7 @@ export function invitationEmail(
   return { to, subject, text, html };
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) =>
     ({
       "&": "&amp;",

@@ -50,7 +50,7 @@ export function ReviewPage() {
             {question.is_correct ? <Check className="mt-0.5 shrink-0" /> : <X className="mt-0.5 shrink-0" />}
             <span>{question.position}. <MathText>{question.statement}</MathText></span>
           </h2>
-          <Badge tone={question.is_correct ? "success" : "warning"}>{question.is_correct ? "Correcta" : "Incorrecta"}</Badge>
+          <Badge tone={question.is_correct ? "success" : "danger"}>{question.is_correct ? "Correcta" : "Incorrecta"}</Badge>
         </div>
         <div className="mt-5 grid gap-2">
           {options(question).map(([answerOption, text]) => {

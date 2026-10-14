@@ -361,6 +361,15 @@ Deno.test({
       ),
     );
 
+    const warmed = await fetch(`${testUrl}/functions/v1/answer-question`, {
+      headers: {
+        "apikey": testPublishableKey,
+        "Authorization": `Bearer ${studentToken}`,
+      },
+    });
+    assert.equal(warmed.status, 200);
+    assert.deepEqual(await warmed.json(), { status: "ready" });
+
     const answered = await jsonResponse(
       "answer-question",
       {
@@ -370,6 +379,19 @@ Deno.test({
       },
       { token: studentToken },
     );
+    // The answer is saved after the feedback is sent.
+    let storedAnswer: string | null = null;
+    for (let attempt = 0; attempt < 40 && !storedAnswer; attempt++) {
+      const { data: storedRow, error: storedRowError } = await adminClient
+        .from(TABLES.assessmentSessionQuestions)
+        .select("selected_option")
+        .eq("id", questions[0]!.session_question_id)
+        .single();
+      assert.ifError(storedRowError);
+      storedAnswer = storedRow.selected_option;
+      if (!storedAnswer) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(storedAnswer, "A");
     const answeredFeedback = answered.feedback as Record<string, unknown>;
     assert.equal(answered.status, "accepted");
     assert.equal(answered.selected_option, "A");
@@ -1546,5 +1568,75 @@ Deno.test({
     const cancelId = (toCancel.invitation as { id: string }).id;
     await call(`invitations?id=${cancelId}`, { method: "DELETE", token });
     await call(`invitations?id=${cancelId}`, { method: "DELETE", token }, 404);
+  },
+});
+
+Deno.test({
+  name: "complaints book numbers, limits by IP and returns the sheet PDF",
+  ignore: !enabled,
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
+    const data = {
+      consumer_name: "Ana Pérez",
+      consumer_document_type: "DNI",
+      consumer_document_number: "12345678",
+      consumer_address: "Av. Lima 123",
+      consumer_department: "Lima",
+      consumer_province: "Lima",
+      consumer_district: "Miraflores",
+      consumer_phone: null,
+      consumer_email: "ana@example.com",
+      is_minor: false,
+      guardian_name: null,
+      guardian_document_type: null,
+      guardian_document_number: null,
+      item_type: "servicio",
+      item_description: "Plan Estudiante",
+      claimed_amount: 14.9,
+      kind: "reclamo",
+      detail: "Se me cobró dos veces.",
+      consumer_request: "Devolución del cobro duplicado.",
+    };
+    // Una IP distinta en cada corrida, para que el límite diario no dependa de
+    // las anteriores.
+    const ip = `198.51.100.${Math.floor(Math.random() * 250) + 1}-${crypto.randomUUID()}`;
+    const submit = async (fields: Record<string, string>, files: File[] = []) => {
+      const form = new FormData();
+      form.append("data", JSON.stringify(data));
+      for (const [name, value] of Object.entries(fields)) form.append(name, value);
+      for (const file of files) form.append("evidence", file, file.name);
+      const response = await fetch(`${url}/functions/v1/complaints/sheets`, {
+        method: "POST",
+        headers: { "apikey": publishableKey!, "cf-connecting-ip": ip },
+        body: form,
+      });
+      return { status: response.status, body: await response.json() };
+    };
+
+    const test = await submit({ test: "true" });
+    assert.equal(test.status, 200, JSON.stringify(test.body));
+    assert.equal(test.body.sheet_number, null);
+    assert.ok(atob(test.body.pdf).startsWith("%PDF-"));
+
+    const first = await submit({}, [
+      new File(["%PDF-1.3"], "voucher.pdf", { type: "application/pdf" }),
+    ]);
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    assert.equal(typeof first.body.sheet_number, "number");
+    const second = await submit({});
+    assert.equal(second.body.sheet_number, first.body.sheet_number + 1);
+
+    const limited = await submit({});
+    assert.equal(limited.status, 429);
+    assert.equal(limited.body.error.code, "complaint_daily_limit");
+    // El modo prueba no tiene límite.
+    assert.equal((await submit({ test: "true" })).status, 200);
+
+    const invalid = await submit({ test: "true" }, [
+      new File(["x"], "virus.exe", { type: "application/octet-stream" }),
+    ]);
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.error.code, "invalid_evidence");
   },
 });

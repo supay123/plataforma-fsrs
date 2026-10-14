@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "../../lib/api/errors";
 import type { AnswerOption, SessionPayload } from "../../types/contracts";
 import { SessionPage } from "./SessionPage";
 
@@ -10,12 +11,14 @@ const mocks = vi.hoisted(() => ({
   startSession: vi.fn(),
   answerQuestion: vi.fn(),
   completeSession: vi.fn(),
+  warmAnswerQuestion: vi.fn(),
 }));
 
 vi.mock("../../features/sessions/api", () => ({
   startSession: mocks.startSession,
   answerQuestion: mocks.answerQuestion,
   completeSession: mocks.completeSession,
+  warmAnswerQuestion: mocks.warmAnswerQuestion,
 }));
 
 function payload(total = 3): SessionPayload {
@@ -83,6 +86,7 @@ describe("SessionPage", () => {
     mocks.startSession.mockReset().mockResolvedValue(payload());
     mocks.answerQuestion.mockReset().mockImplementation(answerResult);
     mocks.completeSession.mockReset().mockResolvedValue({ session: {} });
+    mocks.warmAnswerQuestion.mockReset().mockResolvedValue({ status: "ready" });
   });
 
   it("shows feedback after each answer and completes once everything is answered", async () => {
@@ -134,6 +138,22 @@ describe("SessionPage", () => {
     expect(await screen.findByText("Pregunta 2 de 3")).toBeInTheDocument();
     expect(screen.getByText("1 respondidas")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("retries the completion while the last answer is still being saved", async () => {
+    const user = userEvent.setup();
+    mocks.startSession.mockResolvedValue(payload(1));
+    mocks.completeSession.mockReset()
+      .mockRejectedValueOnce(new AppError("incomplete_submission", "Pendiente."))
+      .mockResolvedValue({ session: {} });
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
+    expect(mocks.warmAnswerQuestion).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
+    await user.click(await screen.findByRole("button", { name: "Finalizar examen" }));
+    expect(await screen.findByText("Revisión", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(mocks.completeSession).toHaveBeenCalledTimes(2);
   });
 
   it("lets the student retry when the answer cannot be saved", async () => {

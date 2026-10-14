@@ -1,26 +1,36 @@
+import type { EmailAttachment } from "./email.ts";
 import { AppError } from "./errors.ts";
 
 export interface MimeMessage {
   from: string;
   to: string;
+  cc?: string;
+  replyTo?: string;
   subject: string;
   text: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+// Los correos con adjuntos se suben tal cual (hasta 35 MB) en vez de ir en JSON.
+const UPLOAD_URL =
+  "https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media";
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-function base64(bytes: Uint8Array): string {
+export function encodeBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  // Por bloques: String.fromCharCode con millones de argumentos desborda la pila.
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
   return btoa(binary);
 }
 
 function utf8Base64(value: string): string {
-  return base64(new TextEncoder().encode(value));
+  return encodeBase64(new TextEncoder().encode(value));
 }
 
 /** Encabezado con caracteres no ASCII (tildes, ñ) según RFC 2047. */
@@ -36,32 +46,67 @@ function encodeAddress(value: string): string {
   return match ? `${encodeHeader(match[1]!)} <${match[2]}>` : value.trim();
 }
 
-function wrappedBase64(value: string): string {
-  return utf8Base64(value).replace(/.{1,76}/g, "$&\r\n").trimEnd();
+function wrapLines(base64: string): string {
+  return base64.replace(/.{1,76}/g, "$&\r\n").trimEnd();
 }
 
-/** Arma el correo en formato RFC 2822 con versión de texto y HTML. */
+function wrappedBase64(value: string): string {
+  return wrapLines(utf8Base64(value));
+}
+
+/** Nombre de archivo sin comillas ni saltos de línea, codificado si lleva tildes. */
+function attachmentName(filename: string): string {
+  return encodeHeader(filename.replace(/["\\\r\n]/g, "_"));
+}
+
+/**
+ * Arma el correo en formato RFC 2822 con versión de texto y HTML. Con adjuntos,
+ * ambas versiones van dentro de un multipart/mixed junto a los archivos.
+ */
 export function buildMimeMessage(
   message: MimeMessage,
   boundary: string,
 ): string {
-  return [
+  const headers = [
     `From: ${encodeAddress(message.from)}`,
     `To: ${message.to}`,
+    ...(message.cc ? [`Cc: ${message.cc}`] : []),
+    ...(message.replyTo ? [`Reply-To: ${message.replyTo}`] : []),
     `Subject: ${encodeHeader(message.subject)}`,
     "MIME-Version: 1.0",
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  ];
+  const alternative = (altBoundary: string) => [
+    `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
     "",
-    `--${boundary}`,
+    `--${altBoundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
     wrappedBase64(message.text),
-    `--${boundary}`,
+    `--${altBoundary}`,
     'Content-Type: text/html; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
     wrappedBase64(message.html),
+    `--${altBoundary}--`,
+  ];
+  if (!message.attachments?.length) {
+    return [...headers, ...alternative(boundary), ""].join("\r\n");
+  }
+  return [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    ...alternative(`${boundary}-alt`),
+    ...message.attachments.flatMap((file) => [
+      `--${boundary}`,
+      `Content-Type: ${file.contentType}; name="${attachmentName(file.filename)}"`,
+      `Content-Disposition: attachment; filename="${attachmentName(file.filename)}"`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      wrapLines(encodeBase64(file.content)),
+    ]),
     `--${boundary}--`,
     "",
   ].join("\r\n");
@@ -130,16 +175,17 @@ async function accessToken(): Promise<string> {
 
 export async function sendWithGmail(message: MimeMessage): Promise<void> {
   const token = await accessToken();
-  const raw = toBase64Url(buildMimeMessage(message, crypto.randomUUID()));
+  const mime = buildMimeMessage(message, crypto.randomUUID());
+  const upload = Boolean(message.attachments?.length);
   let response: Response;
   try {
-    response = await fetch(SEND_URL, {
+    response = await fetch(upload ? UPLOAD_URL : SEND_URL, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
+        "Content-Type": upload ? "message/rfc822" : "application/json",
       },
-      body: JSON.stringify({ raw }),
+      body: upload ? mime : JSON.stringify({ raw: toBase64Url(mime) }),
     });
   } catch (error) {
     console.error("Gmail send request failed", error);

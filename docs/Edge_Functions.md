@@ -5,7 +5,7 @@ error handling, CSV, XLSX, session serialization, and FSRS scheduling live in
 `supabase/functions/_shared`.
 
 Endpoints accept `POST` unless noted (`GET public/colleges`). Except for the
-public ones (`login-with-code`, `recover-password`, `assign-complaint-number`,
+public ones (`login-with-code`, `recover-password`, `complaints`,
 `public`, and `registration`), callers must send a valid user access token in
 `Authorization: Bearer <token>`. Public endpoints require the project's
 publishable key. A function can expose several endpoints as sub-paths
@@ -56,7 +56,7 @@ pnpm exec supabase gen types --local --schema public \
 | `complete-session` | Student | Closes an owned session only after all questions are answered and returns its summary. Repeated completion is safe. |
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
-| `assign-complaint-number` | Public | Reserves the next correlative number of the Libro de Reclamaciones from `private.complaint_sheet_number_seq` and returns it with the official submission timestamp. Complaints themselves are never stored: the browser fills the official sheet as a PDF and emails it through FormSubmit. |
+| `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
 | `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges a new student can choose. |
 | `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` creates the Kuti charge (QR, plus a bank code from S/ 50) of the chosen plan; `GET /registration/payment` reports its status and activates the account once Kuti confirms it. No account exists until the first payment is confirmed. |
 | `kuti` | Kuti signature | `POST /kuti/webhook` receives Kuti payment events (`payment.succeeded`, `failed`, `expired`, `cancelled`), verifies `X-Kuti-Signature` with the signing secret stored in Vault, and applies the payment. Called by Kuti, never by the app. |
@@ -86,13 +86,19 @@ pnpm exec supabase gen types --local --schema public \
 - `answer-question`: `session_question_id`, `selected_option` (`A`–`D`),
   `response_time_ms`. Responds with `status` (`accepted` or
   `already_answered`), `session_id`, the stored `selected_option`, and
-  `feedback` (`is_correct`, `correct_option`, `explanation`). A retry reports
-  the answer that was stored first, even if it sends a different option.
+  `feedback` (`is_correct`, `correct_option`, `explanation`). The answer is
+  saved right after the response is sent; a retry once it is saved reports the
+  stored answer, even if it sends a different option. `GET` only boots the
+  function (the session page calls it on open).
 - `export-data`: optional `college_id`, `teacher_id`, `course_id`,
   `student_id`, and `topic_id` filters.
-- `assign-complaint-number`: no body. Responds with `sheet_number`
-  (integer) and `submitted_at` (ISO timestamp). A failed email retry must
-  reuse the number already assigned to avoid gaps.
+- `POST complaints/sheets` (`multipart/form-data`): `data` (the sheet as
+  JSON), optional `evidence` files (images or PDF, up to 10 and 5 MB in
+  total), `test=true` for a test sheet (no number, no IP limit, emailed only to
+  the business), and `sheet_number` to retry a send that failed. Responds with
+  `sheet_number` (`null` for a test sheet), `submitted_at`, and `pdf` (base64).
+  Errors: `429 complaint_daily_limit`, and `503 complaint_not_sent` with
+  `details.sheet_number` so the retry reuses the number and leaves no gaps.
 - `GET public/colleges`: no body. Responds with `colleges` (`id`, `name`).
   Creates `Chancón – Particular` once if no college is active.
 - `POST registration/student/validate`: `college_id`,

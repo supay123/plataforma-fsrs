@@ -194,6 +194,6 @@ describe("SignUpPage", () => {
     expect(password).toHaveAttribute("type", "password");
     await user.click(screen.getAllByRole("button", { name: "Mostrar contraseña" })[0]!);
     expect(password).toHaveAttribute("type", "text");
-    expect(screen.getByRole("link", { name: "Inicia sesión" })).toHaveAttribute("href", "/estudiante/login");
+    expect(screen.getByRole("link", { name: "Iniciar sesión" })).toHaveAttribute("href", "/estudiante/login");
   });
 });

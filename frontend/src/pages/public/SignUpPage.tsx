@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { LockKeyhole, Mail, Phone, School, User } from "lucide-react";
+import { LockKeyhole, LogIn, Mail, Phone, School, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -169,10 +169,12 @@ export function SignUpPage() {
     }
   });
 
-  return <AuthLayout wide>
+  return <AuthLayout wide action={<Link
+    to="/estudiante/login"
+    className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
+  ><LogIn className="h-4 w-4" aria-hidden />Iniciar sesión</Link>}>
     <div className="mb-4">
       <h1 className="text-2xl font-bold">Crea tu cuenta</h1>
-      <p className="mt-2 text-sm text-slate-600">¿Ya tienes una cuenta? <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante/login">Inicia sesión</Link></p>
     </div>
     <div className="mb-4"><PlanPicker plan={plan} onChange={(id) => setSearchParams({ plan: id }, { replace: true })} /></div>
     <Steps current={step} />

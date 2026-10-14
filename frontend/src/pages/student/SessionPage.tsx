@@ -2,7 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert, Button, Card, PageHeader, Spinner } from "../../components/ui";
-import { answerQuestion, completeSession, startSession } from "../../features/sessions/api";
+import { answerQuestion, completeSession, startSession, warmAnswerQuestion } from "../../features/sessions/api";
+import { AppError } from "../../lib/api/errors";
 import { MathText } from "../../lib/math";
 import type { AnswerOption, SessionPayload, SessionQuestion } from "../../types/contracts";
 
@@ -14,11 +15,12 @@ function firstPendingIndex(questions: SessionQuestion[], after = -1): number {
 function optionClass(answerOption: AnswerOption, question: SessionQuestion, selected: AnswerOption | null): string {
   const { feedback, selected_option } = question;
   if (feedback) {
-    if (answerOption === feedback.correct_option) return "border-emerald-500 bg-emerald-50";
-    if (answerOption === selected_option) return "border-rose-500 bg-rose-50";
-    return "opacity-60";
+    if (answerOption === feedback.correct_option) return "flex border-emerald-500 bg-emerald-50";
+    if (answerOption === selected_option) return "flex border-rose-500 bg-rose-50";
+    // On mobile the feedback only keeps the student's answer and the correct one.
+    return "hidden opacity-60 sm:flex";
   }
-  return selected === answerOption ? "border-indigo-500 bg-indigo-50" : "hover:border-indigo-300";
+  return selected === answerOption ? "flex border-indigo-500 bg-indigo-50" : "flex hover:border-indigo-300";
 }
 
 export function SessionPage() {
@@ -32,6 +34,8 @@ export function SessionPage() {
   const start = useMutation({
     mutationFn: () => startSession(topicId),
     onSuccess: (data) => {
+      // Si falla, la primera respuesta solo tarda un poco más.
+      warmAnswerQuestion().catch(() => undefined);
       setPayload(data);
       setStartedAt(Date.now());
       setIndex(firstPendingIndex(data.questions));
@@ -63,6 +67,10 @@ export function SessionPage() {
 
   const complete = useMutation({
     mutationFn: () => completeSession(payload!.session.id, []),
+    // La última respuesta se guarda después de mostrar su corrección; si aún no
+    // termina, el servidor la ve pendiente y basta con volver a intentar.
+    retry: (failureCount, error) => error instanceof AppError && error.code === "incomplete_submission" && failureCount < 4,
+    retryDelay: 500,
     onSuccess: () => {
       navigate(`/estudiante/sesiones/${payload!.session.id}/revision`, { replace: true });
     },
@@ -119,7 +127,7 @@ export function SessionPage() {
           key={answerOption}
           disabled={Boolean(feedback) || answer.isPending || complete.isPending}
           onClick={() => setSelected(answerOption)}
-          className={`flex min-h-14 items-center gap-3 rounded-xl border p-3 text-left ${
+          className={`min-h-14 items-center gap-3 rounded-xl border p-3 text-left ${
             optionClass(answerOption, question, selected)
           }`}
         >
@@ -132,11 +140,13 @@ export function SessionPage() {
         </button>)}
       </div>
       {feedback && <div className="mt-6 grid gap-3">
-        <Alert tone={feedback.is_correct ? "success" : "error"}>
-          {feedback.is_correct
-            ? "¡Correcto!"
-            : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`}
-        </Alert>
+        <div className="hidden sm:block">
+          <Alert tone={feedback.is_correct ? "success" : "error"}>
+            {feedback.is_correct
+              ? "¡Correcto!"
+              : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`}
+          </Alert>
+        </div>
         {feedback.explanation && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <h3 className="text-sm font-semibold text-slate-700">Explicación</h3>
           <div className="mt-2 text-slate-800"><MathText>{feedback.explanation}</MathText></div>

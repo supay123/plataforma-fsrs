@@ -90,7 +90,7 @@ export function PrivacyPage() {
     <h2>3. Con quién los compartimos</h2>
     <ul>
       <li>Los profesores y la institución a la que perteneces pueden ver tus resultados y progreso en los cursos que te asignan.</li>
-      <li>Proveedores que nos ayudan a operar el servicio: Kuti (pagos), Supabase (base de datos y autenticación), Netlify (alojamiento web), Google (envío de correos de verificación mediante Gmail) y FormSubmit (envío del Libro de reclamaciones a nuestro correo). Algunos de ellos almacenan la información en servidores fuera del Perú, con medidas de seguridad adecuadas.</li>
+      <li>Proveedores que nos ayudan a operar el servicio: Kuti (pagos), Supabase (base de datos y autenticación), Netlify (alojamiento web) y Google (envío de correos mediante Gmail, incluidas las hojas del Libro de reclamaciones). Algunos de ellos almacenan la información en servidores fuera del Perú, con medidas de seguridad adecuadas.</li>
       <li>Autoridades competentes, cuando la ley lo exija.</li>
     </ul>
     <h2>4. Menores de edad</h2>

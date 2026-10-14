@@ -48,6 +48,11 @@ const translatedMessages: Record<string, string> = {
   invitation_not_found: "La invitación ya no existe. Recarga la página.",
   invitation_access_ended: "El periodo de acceso de esta invitación ya terminó. Anúlala e invita de nuevo.",
   invitation_failed: "No se pudo procesar la invitación. Inténtalo de nuevo.",
+  complaint_daily_limit: "Ya enviaste 2 hojas de reclamación hoy desde esta conexión.",
+  complaint_not_sent: "No pudimos enviar tu hoja de reclamación. Inténtalo de nuevo en unos minutos.",
+  complaint_number_failed: "No pudimos registrar tu hoja de reclamación. Inténtalo de nuevo en unos minutos.",
+  attachments_too_large: "Los archivos adjuntos superan el tamaño permitido. Quita alguno e inténtalo de nuevo.",
+  invalid_evidence: "Solo se aceptan imágenes o archivos PDF como evidencia.",
 };
 
 export async function normalizeError(error: unknown): Promise<AppError> {
