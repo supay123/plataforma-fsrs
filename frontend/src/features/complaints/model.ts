@@ -8,6 +8,8 @@ export const DOCUMENT_TYPES = [
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number]["value"];
 
+// Debe coincidir con ComplaintData en supabase/functions/_shared/complaints.ts,
+// que valida la hoja, genera el PDF y la envía.
 export interface ComplaintData {
   consumer_name: string;
   consumer_document_type: DocumentType;
@@ -36,13 +38,6 @@ export interface ComplaintData {
 export interface ComplaintRecord { sheetNumber: number | null; createdAt: string; data: ComplaintData }
 export interface ComplaintSection { title: string; rows: Array<[string, string]> }
 
-export const COMPLAINT_NOTES = [
-  "Reclamo: disconformidad relacionada con los productos o servicios.",
-  "Queja: disconformidad no relacionada con los productos o servicios; o malestar o descontento respecto a la atención al público.",
-  "La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI.",
-  "El proveedor debe dar respuesta al reclamo o queja en un plazo no mayor a quince (15) días hábiles improrrogables.",
-] as const;
-
 export function formatSheetNumber(sheetNumber: number | null) {
   return sheetNumber === null ? "PRUEBA" : String(sheetNumber).padStart(9, "0");
 }
@@ -55,18 +50,8 @@ export function sheetLabel(record: ComplaintRecord) {
   return `${BUSINESS.complaintsBookCode}-${formatSheetNumber(record.sheetNumber)}`;
 }
 
-export function formatComplaintDate(value: string) {
-  return new Intl.DateTimeFormat("es-PE", { dateStyle: "long", timeStyle: "short", timeZone: "America/Lima" }).format(new Date(value));
-}
-
-export function providerRows(createdAt: string): Array<[string, string]> {
-  return [
-    ["Razón social", BUSINESS.legalName],
-    ["Nombre comercial", BUSINESS.tradeName],
-    ["RUC", BUSINESS.ruc],
-    ["Domicilio fiscal", BUSINESS.address],
-    ["Fecha", formatComplaintDate(createdAt)],
-  ];
+export function complaintPdfFilename(record: ComplaintRecord) {
+  return `hoja-reclamacion-${sheetLabel(record)}.pdf`;
 }
 
 /** Domicilio completo: dirección, distrito, provincia y departamento. */

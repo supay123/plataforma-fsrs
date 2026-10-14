@@ -1,6 +1,13 @@
-import { BUSINESS } from "../../config/business";
-import type { GState as GStateClass, jsPDF } from "jspdf";
-import { COMPLAINT_NOTES, formatComplaintDate, formatSheetNumber, fullAddress, isTestSheet, sheetLabel, type ComplaintRecord } from "./model";
+import { GState, jsPDF } from "jspdf";
+import { BUSINESS } from "./business.ts";
+import {
+  COMPLAINT_NOTES,
+  type ComplaintRecord,
+  formatComplaintDate,
+  formatSheetNumber,
+  fullAddress,
+  isTestSheet,
+} from "./complaints.ts";
 
 // Reproduce el formato de Hoja de Reclamación del Anexo I del Reglamento del
 // Libro de Reclamaciones. Medidas en milímetros sobre A4.
@@ -11,12 +18,8 @@ const BOTTOM = 285;
 const LINE = 4;
 const PAD = 2;
 
-export function complaintPdfFilename(record: ComplaintRecord) {
-  return `hoja-reclamacion-${sheetLabel(record)}.pdf`;
-}
-
 /** Marca cada página de una hoja de prueba para que no se confunda con un reclamo real. */
-function watermark(doc: jsPDF, GState: typeof GStateClass) {
+function watermark(doc: jsPDF) {
   for (let page = 1; page <= doc.getNumberOfPages(); page += 1) {
     doc.setPage(page);
     doc.saveGraphicsState();
@@ -28,8 +31,8 @@ function watermark(doc: jsPDF, GState: typeof GStateClass) {
   }
 }
 
-async function renderSheet(record: ComplaintRecord) {
-  const { jsPDF, GState } = await import("jspdf");
+/** Hoja de Reclamación en PDF, lista para adjuntar al correo. */
+export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setLineWidth(0.25).setDrawColor(90).setTextColor(20);
   let y = TOP;
@@ -210,14 +213,6 @@ async function renderSheet(record: ComplaintRecord) {
     doc.setFont("helvetica", "normal").setFontSize(7).text(noteLines, X, y + 2.5, { lineHeightFactor: 1.15 });
     y += noteLines.length * 3.2;
   }
-  if (isTestSheet(record)) watermark(doc, GState);
-  return doc;
-}
-
-export async function complaintPdfBlob(record: ComplaintRecord) {
-  return (await renderSheet(record)).output("blob");
-}
-
-export async function downloadComplaintPdf(record: ComplaintRecord) {
-  (await renderSheet(record)).save(complaintPdfFilename(record));
+  if (isTestSheet(record)) watermark(doc);
+  return new Uint8Array(doc.output("arraybuffer"));
 }

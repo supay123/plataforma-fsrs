@@ -186,7 +186,7 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
 | Componente | Descripción |
 | --- | --- |
 | `PortalLayout` | Menú lateral, usuario y botón "Salir" de los portales. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. |
-| `AuthLayout` | Fondo degradado con una tarjeta y el logo, sin encabezado ni pie. Para pantallas de acceso: login, registro y nueva contraseña. Usa `wide` para formularios de dos columnas. |
+| `AuthLayout` | Fondo degradado con una tarjeta y el logo, sin encabezado ni pie. Para pantallas de acceso: login, registro y nueva contraseña. Usa `wide` para formularios de dos columnas y `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro). |
 | `PublicPage` | Página pública con el logo arriba y el pie de página legal. |
 | `PublicFooter` | Pie de página con enlaces legales y datos de la empresa (ya incluido en `PublicPage`). |
 | `ComplaintsBookIcon` | Ícono del Libro de Reclamaciones. |

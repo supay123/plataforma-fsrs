@@ -73,6 +73,7 @@ function_names=(
   password-reset
   invitations
   student-invitation
+  complaints
 )
 
 for function_name in "${function_names[@]}"; do

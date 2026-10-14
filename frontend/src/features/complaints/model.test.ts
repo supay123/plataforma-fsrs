@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { complaintSections, formatSheetNumber, providerRows, sheetLabel, type ComplaintData } from "./model";
+import { complaintPdfFilename, complaintSections, formatSheetNumber, sheetLabel, type ComplaintData } from "./model";
 
 const data: ComplaintData = {
   consumer_name: "Ana Pérez", consumer_document_type: "DNI", consumer_document_number: "12345678",
@@ -15,12 +15,12 @@ describe("complaint model", () => {
     expect(formatSheetNumber(1)).toBe("000000001");
     expect(sheetLabel(record)).toBe("001-000000042");
     expect(sheetLabel({ ...record, sheetNumber: null })).toBe("001-PRUEBA");
+    expect(complaintPdfFilename(record)).toBe("hoja-reclamacion-001-000000042.pdf");
   });
 
   it("keeps provider data out of the consumer sections", () => {
     const labels = complaintSections(record).flatMap((section) => section.rows.map(([label]) => label));
     expect(labels).not.toContain("RUC");
-    expect(Object.fromEntries(providerRows(record.createdAt))).toMatchObject({ RUC: "10774172578", "Razón social": "Miguel Ángel Llacta Pereira" });
   });
 
   it("omits empty optional rows and keeps labels unique", () => {

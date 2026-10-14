@@ -2,23 +2,18 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "../../lib/api/errors";
 import { ComplaintsBookPage } from "./ComplaintsBookPage";
 
-const mocks = vi.hoisted(() => ({
-  assignComplaintNumber: vi.fn(),
-  sendComplaint: vi.fn(),
-  complaintPdfBlob: vi.fn(),
-  downloadComplaintPdf: vi.fn(),
+const mocks = vi.hoisted(() => ({ sendComplaint: vi.fn() }));
+
+vi.mock("../../features/complaints/api", () => ({
+  EVIDENCE_MAX_BYTES: 5 * 1024 * 1024,
+  sendComplaint: mocks.sendComplaint,
+  pdfFromBase64: () => new Blob(["%PDF"], { type: "application/pdf" }),
 }));
 
-vi.mock("../../features/complaints/api", () => ({ EVIDENCE_MAX_BYTES: 5 * 1024 * 1024, assignComplaintNumber: mocks.assignComplaintNumber, sendComplaint: mocks.sendComplaint }));
-vi.mock("../../features/complaints/pdf", () => ({
-  complaintPdfBlob: mocks.complaintPdfBlob,
-  complaintPdfFilename: () => "hoja.pdf",
-  downloadComplaintPdf: mocks.downloadComplaintPdf,
-}));
-
-const pdf = new Blob(["%PDF"], { type: "application/pdf" });
+const sent = { sheet_number: 7, submitted_at: "2026-10-09T15:00:00.000Z", pdf: "JVBERg==" };
 
 function renderPage(path = "/libro-reclamaciones") {
   return render(<MemoryRouter initialEntries={[path]}><ComplaintsBookPage /></MemoryRouter>);
@@ -42,32 +37,29 @@ async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
 describe("ComplaintsBookPage", () => {
   afterEach(cleanup);
   beforeEach(() => {
-    mocks.assignComplaintNumber.mockReset().mockResolvedValue({ sheet_number: 7, submitted_at: "2026-10-09T15:00:00.000Z" });
-    mocks.sendComplaint.mockReset().mockResolvedValue(undefined);
-    mocks.complaintPdfBlob.mockReset().mockResolvedValue(pdf);
-    mocks.downloadComplaintPdf.mockReset().mockResolvedValue(undefined);
+    mocks.sendComplaint.mockReset().mockResolvedValue(sent);
     window.scrollTo = vi.fn();
+    URL.createObjectURL = vi.fn(() => "blob:hoja");
+    URL.revokeObjectURL = vi.fn();
   });
 
-  it("sends the filled sheet as a PDF and lets the consumer download it", async () => {
+  it("sends the filled sheet and lets the consumer download the PDF made by the server", async () => {
     const user = userEvent.setup();
     renderPage();
     await fillRequired(user);
     await user.click(screen.getByRole("button", { name: "Enviar" }));
 
     await waitFor(() => expect(mocks.sendComplaint).toHaveBeenCalledTimes(1));
-    const [record, attachment, filename] = mocks.sendComplaint.mock.calls[0]!;
-    expect(record).toMatchObject({
-      sheetNumber: 7,
-      createdAt: "2026-10-09T15:00:00.000Z",
-      data: { kind: "reclamo", item_type: "servicio", consumer_name: "Ana Pérez", consumer_phone: null, claimed_amount: 15, is_minor: false, guardian_name: null },
-    });
-    expect(attachment).toBe(pdf);
-    expect(filename).toBe("hoja.pdf");
+    const [data, options] = mocks.sendComplaint.mock.calls[0]!;
+    expect(data).toMatchObject({ kind: "reclamo", item_type: "servicio", consumer_name: "Ana Pérez", consumer_phone: null, claimed_amount: 15, is_minor: false, guardian_name: null });
+    expect(options).toEqual({ test: false, evidence: [], retrySheetNumber: null });
     expect(await screen.findByText("Hoja de reclamación N.° 001-000000007")).toBeInTheDocument();
 
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     await user.click(screen.getByRole("button", { name: "Descargar copia (PDF)" }));
-    expect(mocks.downloadComplaintPdf).toHaveBeenCalledWith(record);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    click.mockRestore();
   });
 
   it("does not show provider data and lets the consumer choose product or service", () => {
@@ -80,6 +72,7 @@ describe("ComplaintsBookPage", () => {
   });
 
   it("offers test mode only with ?prueba and sends without a correlative number", async () => {
+    mocks.sendComplaint.mockResolvedValue({ ...sent, sheet_number: null });
     const user = userEvent.setup();
     renderPage("/libro-reclamaciones?prueba");
     const toggle = screen.getByRole("switch", { name: "Modo prueba" });
@@ -90,22 +83,21 @@ describe("ComplaintsBookPage", () => {
     await user.click(screen.getByRole("button", { name: "Enviar" }));
 
     expect(await screen.findByText("Hoja de reclamación N.° 001-PRUEBA")).toBeInTheDocument();
-    expect(mocks.assignComplaintNumber).not.toHaveBeenCalled();
-    expect(mocks.sendComplaint.mock.calls[0]![0]).toMatchObject({ sheetNumber: null });
+    expect(mocks.sendComplaint.mock.calls[0]![1]).toMatchObject({ test: true, retrySheetNumber: null });
   });
 
-  it("reuses the assigned number when sending is retried", async () => {
-    mocks.sendComplaint.mockRejectedValueOnce(new Error("No se pudo enviar tu reclamo."));
+  it("offers WhatsApp on failure and retries with the number already assigned", async () => {
+    mocks.sendComplaint.mockRejectedValueOnce(new AppError("complaint_not_sent", "No pudimos enviar tu hoja de reclamación.", { sheet_number: 7 }));
     const user = userEvent.setup();
     renderPage();
     await fillRequired(user);
     await user.click(screen.getByRole("button", { name: "Enviar" }));
-    expect(await screen.findByText("No se pudo enviar tu reclamo.")).toBeInTheDocument();
+    expect(await screen.findByText(/No pudimos enviar tu hoja de reclamación\. Si el problema continúa, escríbenos por WhatsApp/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Escribir al/ })).toHaveAttribute("href", "https://wa.me/51942722127");
 
     await user.click(screen.getByRole("button", { name: "Enviar" }));
     expect(await screen.findByText("Hoja de reclamación N.° 001-000000007")).toBeInTheDocument();
-    expect(mocks.assignComplaintNumber).toHaveBeenCalledTimes(1);
-    expect(mocks.sendComplaint).toHaveBeenCalledTimes(2);
+    expect(mocks.sendComplaint.mock.calls[1]![1]).toMatchObject({ retrySheetNumber: 7 });
   });
 
   it("sends the attached evidence along with the sheet and lets the consumer remove files", async () => {
@@ -121,7 +113,7 @@ describe("ComplaintsBookPage", () => {
     await fillRequired(user);
     await user.click(screen.getByRole("button", { name: "Enviar" }));
     await waitFor(() => expect(mocks.sendComplaint).toHaveBeenCalledTimes(1));
-    expect(mocks.sendComplaint.mock.calls[0]![3]).toEqual([receipt]);
+    expect(mocks.sendComplaint.mock.calls[0]![1]).toMatchObject({ evidence: [receipt] });
   });
 
   it("rejects evidence above the size limit", async () => {
@@ -142,6 +134,6 @@ describe("ComplaintsBookPage", () => {
     await user.click(screen.getByRole("button", { name: "Enviar" }));
 
     expect(await screen.findByText("Ingresa el nombre del padre, madre o apoderado.")).toBeInTheDocument();
-    expect(mocks.assignComplaintNumber).not.toHaveBeenCalled();
+    expect(mocks.sendComplaint).not.toHaveBeenCalled();
   });
 });

@@ -43,3 +43,27 @@ Deno.test("keeps ASCII headers readable and encodes the message as base64url", (
   assert.ok(raw.includes("\r\nSubject: Codigo\r\n"));
   assert.doesNotMatch(toBase64Url(raw), /[+/=]/);
 });
+
+Deno.test("adds copy, reply-to and attachments in a multipart/mixed message", () => {
+  const raw = buildMimeMessage({
+    from: "envios@example.com",
+    to: "negocio@example.com",
+    cc: "ana@example.com",
+    replyTo: "ana@example.com",
+    subject: "Reclamo",
+    text: "x",
+    html: "<p>x</p>",
+    attachments: [{
+      filename: "hoja-reclamación.pdf",
+      contentType: "application/pdf",
+      content: new TextEncoder().encode("%PDF-1.3"),
+    }],
+  }, "b");
+  assert.ok(raw.includes("\r\nCc: ana@example.com\r\n"));
+  assert.ok(raw.includes("\r\nReply-To: ana@example.com\r\n"));
+  assert.ok(raw.includes('Content-Type: multipart/mixed; boundary="b"'));
+  assert.ok(raw.includes('Content-Type: multipart/alternative; boundary="b-alt"'));
+  assert.match(raw, /Content-Disposition: attachment; filename="=\?UTF-8\?B\?.+\?="/);
+  const attachment = raw.split("--b\r\n")[2]!.split("\r\n\r\n")[1]!;
+  assert.equal(decodeBase64(attachment.replace("\r\n--b--", "").trim()), "%PDF-1.3");
+});

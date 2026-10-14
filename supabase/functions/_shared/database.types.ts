@@ -2306,13 +2306,24 @@ export type Database = {
         Returns: string;
       };
       edge_kuti_webhook_secret: { Args: { p_mode: string }; Returns: string };
-      edge_next_complaint_sheet_number: { Args: never; Returns: number };
+      edge_mark_complaint_sheet_sent: {
+        Args: { p_sheet_number: number };
+        Returns: undefined;
+      };
       edge_registration_colleges: {
         Args: never;
         Returns: {
           college_id: string;
           college_name: string;
         }[];
+      };
+      edge_reserve_complaint_sheet: {
+        Args: {
+          p_daily_limit: number;
+          p_ip_hash: string;
+          p_retry_sheet_number?: number;
+        };
+        Returns: Json;
       };
       edge_revoke_user_sessions: {
         Args: { p_user_id: string };
