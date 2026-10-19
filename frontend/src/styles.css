@@ -24,6 +24,11 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
     100% { transform: translateX(400%); }
   }
 }
+/* Barra del toast: se llena durante el tiempo que el aviso sigue visible. */
+@keyframes toast-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
 .bg-grid {
   background-image: linear-gradient(rgb(148 163 184 / .07) 1px, transparent 1px), linear-gradient(90deg, rgb(148 163 184 / .07) 1px, transparent 1px);
   background-size: 48px 48px;

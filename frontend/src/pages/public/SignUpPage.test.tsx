@@ -24,6 +24,15 @@ function renderPage(path = "/estudiante/sign-up") {
   return render(<QueryClientProvider client={queryClient}><ToastProvider><MemoryRouter initialEntries={[path]}><SignUpPage /></MemoryRouter></ToastProvider></QueryClientProvider>);
 }
 
+/** El grupo nunca viene elegido: se muestra "Selecciona tu grupo" aunque haya uno solo. */
+async function chooseGroup(user: ReturnType<typeof userEvent.setup>) {
+  const group = screen.getByRole("combobox", { name: /Grupo/ });
+  await waitFor(() => expect(group).toBeEnabled());
+  expect(group).toHaveValue("");
+  expect(screen.getByRole("option", { name: "Selecciona tu grupo" })).toBeInTheDocument();
+  await user.selectOptions(group, "teacher-1");
+}
+
 async function fillForm(user: ReturnType<typeof userEvent.setup>, overrides: { password?: string } = {}) {
   await user.type(screen.getByLabelText("Nombres"), "Ana María");
   await user.type(screen.getByLabelText("Apellidos"), "Quispe");
@@ -74,7 +83,7 @@ describe("SignUpPage", () => {
   it("validates the data, verifies the email code and reaches the payment step", async () => {
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Grupo/ })).toHaveValue("teacher-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
 
@@ -107,7 +116,7 @@ describe("SignUpPage", () => {
   it("replaces the previous registration when the user goes back to fix the email", async () => {
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Grupo/ })).toHaveValue("teacher-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     await user.click(await screen.findByRole("button", { name: "Corregir mis datos" }));
@@ -132,7 +141,7 @@ describe("SignUpPage", () => {
     mocks.requestRegistrationCode.mockRejectedValueOnce(new AppError("email_unavailable", "No pudimos enviar el correo de verificación."));
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Grupo/ })).toHaveValue("teacher-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
 
@@ -154,7 +163,7 @@ describe("SignUpPage", () => {
     mocks.validateStudentRegistration.mockReset().mockRejectedValueOnce(new AppError("email_taken", "Este correo ya tiene una cuenta.", { field: "email" }));
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Grupo/ })).toHaveValue("teacher-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     expect(await screen.findByText("Este correo ya tiene una cuenta.")).toBeInTheDocument();

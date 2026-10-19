@@ -116,7 +116,7 @@ export function SignUpPage() {
   const plan = findPlan(searchParams.get("plan"));
   const toast = useToast();
   const teachers = useQuery({ queryKey: ["registration-teachers"], queryFn: listRegistrationTeachers });
-  const { register, handleSubmit, control, setValue, getValues, setError, formState: { errors, isSubmitting } } = useForm<Values>({
+  const { register, handleSubmit, control, setError, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
@@ -127,10 +127,6 @@ export function SignUpPage() {
   const password = useWatch({ control, name: "password" });
   const passwordConfirmation = useWatch({ control, name: "password_confirmation" });
   const teacherId = useWatch({ control, name: "teacher_id" });
-
-  useEffect(() => {
-    if (teachers.data?.length === 1 && !getValues("teacher_id")) setValue("teacher_id", teachers.data[0]!.id);
-  }, [teachers.data, getValues, setValue]);
 
   useEffect(() => {
     if (teachers.error) toast.error("No se pudo cargar la lista de grupos. Recarga la página.");

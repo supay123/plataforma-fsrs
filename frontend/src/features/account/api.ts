@@ -11,6 +11,8 @@ export interface AccountProfile {
   identity_document_number: string | null;
   college_id: string | null;
   college_name: string | null;
+  /** Grupo = nombre del profesor de sus cursos activos (varios, separados por coma). */
+  group_name: string | null;
 }
 export interface UpdateAccountProfileBody {
   given_names: string;

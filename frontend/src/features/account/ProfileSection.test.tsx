@@ -37,6 +37,7 @@ const profile: AccountProfile = {
   identity_document_number: "12345678",
   college_id: "college-1",
   college_name: "Universidad Uno",
+  group_name: "Ana Pérez",
 };
 const inOneMinute = () => new Date(Date.now() + 60_000).toISOString();
 
@@ -62,9 +63,10 @@ describe("ProfileSection", () => {
     renderSection();
     expect(await screen.findByLabelText("Nombres")).toHaveValue("Luis Manuel");
     expect(screen.getByLabelText("Correo electrónico")).toHaveValue("luis@example.com");
-    // La institución se ve, pero no se puede cambiar.
-    expect(screen.getByLabelText("Institución")).toHaveValue("Universidad Uno");
-    expect(screen.getByLabelText("Institución")).toHaveAttribute("readonly");
+    // El grupo (profesor) se ve, pero no se puede cambiar; la institución ya no.
+    expect(screen.getByLabelText("Grupo")).toHaveValue("Ana Pérez");
+    expect(screen.getByLabelText("Grupo")).toHaveAttribute("readonly");
+    expect(screen.queryByLabelText("Institución")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeDisabled();
 
     await user.clear(screen.getByLabelText("Celular"));

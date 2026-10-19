@@ -7,11 +7,13 @@ import { PublicFooter } from "../components/layout/PublicLayout";
 import { BUSINESS, PLAN, formatSoles } from "../config/business";
 import { useAuth } from "../features/auth/AuthProvider";
 import { PlanCards } from "../features/payments/PlanCards";
+import { loadYouTubeApi, type YouTubePlayer } from "../lib/youtube";
 
 const VIDEO_ID = "nE8ms_B1G7M";
-// Los navegadores solo reproducen un video automáticamente si empieza en
-// silencio; el sonido se activa con el botón (API de postMessage de YouTube).
-const VIDEO_URL = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${VIDEO_ID}&playsinline=1&rel=0&enablejsapi=1`;
+// El video intenta empezar con sonido; si el navegador lo bloquea, sigue en
+// silencio y el botón "Activar sonido" lo habilita. Esta URL solo se usa si
+// la API de YouTube no carga.
+const MUTED_VIDEO_URL = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${VIDEO_ID}&playsinline=1&rel=0`;
 
 const signUpPath = `/estudiante/sign-up?plan=${PLAN.id}`;
 // Tope redondeado hacia arriba a 10 céntimos, siempre mayor al precio diario real.
@@ -78,19 +80,62 @@ function Header() {
 }
 
 function IntroVideo() {
-  const frame = useRef<HTMLIFrameElement>(null);
-  const [muted, setMuted] = useState(true);
-  const unmute = () => {
-    for (const command of [{ func: "unMute", args: [] }, { func: "setVolume", args: [100] }, { func: "playVideo", args: [] }]) {
-      frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", ...command }), "*");
-    }
-    setMuted(false);
-  };
+  const host = useRef<HTMLDivElement>(null);
+  const player = useRef<YouTubePlayer | null>(null);
+  const [muted, setMuted] = useState(false);
+  const [apiFailed, setApiFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let fallback: number | undefined;
+    const playMuted = (target: YouTubePlayer) => { target.mute(); target.playVideo(); setMuted(true); };
+    loadYouTubeApi().then((YT) => {
+      if (cancelled || !host.current) return;
+      // YouTube reemplaza el elemento por su iframe: se le da uno propio para
+      // que React no intente quitar un nodo que ya no existe.
+      const element = document.createElement("div");
+      host.current.append(element);
+      player.current = new YT.Player(element, {
+        videoId: VIDEO_ID,
+        host: "https://www.youtube-nocookie.com",
+        width: "100%",
+        height: "100%",
+        playerVars: { autoplay: 1, loop: 1, playlist: VIDEO_ID, playsinline: 1, rel: 0 },
+        events: {
+          // Primero intenta con sonido.
+          onReady: ({ target }) => {
+            host.current?.querySelector("iframe")?.setAttribute("title", `Conoce ${BUSINESS.brand}`);
+            target.unMute();
+            target.playVideo();
+            // Si en 2 s no arrancó, el navegador lo bloqueó sin avisar.
+            fallback = window.setTimeout(() => {
+              const state = target.getPlayerState();
+              if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING) playMuted(target);
+            }, 2000);
+          },
+          onAutoplayBlocked: ({ target }) => playMuted(target),
+          // YouTube también puede silenciarlo por su cuenta para poder reproducirlo.
+          onStateChange: ({ target, data }) => { if (data === YT.PlayerState.PLAYING) setMuted(target.isMuted()); },
+        },
+      });
+    }).catch(() => { if (!cancelled) setApiFailed(true); });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallback);
+      player.current?.destroy();
+      player.current = null;
+    };
+  }, []);
+
+  const unmute = () => { player.current?.unMute(); player.current?.playVideo(); setMuted(false); };
+
   return <div className="relative">
     <div aria-hidden className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-indigo-600/40 via-transparent to-emerald-500/30 blur-2xl" />
     <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900 shadow-2xl shadow-indigo-950/60">
-      <iframe ref={frame} className="absolute inset-0 h-full w-full" src={VIDEO_URL} title={`Conoce ${BUSINESS.brand}`}
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+      {apiFailed
+        // Sin la API (bloqueada o sin red) queda el video en silencio; se activa con los controles de YouTube.
+        ? <iframe className="absolute inset-0 h-full w-full" src={MUTED_VIDEO_URL} title={`Conoce ${BUSINESS.brand}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+        : <div ref={host} className="absolute inset-0 [&_iframe]:h-full [&_iframe]:w-full" />}
       {muted && <button type="button" onClick={unmute} className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-slate-950/85 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-950">
         <Volume2 size={18} aria-hidden />Activar sonido
       </button>}

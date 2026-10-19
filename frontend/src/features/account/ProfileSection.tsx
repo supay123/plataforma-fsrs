@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Mail, Phone, School, User } from "lucide-react";
+import { KeyRound, Mail, Phone, User, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,7 +17,7 @@ import {
   type AccountProfile, type EmailChangeDelivery, type PasswordResetDelivery,
 } from "./api";
 
-// La institución no se edita aquí. El correo puede quedar vacío en cuentas creadas por el administrador.
+// El grupo no se edita aquí. El correo puede quedar vacío en cuentas creadas por el administrador.
 const schema = z.object(studentFields)
   .extend({ email: studentFields.email.or(z.literal("")) })
   .refine(documentIsValid, documentIssue);
@@ -152,9 +152,9 @@ function ProfileForm({ profile }: { profile: AccountProfile }) {
           <Field label="Tipo de documento" hideLabel><Select variant="soft" {...register("identity_document_type")}>{DOCUMENT_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field>
           <Field label="Número de documento" hideLabel error={errors.identity_document_number?.message}><Input variant="soft" placeholder="Nro. de documento" autoComplete="off" {...register("identity_document_number")} /></Field>
         </div>
-        {/* Solo lectura: la institución la cambia el administrador. */}
-        <Field label="Institución" hideLabel>
-          <Input variant="soft" icon={<School size={20} />} readOnly value={profile.college_name ?? ""} placeholder="Institución" className="cursor-default read-only:text-slate-500 read-only:focus:border-indigo-100 read-only:focus:bg-indigo-50/50 read-only:focus:ring-0" />
+        {/* Solo lectura: el grupo (profesor) lo cambia el administrador. */}
+        <Field label="Grupo" hideLabel>
+          <Input variant="soft" icon={<Users size={20} />} readOnly value={profile.group_name ?? ""} placeholder="Sin grupo asignado" className="cursor-default read-only:text-slate-500 read-only:focus:border-indigo-100 read-only:focus:bg-indigo-50/50 read-only:focus:ring-0" />
         </Field>
       </div>
       <div><Button disabled={isSubmitting || !isDirty}>{isSubmitting ? "Guardando…" : "Guardar cambios"}</Button></div>

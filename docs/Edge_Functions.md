@@ -159,7 +159,7 @@ pnpm exec supabase gen types --local --schema public \
   `registration/payment`, only for the student's own payments.
 - `GET account/profile`: no body. Responds with `profile` (`given_names`,
   `family_names`, `email`, `phone`, `identity_document_type`,
-  `identity_document_number`, `college_id`, `college_name`). Fields the
+  `identity_document_number`, `college_id`, `college_name`, `group_name`: name of the teacher of their active courses, comma-separated if several, or `null`). Fields the
   student has not filled yet are null (for example, `email` in accounts
   created by an administrator).
 - `PUT account/profile`: `given_names`, `family_names`, `phone`,

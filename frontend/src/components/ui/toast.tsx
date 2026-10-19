@@ -24,6 +24,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
   }, [paused, onDismiss, toast.id]);
 
   const Icon = toast.tone === "success" ? CircleCheck : CircleAlert;
+  const isSuccess = toast.tone === "success";
   return <div
     role={toast.tone === "error" ? "alert" : "status"}
     onMouseEnter={() => setPaused(true)}
@@ -31,15 +32,23 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
     onFocus={() => setPaused(true)}
     onBlur={() => setPaused(false)}
     className={clsx(
-      "pointer-events-auto flex items-start gap-3 rounded-xl border p-4 text-sm shadow-lg",
-      toast.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-rose-200 bg-rose-50 text-rose-900",
+      "pointer-events-auto relative flex items-stretch gap-3 overflow-hidden rounded-xl border p-4 text-sm shadow-lg",
+      isSuccess ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-rose-200 bg-rose-50 text-rose-900",
     )}
   >
-    <Icon size={20} aria-hidden="true" className={clsx("mt-0.5 shrink-0", toast.tone === "success" ? "text-emerald-600" : "text-rose-600")} />
+    <Icon size={20} aria-hidden="true" className={clsx("mt-0.5 shrink-0", isSuccess ? "text-emerald-600" : "text-rose-600")} />
     <p className="flex-1 leading-5">{toast.message}</p>
-    <button type="button" aria-label="Cerrar notificación" className="-m-1 rounded-lg p-1 opacity-70 hover:bg-black/5 hover:opacity-100" onClick={() => onDismiss(toast.id)}>
-      <X size={16} />
-    </button>
+    <div className={clsx("flex items-center border-l pl-3", isSuccess ? "border-emerald-200" : "border-rose-200")}>
+      <button type="button" aria-label="Cerrar notificación" className="rounded-lg p-1 opacity-70 hover:bg-black/5 hover:opacity-100" onClick={() => onDismiss(toast.id)}>
+        <X size={16} />
+      </button>
+    </div>
+    {/* Misma duración que el temporizador y se pausa con él: llena = el aviso se cierra. */}
+    <span
+      aria-hidden="true"
+      className={clsx("absolute inset-x-0 bottom-0 h-1 origin-left", isSuccess ? "bg-emerald-400" : "bg-rose-400")}
+      style={{ animation: `toast-progress ${toast.duration}ms linear forwards`, animationPlayState: paused ? "paused" : "running" }}
+    />
   </div>;
 }
 

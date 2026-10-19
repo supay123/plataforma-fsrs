@@ -32,8 +32,9 @@ toast y el modal, que tienen archivos propios (ver abajo).
 ## Toast
 
 Notificación flotante de éxito o de error. Dura **3,5 segundos**, se detiene
-mientras el mouse o el foco están encima y tiene un botón para cerrarla. Un
-mismo mensaje repetido no se apila.
+mientras el mouse o el foco están encima y tiene un botón para cerrarla. Una
+barra en el borde inferior se llena de izquierda a derecha en proporción al
+tiempo transcurrido (también se pausa). Un mismo mensaje repetido no se apila.
 
 - Archivos: `components/ui/toast.tsx` (`ToastProvider`) y
   `components/ui/use-toast.ts` (`useToast`).
@@ -238,6 +239,7 @@ Los planes y precios están en `config/business.ts` (`PLANS`, `findPlan`,
 | `formatDate(valor)` y `todayInLima()` | `lib/dates.ts` | Fecha y hora legible en español (para fechas con hora, como `created_at`) y fecha de hoy en Lima (`AAAA-MM-DD`). |
 | `studentAccess(perfil)` | `lib/student-access.ts` | Situación del plan del estudiante hoy en Lima: `active` (con `daysLeft`), `expired` (con `daysSinceExpiry`) o `not_started`. Úsala en lugar de comparar fechas a mano. También exporta `RENEWAL_NOTICE_DAYS` (3) y `EXPIRED_REVIEW_DAYS` (7). |
 | `formatDay(valor)` | `lib/dates.ts` | Fecha sin hora (`AAAA-MM-DD`, como las vigencias de acceso) en `DD/MM/AAAA`. Úsala en lugar de `formatDate` para esas fechas: `formatDate` las mostraría un día antes. |
+| `loadYouTubeApi()` y `YouTubePlayer` | `lib/youtube.ts` | Carga una sola vez la API del reproductor de YouTube (falla si el script está bloqueado) y tipa lo que usa la app: reproducir, silenciar, activar el sonido y su estado. La usa el video del home. |
 | `MathText` | `lib/math.tsx` | Muestra texto con fórmulas LaTeX (`$...$` y `$$...$$`) usando KaTeX. |
 | `roleLabel(rol)` | `features/users/api.ts` | Nombre en español del nivel de acceso: "Administrador", "Profesor" o "Estudiante". |
 
