@@ -98,7 +98,7 @@ describe("SessionPage", () => {
 
     await user.click(screen.getByRole("button", { name: /AOpción A 1/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(await screen.findByText("¡Correcto!")).toBeInTheDocument();
+    expect(await screen.findAllByText("¡Correcto!")).not.toHaveLength(0);
     expect(screen.getByText("Porque A es la correcta.")).toBeInTheDocument();
     expect(mocks.answerQuestion).toHaveBeenCalledWith(expect.objectContaining({
       session_question_id: "session-question-1",
@@ -110,7 +110,7 @@ describe("SessionPage", () => {
     expect(screen.getByText("Pregunta 2 de 3")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /BOpción B 2/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(await screen.findByText("Incorrecto. La respuesta correcta es la A.")).toBeInTheDocument();
+    expect(await screen.findAllByText("Incorrecto. La respuesta correcta es la A.")).not.toHaveLength(0);
     expect(screen.getByText("Tu respuesta")).toBeInTheDocument();
     expect(screen.getByText("Respuesta correcta")).toBeInTheDocument();
 
@@ -166,7 +166,7 @@ describe("SessionPage", () => {
     expect(await screen.findByText(/Sin conexión\./)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Reintentar" }));
-    expect(await screen.findByText("¡Correcto!")).toBeInTheDocument();
+    expect(await screen.findAllByText("¡Correcto!")).not.toHaveLength(0);
     expect(mocks.answerQuestion).toHaveBeenCalledTimes(2);
   });
 });

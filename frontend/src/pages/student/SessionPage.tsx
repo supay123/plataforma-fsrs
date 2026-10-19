@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert, Button, Card, PageHeader, Spinner } from "../../components/ui";
 import { answerQuestion, completeSession, startSession, warmAnswerQuestion } from "../../features/sessions/api";
@@ -30,6 +30,17 @@ export function SessionPage() {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<AnswerOption | null>(null);
   const [startedAt, setStartedAt] = useState(0);
+  // Alto real de la barra fija en móvil, para reservar justo ese espacio al final.
+  const [barHeight, setBarHeight] = useState(0);
+  const barRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const measure = () => setBarHeight(node.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   const start = useMutation({
     mutationFn: () => startSession(topicId),
@@ -115,14 +126,15 @@ export function SessionPage() {
     setStartedAt(Date.now());
   }
 
-  return <>
+  return <div className="max-sm:[&>header]:mb-4 max-sm:[&_h1]:text-xl">
     <PageHeader
       title={`Pregunta ${index + 1} de ${payload.questions.length}`}
       description={`${answeredCount} respondidas`}
     />
-    <Card className="mx-auto max-w-3xl">
+    {/* En móvil la pregunta va directo sobre el fondo, sin marco, para ganar espacio. */}
+    <Card className="mx-auto max-w-3xl max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:border sm:border-slate-200 sm:bg-white">
       <h2 className="text-lg font-semibold"><MathText>{question.question.statement}</MathText></h2>
-      <div className="mt-6 grid gap-3">
+      <div className="mt-4 grid gap-3 sm:mt-6">
         {options.map(([answerOption, text]) => <button
           key={answerOption}
           disabled={Boolean(feedback) || answer.isPending || complete.isPending}
@@ -139,7 +151,7 @@ export function SessionPage() {
             <span className="text-xs font-semibold text-rose-700">Tu respuesta</span>}
         </button>)}
       </div>
-      {feedback && <div className="mt-6 grid gap-3">
+      {feedback && <div className="mt-4 grid gap-3 sm:mt-6">
         <div className="hidden sm:block">
           <Alert tone={feedback.is_correct ? "success" : "error"}>
             {feedback.is_correct
@@ -158,17 +170,25 @@ export function SessionPage() {
       {complete.error && <div className="mt-4"><Alert tone="error">
         {complete.error.message} Tus respuestas siguen guardadas; puedes reintentar sin recargar.
       </Alert></div>}
-      <div className="mt-6 flex justify-end">
+      {/* En móvil la acción queda fija abajo (estilo Duolingo) y muestra el resultado. */}
+      <div ref={barRef} className={`fixed inset-x-0 bottom-0 z-20 grid gap-3 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:static sm:mt-6 sm:flex sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 ${
+        !feedback ? "border-slate-200 bg-white" : feedback.is_correct ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"
+      }`}>
+        {feedback && <p className={`font-semibold sm:hidden ${feedback.is_correct ? "text-emerald-700" : "text-rose-700"}`}>
+          {feedback.is_correct ? "¡Correcto!" : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`}
+        </p>}
         {!feedback
-          ? <Button disabled={!selected || answer.isPending} onClick={confirm}>
+          ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={!selected || answer.isPending} onClick={confirm}>
             {answer.isPending ? "Corrigiendo…" : answer.error ? "Reintentar" : "Confirmar respuesta"}
           </Button>
           : allAnswered
-            ? <Button disabled={complete.isPending} onClick={() => complete.mutate()}>
+            ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={complete.isPending} onClick={() => complete.mutate()}>
               {complete.isPending ? "Finalizando…" : complete.error ? "Reintentar finalización" : "Finalizar examen"}
             </Button>
-            : <Button onClick={next}>Siguiente</Button>}
+            : <Button className="h-12 w-full sm:h-auto sm:w-auto" onClick={next}>Siguiente</Button>}
       </div>
     </Card>
-  </>;
+    {/* Espacio para que la barra fija no tape el final del contenido en móvil. */}
+    <div aria-hidden className="sm:hidden" style={{ height: barHeight }} />
+  </div>;
 }
