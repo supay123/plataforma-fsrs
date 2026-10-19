@@ -4,7 +4,7 @@ The backend exposes twelve Edge Functions. Shared authentication, validation,
 error handling, CSV, XLSX, session serialization, and FSRS scheduling live in
 `supabase/functions/_shared`.
 
-Endpoints accept `POST` unless noted (`GET public/colleges`). Except for the
+Endpoints accept `POST` unless noted (`GET public/colleges`, `GET public/teachers`). Except for the
 public ones (`login-with-code`, `recover-password`, `complaints`,
 `public`, and `registration`), callers must send a valid user access token in
 `Authorization: Bearer <token>`. Public endpoints require the project's
@@ -57,7 +57,7 @@ pnpm exec supabase gen types --local --schema public \
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
-| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges a new student can choose. |
+| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose. |
 | `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` creates the Kuti charge (QR, plus a bank code from S/ 50) of the chosen plan; `GET /registration/payment` reports its status and activates the account once Kuti confirms it. No account exists until the first payment is confirmed. |
 | `kuti` | Kuti signature | `POST /kuti/webhook` receives Kuti payment events (`payment.succeeded`, `failed`, `expired`, `cancelled`), verifies `X-Kuti-Signature` with the signing secret stored in Vault, and applies the payment. Called by Kuti, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
@@ -101,7 +101,12 @@ pnpm exec supabase gen types --local --schema public \
   `details.sheet_number` so the retry reuses the number and leaves no gaps.
 - `GET public/colleges`: no body. Responds with `colleges` (`id`, `name`).
   Creates `Chancón – Particular` once if no college is active.
-- `POST registration/student/validate`: `college_id`,
+- `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`):
+  active teachers of an active college with at least one non-archived course.
+  The sign-up form shows them as "Grupo".
+- `POST registration/student/validate`: `teacher_id` (the group; the college
+  is taken from the teacher, `400 invalid_teacher` if it is not listed by
+  `public/teachers`),
   `given_names`, `family_names`, `email`, `phone` (Peruvian mobile only: 9
   digits starting with 9, with or without `+51`; stored without the prefix),
   `identity_document_type`
@@ -112,7 +117,9 @@ pnpm exec supabase gen types --local --schema public \
   fix the data). Stores the pending registration and responds `201` with
   `registration_id` and the masked `email`. It does not send the code. Field
   errors carry `details.field`; an email that already has an account returns
-  `409 email_taken`.
+  `409 email_taken`. When the payment activates the account, the student is
+  enrolled in every non-archived course of that teacher, and later courses of
+  the teacher are added automatically (`sync_new_course_enrollments`).
 - `POST registration/request-code`: `registration_id`. Sends the first code
   and every resend: at most 5 codes, 60 seconds apart. Responds with the
   masked `email`, `code_expires_at`, and `resend_available_at`.
@@ -176,10 +183,11 @@ pnpm exec supabase gen types --local --schema public \
 - `DELETE account/password-reset`: no body. Deletes the student's pending
   link so it stops working; another one can be requested right away.
   Responds with `status: "cancelled"`.
-- `POST password-reset/request-link`: `email`. Sends the reset link if the
-  email belongs to an active student (same 1-hour link, at most one per
-  minute). Always responds `200 { status: "requested" }`, so it never reveals
-  which emails have an account.
+- `POST password-reset/request-link`: `email`. Sends the reset link to an
+  active student (same 1-hour link, at most one per minute; a repeated request
+  within that minute still answers `200`). Responds `200 { status: "requested" }`,
+  `404 email_not_found` if no student account uses the email, or
+  `403 account_inactive` if the account is deactivated.
 - `POST invitations`: `email`, `college_id`, `access_valid_from`,
   `access_valid_until` (the end cannot be in the past). Emails a link to
   `<site>/estudiante/invitacion?code=...` that lasts 7 days, never beyond the

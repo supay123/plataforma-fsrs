@@ -1403,6 +1403,7 @@ export type Database = {
             Database["public"]["Enums"]["identity_document_type"];
           password_hash: string;
           phone: string;
+          teacher_id: string | null;
           user_code: string | null;
         };
         Insert: {
@@ -1424,6 +1425,7 @@ export type Database = {
             Database["public"]["Enums"]["identity_document_type"];
           password_hash: string;
           phone: string;
+          teacher_id?: string | null;
           user_code?: string | null;
         };
         Update: {
@@ -1445,6 +1447,7 @@ export type Database = {
             Database["public"]["Enums"]["identity_document_type"];
           password_hash?: string;
           phone?: string;
+          teacher_id?: string | null;
           user_code?: string | null;
         };
         Relationships: [
@@ -1461,6 +1464,27 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "v_export_all_data";
             referencedColumns: ["college_id"];
+          },
+          {
+            foreignKeyName: "student_registrations_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_registrations_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["student_id"];
+          },
+          {
+            foreignKeyName: "student_registrations_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["teacher_id"];
           },
         ];
       };
@@ -2251,7 +2275,6 @@ export type Database = {
       };
       edge_create_student_registration: {
         Args: {
-          p_college_id: string;
           p_email: string;
           p_family_names: string;
           p_given_names: string;
@@ -2261,6 +2284,7 @@ export type Database = {
           p_password_hash: string;
           p_phone: string;
           p_replaces_registration_id?: string;
+          p_teacher_id: string;
         };
         Returns: string;
       };
@@ -2315,6 +2339,13 @@ export type Database = {
         Returns: {
           college_id: string;
           college_name: string;
+        }[];
+      };
+      edge_registration_teachers: {
+        Args: never;
+        Returns: {
+          teacher_id: string;
+          teacher_name: string;
         }[];
       };
       edge_reserve_complaint_sheet: {

@@ -389,7 +389,9 @@ Deno.test({
         .single();
       assert.ifError(storedRowError);
       storedAnswer = storedRow.selected_option;
-      if (!storedAnswer) await new Promise((resolve) => setTimeout(resolve, 100));
+      if (!storedAnswer) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
     assert.equal(storedAnswer, "A");
     const answeredFeedback = answered.feedback as Record<string, unknown>;
@@ -831,8 +833,44 @@ Deno.test({
     await call("public/colleges", {}, 405);
     await call("registration/unknown", {}, 404);
 
+    // El grupo es un profesor: solo se listan los que tienen algún curso.
+    const { data: teacherUser, error: teacherUserError } = await adminClient
+      .auth.admin.createUser({
+        email: `profe.${suffix}@teachers.invalid`,
+        password: "Profesor9",
+        email_confirm: true,
+      });
+    assert.ifError(teacherUserError);
+    const teacherId = created.user(teacherUser.user.id);
+    const { error: teacherError } = await adminClient.from(TABLES.profiles)
+      .insert({
+        id: teacherId,
+        college_id: college.id,
+        role: "teacher",
+        user_code: `PROFE-${suffix}`,
+        full_name: `Profesor ${suffix}`,
+        is_active: true,
+      });
+    assert.ifError(teacherError);
+    const listsTeacher = async () =>
+      ((await call("public/teachers", null)).teachers as Array<{ id: string }>)
+        .some((item) => item.id === teacherId);
+    assert.equal(await listsTeacher(), false);
+    const { data: firstCourse, error: firstCourseError } = await adminClient
+      .from(TABLES.courses)
+      .insert({
+        college_id: college.id,
+        teacher_id: teacherId,
+        name: `Curso ${suffix}`,
+        created_by: teacherId,
+      })
+      .select("id")
+      .single();
+    assert.ifError(firstCourseError);
+    assert.equal(await listsTeacher(), true);
+
     const form = {
-      college_id: college.id,
+      teacher_id: teacherId,
       given_names: "Ana María",
       family_names: "Quispe",
       email: `ana.${suffix}@example.com`,
@@ -850,6 +888,15 @@ Deno.test({
     assert.equal(
       (invalidDocument.error as { details: { field: string } }).details.field,
       "identity_document_number",
+    );
+    const invalidTeacher = await call(
+      "registration/student/validate",
+      { ...form, teacher_id: crypto.randomUUID() },
+      400,
+    );
+    assert.equal(
+      (invalidTeacher.error as { code: string }).code,
+      "invalid_teacher",
     );
 
     const firstStart = await call("registration/student/validate", form, 201);
@@ -971,6 +1018,29 @@ Deno.test({
       planPeriod(activated.access_valid_from, "semestral").period_end,
     );
     assert.ok(activated.user_code.startsWith(`ana.maria.${suffix}`));
+
+    // Queda inscrito en los cursos del profesor, también en los que cree después.
+    const { data: laterCourse, error: laterCourseError } = await adminClient
+      .from(TABLES.courses)
+      .insert({
+        college_id: college.id,
+        teacher_id: teacherId,
+        name: `Curso nuevo ${suffix}`,
+        created_by: teacherId,
+      })
+      .select("id")
+      .single();
+    assert.ifError(laterCourseError);
+    const { data: enrollments, error: enrollmentsError } = await adminClient
+      .from(TABLES.courseEnrollments)
+      .select("course_id")
+      .eq("student_id", activated.user_id)
+      .eq("status", "active");
+    assert.ifError(enrollmentsError);
+    assert.deepEqual(
+      enrollments.map((row) => row.course_id).sort(),
+      [firstCourse.id, laterCourse.id].sort(),
+    );
 
     // Entra con su correo (sin importar mayúsculas) y también con el código
     // generado, que es lo que ven el administrador y los profesores.
@@ -1217,26 +1287,26 @@ Deno.test({
     assert.equal(cancelledLinks, 0);
     await call("account/password-reset", { token });
 
-    // "¿Olvidaste tu contraseña?" del login: responde igual exista o no el
-    // correo, y solo crea el link para un estudiante real.
+    // "¿Olvidaste tu contraseña?" del login: avisa si el correo no tiene
+    // cuenta de estudiante y solo crea el link para un estudiante real.
     await adminClient.from(TABLES.passwordResetCodes).delete().eq(
       "user_id",
       student.id,
     );
-    for (
-      const email of [student.authEmail, `nadie.${suffix}@example.com`]
-    ) {
-      const requested = await call("password-reset/request-link", {
-        body: { email },
-      });
-      assert.deepEqual(requested, { status: "requested" });
-    }
+    const unknown = await call("password-reset/request-link", {
+      body: { email: `nadie.${suffix}@example.com` },
+    }, 404);
+    assert.equal((unknown.error as { code: string }).code, "email_not_found");
+    const requested = await call("password-reset/request-link", {
+      body: { email: student.authEmail },
+    });
+    assert.deepEqual(requested, { status: "requested" });
     const { count: requestedLinks } = await adminClient
       .from(TABLES.passwordResetCodes)
       .select("user_id", { count: "exact", head: true })
       .eq("user_id", student.id);
     assert.equal(requestedLinks, 1);
-    // Pedirlo de nuevo enseguida tampoco revela nada.
+    // Pedirlo de nuevo enseguida no falla: el link anterior sigue sirviendo.
     await call("password-reset/request-link", {
       body: { email: student.authEmail },
     });
@@ -1600,11 +1670,18 @@ Deno.test({
     };
     // Una IP distinta en cada corrida, para que el límite diario no dependa de
     // las anteriores.
-    const ip = `198.51.100.${Math.floor(Math.random() * 250) + 1}-${crypto.randomUUID()}`;
-    const submit = async (fields: Record<string, string>, files: File[] = []) => {
+    const ip = `198.51.100.${
+      Math.floor(Math.random() * 250) + 1
+    }-${crypto.randomUUID()}`;
+    const submit = async (
+      fields: Record<string, string>,
+      files: File[] = [],
+    ) => {
       const form = new FormData();
       form.append("data", JSON.stringify(data));
-      for (const [name, value] of Object.entries(fields)) form.append(name, value);
+      for (const [name, value] of Object.entries(fields)) {
+        form.append(name, value);
+      }
       for (const file of files) form.append("evidence", file, file.name);
       const response = await fetch(`${url}/functions/v1/complaints/sheets`, {
         method: "POST",

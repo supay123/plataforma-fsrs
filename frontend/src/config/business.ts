@@ -23,13 +23,11 @@ export const PLAN = {
   months: 1,
   period: "mes",
   features: [
-    "Acceso a todos los cursos y temas que tengas asignados",
-    "Sesiones de práctica de hasta 20 preguntas por tema",
-    "Repaso espaciado: las preguntas que fallas vuelven en el momento justo",
-    "Explicación instantánea de cada pregunta al responder",
-    "Revisión detallada de cada sesión completada",
-    "Progreso y porcentaje de acierto por curso y por tema",
-    "Materiales de estudio de cada tema",
+    "Todos los cursos de tu grupo",
+    "Sesiones de 20 preguntas por tema",
+    "Repaso espaciado de tus errores",
+    "Explicación al instante de cada respuesta",
+    "Progreso por curso y por tema",
   ],
 };
 

@@ -95,7 +95,7 @@ function EmailRecoveryForm({ onBack }: { onBack: () => void }) {
     <p className="mt-2 text-sm text-slate-600">Escribe el correo de tu cuenta y te enviaremos un link para crear una nueva contraseña.</p>
     <form onSubmit={(event) => void send(event)} className="mt-6 grid gap-4" noValidate>
       {sentTo
-        ? <Alert tone="success">Si <strong>{sentTo}</strong> tiene una cuenta, te enviamos un link para crear una nueva contraseña. Vence en 1 hora; si no lo ves, revisa la carpeta de spam.</Alert>
+        ? <Alert tone="success">Te enviamos a <strong>{sentTo}</strong> un link para crear una nueva contraseña. Vence en 1 hora; si no lo ves, revisa la carpeta de spam.</Alert>
         : <>
           <Field label="Correo" error={error}><Input type="email" autoComplete="email" icon={<Mail size={20} />} placeholder="tu@correo.com" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
           <Button disabled={busy}>{busy ? "Enviando…" : "Enviar link"}</Button>

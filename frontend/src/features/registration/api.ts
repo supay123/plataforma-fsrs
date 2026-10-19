@@ -3,9 +3,11 @@ import type { PlanId } from "../../config/business";
 import type { PlanPayment, PlanPaymentState, SimulatedMethod } from "../payments/api";
 import type { DocumentType } from "../complaints/model";
 
-export interface RegistrationCollege { id: string; name: string }
+/** Grupo que elige el estudiante: un profesor. */
+export interface RegistrationTeacher { id: string; name: string }
 export interface ValidateStudentBody {
-  college_id: string;
+  /** Profesor del grupo; la institución y los cursos salen de él. */
+  teacher_id: string;
   given_names: string;
   family_names: string;
   email: string;
@@ -23,10 +25,10 @@ export interface ValidatedRegistration { registration_id: string; email: string 
 export interface EmailCodeDelivery { email: string; code_expires_at: string; resend_available_at: string }
 export interface VerifiedRegistration { status: "verified"; registration_id: string }
 
-/** GET /public/colleges */
-export async function listRegistrationColleges() {
-  const { colleges } = await invokeFunction<{ colleges: RegistrationCollege[] }, Record<string, never>>("public/colleges", {}, { method: "GET" });
-  return colleges;
+/** GET /public/teachers */
+export async function listRegistrationTeachers() {
+  const { teachers } = await invokeFunction<{ teachers: RegistrationTeacher[] }, Record<string, never>>("public/teachers", {}, { method: "GET" });
+  return teachers;
 }
 
 /** POST /registration/student/validate: valida los datos y crea el registro pendiente. */

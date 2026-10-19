@@ -204,7 +204,7 @@ con las validaciones del backend: si cambias una, cambia la otra.
 
 | Archivo | Qué ofrece |
 | --- | --- |
-| `fields.ts` | Campos zod listos: `studentFields` (nombres, apellidos, correo, celular, documento, institución) y `passwordFields` (contraseña y confirmación); validaciones entre campos `documentIsValid`/`documentIssue` y `passwordsMatch`/`passwordMismatchIssue`; `SERVER_FIELD_MESSAGES` para traducir errores de campo del backend. |
+| `fields.ts` | Campos zod listos: `studentFields` (nombres, apellidos, correo, celular y documento) y `passwordFields` (contraseña y confirmación); validaciones entre campos `documentIsValid`/`documentIssue` y `passwordsMatch`/`passwordMismatchIssue`; `SERVER_FIELD_MESSAGES` para traducir errores de campo del backend. |
 | `rules.ts` | Reglas sueltas: `isValidPassword`, `passwordChecks`, `isValidPhone`, `isValidIdentityDocument`, `normalizeIdentityDocument` y los límites de la contraseña. |
 | `PasswordChecklist.tsx` | Lista de reglas de la contraseña que se marcan a medida que se cumplen. |
 
@@ -219,6 +219,7 @@ según el plan; el navegador solo dice qué plan eligió.
 | Archivo | Qué ofrece |
 | --- | --- |
 | `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. |
+| `PlanCards.tsx` | Tarjetas grandes de los dos planes con sus beneficios y el botón «Elegir …» que lleva al registro con ese plan. Se usan en el home y en `/precios`; acepta `className` para el margen. |
 | `PaymentPanel.tsx` | Cobro de un plan: QR, código de pago de servicios (si el monto lo permite), cuenta regresiva y espera de la confirmación. Recibe `createPayment`, `fetchStatus`, `simulatePayment` y `onPaid`, así sirve para el registro y la renovación. En modo prueba muestra el botón «Simular pago». Sin Kuti configurado muestra el contacto por WhatsApp. |
 | `PlanExpiryBanner.tsx` | Aviso en el portal del estudiante cuando a su plan le quedan `RENEWAL_NOTICE_DAYS` días o menos. |
 | `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos que Kuti confirmó pero no se pudieron aplicar. Solo aparece si hay alguno. |

@@ -23,7 +23,7 @@ const schema = z.object({
   ...studentFields,
   ...passwordFields,
   accepted_terms: z.boolean().refine((value) => value, "Debes aceptar los términos y la política de privacidad."),
-}).omit({ email: true, college_id: true })
+}).omit({ email: true })
   .refine(documentIsValid, documentIssue)
   .refine(passwordsMatch, passwordMismatchIssue);
 type Values = z.infer<typeof schema>;

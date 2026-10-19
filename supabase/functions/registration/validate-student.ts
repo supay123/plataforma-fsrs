@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { RPCS, TABLES } from "../_shared/database.constants.ts";
+import { RPCS } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
 import {
   maskEmail,
@@ -23,22 +23,12 @@ export async function validateStudent(
   const body = await readJson<ValidateStudentBody>(request);
   const input = parseStudentRegistration(body as Record<string, unknown>);
 
-  const { data: college, error: collegeError } = await context.supabaseAdmin
-    .from(TABLES.colleges)
-    .select("id,is_active")
-    .eq("id", input.college_id)
-    .maybeSingle();
-  if (collegeError || !college?.is_active) {
-    throw new AppError(400, "invalid_college", "Select an active college.", {
-      field: "college_id",
-    });
-  }
-
+  // La base valida el profesor (grupo) y toma de él la institución.
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_COST);
   const { data: registrationId, error } = await context.supabaseAdmin.rpc(
     RPCS.createStudentRegistration,
     {
-      p_college_id: input.college_id,
+      p_teacher_id: input.teacher_id,
       p_given_names: input.given_names,
       p_family_names: input.family_names,
       p_email: input.email,
@@ -53,6 +43,11 @@ export async function validateStudent(
     },
   );
   if (error) {
+    if (error.message === "invalid_teacher") {
+      throw new AppError(400, "invalid_teacher", "Select a group.", {
+        field: "teacher_id",
+      });
+    }
     if (error.message === "email_taken") {
       throw new AppError(
         409,

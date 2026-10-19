@@ -18,7 +18,7 @@ import {
 } from "../registration.ts";
 
 const validBody = {
-  college_id: "a51ec034-3e1b-4fa2-9e7a-8bc641de87d1",
+  teacher_id: "a51ec034-3e1b-4fa2-9e7a-8bc641de87d1",
   given_names: "  Ana   María ",
   family_names: "Quispe Huamán",
   email: " Ana.Quispe@Example.com ",
@@ -153,11 +153,11 @@ Deno.test("email codes only verify for their own registration", async () => {
   assert.equal(await verifyEmailCode("registration-1", other, hash), false);
 });
 
-Deno.test("parses the editable profile without college, email or password", () => {
+Deno.test("parses the editable profile without group, email or password", () => {
   const {
     email: _email,
     password: _password,
-    college_id: _collegeId,
+    teacher_id: _teacherId,
     ...profileBody
   } = validBody;
   const profile = parseStudentProfile(profileBody);

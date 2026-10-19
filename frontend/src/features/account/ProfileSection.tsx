@@ -18,7 +18,7 @@ import {
 } from "./api";
 
 // La institución no se edita aquí. El correo puede quedar vacío en cuentas creadas por el administrador.
-const schema = z.object(studentFields).omit({ college_id: true })
+const schema = z.object(studentFields)
   .extend({ email: studentFields.email.or(z.literal("")) })
   .refine(documentIsValid, documentIssue);
 type Values = z.infer<typeof schema>;

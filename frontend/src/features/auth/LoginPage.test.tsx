@@ -47,7 +47,7 @@ describe("LoginPage", () => {
 
     await user.type(screen.getByLabelText(/Correo/), "@example.com");
     await user.click(screen.getByRole("button", { name: "Enviar link" }));
-    expect(await screen.findByText(/te enviamos un link para crear una nueva contraseña/)).toBeInTheDocument();
+    expect(await screen.findByText(/Te enviamos a .*un link para crear una nueva contraseña/)).toBeInTheDocument();
     expect(mocks.requestPasswordResetLink).toHaveBeenCalledWith("ana@example.com");
 
     await user.click(screen.getByRole("button", { name: "Inicia sesión" }));
@@ -55,6 +55,17 @@ describe("LoginPage", () => {
   });
 
   it("shows request errors in a toast", async () => {
+    const user = userEvent.setup();
+    mocks.requestPasswordResetLink.mockRejectedValueOnce(new AppError("email_not_found", "No encontramos una cuenta con ese correo. Revisa que esté bien escrito."));
+    renderLogin("student");
+    await user.click(screen.getByRole("button", { name: "¿Olvidaste tu contraseña?" }));
+    await user.type(screen.getByLabelText("Correo"), "nadie@example.com");
+    await user.click(screen.getByRole("button", { name: "Enviar link" }));
+    expect(await screen.findByText("No encontramos una cuenta con ese correo. Revisa que esté bien escrito.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar link" })).toBeEnabled();
+  });
+
+  it("shows connection errors in a toast", async () => {
     const user = userEvent.setup();
     mocks.requestPasswordResetLink.mockRejectedValueOnce(new AppError("network_error", "No se pudo conectar con el servicio."));
     renderLogin("student");

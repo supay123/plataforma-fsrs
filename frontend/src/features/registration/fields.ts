@@ -14,7 +14,6 @@ export const studentFields = {
   phone: z.string().trim().refine(isValidPhone, "Ingresa un celular válido de 9 dígitos, por ejemplo 987654321."),
   identity_document_type: z.enum(["DNI", "CE", "PASAPORTE", "RUC"]),
   identity_document_number: z.string().trim().min(1, "Ingresa tu número de documento."),
-  college_id: z.string().min(1, "Selecciona tu institución."),
 };
 
 export const passwordFields = {
