@@ -14,7 +14,7 @@ export interface StudentProfileInput {
 }
 
 export interface StudentRegistrationInput extends StudentProfileInput {
-  college_id: string;
+  teacher_id: string;
   email: string;
   password: string;
 }
@@ -158,9 +158,9 @@ export function parseStudentRegistration(
   body: Record<string, unknown>,
 ): StudentRegistrationInput {
   if (
-    typeof body.college_id !== "string" || !UUID_PATTERN.test(body.college_id)
+    typeof body.teacher_id !== "string" || !UUID_PATTERN.test(body.teacher_id)
   ) {
-    throw invalid("college_id", "college_id must be a UUID.");
+    throw invalid("teacher_id", "teacher_id must be a UUID.");
   }
   const profile = parseStudentProfile(body);
   const email = parseEmail(body.email);
@@ -171,7 +171,7 @@ export function parseStudentRegistration(
       "The terms and privacy policy must be accepted.",
     );
   }
-  return { ...profile, college_id: body.college_id, email, password };
+  return { ...profile, teacher_id: body.teacher_id, email, password };
 }
 
 /**

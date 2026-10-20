@@ -6,7 +6,7 @@ import { BUSINESS } from "../../config/business";
 import { Logo } from "./Logo";
 
 const columns = [
-  { title: "Producto", links: [{ to: "/precios", label: "Planes y precios" }, { to: "/estudiante/login", label: "Ingreso de estudiantes" }, { to: "/profesor/login", label: "Ingreso de profesores" }] },
+  { title: "Producto", links: [{ to: "/precios", label: "Planes y precios" }, { to: "/estudiante/login", label: "Ingreso de estudiantes" }, { to: "/profesor/login", label: "Ingreso de profesores" }, { to: "/admin/login", label: "Ingreso de administradores" }] },
   { title: "Legal", links: [{ to: "/terminos", label: "Términos y condiciones" }, { to: "/privacidad", label: "Política de privacidad" }, { to: "/reembolsos", label: "Política de reembolsos" }] },
 ];
 
@@ -15,7 +15,9 @@ export function ComplaintsBookIcon({ className = "h-5" }: { className?: string }
 }
 
 export function PublicFooter() {
-  return <footer className="border-t border-slate-800 bg-slate-950 px-4 py-14 text-slate-300 print:hidden">
+  return <footer className="relative border-t border-slate-700 bg-slate-900 px-4 py-14 text-slate-300 print:hidden">
+    {/* Franja de color para separar el pie del contenido. */}
+    <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-indigo-600 via-indigo-400 to-emerald-400" />
     <div className="mx-auto max-w-6xl">
       <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -37,7 +39,7 @@ export function PublicFooter() {
         </div>
       </div>
       {BUSINESS.social.length > 0 && <ul className="mt-10 flex justify-center gap-3">{BUSINESS.social.map((item) => <li key={item.url}><a className="rounded-full border border-slate-700 px-4 py-2 text-sm hover:border-indigo-400 hover:text-white" href={item.url} target="_blank" rel="noreferrer">{item.label}</a></li>)}</ul>}
-      <div className="mt-10 grid gap-1 border-t border-slate-800 pt-6 text-center text-sm text-slate-400">
+      <div className="mt-10 grid gap-1 border-t border-slate-700 pt-6 text-center text-sm text-slate-400">
         <p>© {new Date().getFullYear()} {BUSINESS.tradeName}</p>
         <p>{BUSINESS.legalName} · RUC {BUSINESS.ruc} · {BUSINESS.address}</p>
       </div>

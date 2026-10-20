@@ -43,6 +43,7 @@ export const RPCS = {
   kutiWebhookSecret: "edge_kuti_webhook_secret",
   markComplaintSheetSent: "edge_mark_complaint_sheet_sent",
   registrationColleges: "edge_registration_colleges",
+  registrationTeachers: "edge_registration_teachers",
   reserveComplaintSheet: "edge_reserve_complaint_sheet",
   revokeUserSessions: "edge_revoke_user_sessions",
   saveKutiWebhookSecret: "edge_save_kuti_webhook_secret",

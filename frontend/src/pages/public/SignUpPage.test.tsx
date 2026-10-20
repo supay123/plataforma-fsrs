@@ -8,7 +8,7 @@ import { AppError } from "../../lib/api/errors";
 import { SignUpPage } from "./SignUpPage";
 
 const mocks = vi.hoisted(() => ({
-  listRegistrationColleges: vi.fn(),
+  listRegistrationTeachers: vi.fn(),
   validateStudentRegistration: vi.fn(),
   requestRegistrationCode: vi.fn(),
   validateRegistrationCode: vi.fn(),
@@ -22,6 +22,15 @@ vi.mock("../../features/registration/api", () => mocks);
 function renderPage(path = "/estudiante/sign-up") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}><ToastProvider><MemoryRouter initialEntries={[path]}><SignUpPage /></MemoryRouter></ToastProvider></QueryClientProvider>);
+}
+
+/** El grupo nunca viene elegido: se muestra "Selecciona tu grupo" aunque haya uno solo. */
+async function chooseGroup(user: ReturnType<typeof userEvent.setup>) {
+  const group = screen.getByRole("combobox", { name: /Grupo/ });
+  await waitFor(() => expect(group).toBeEnabled());
+  expect(group).toHaveValue("");
+  expect(screen.getByRole("option", { name: "Selecciona tu grupo" })).toBeInTheDocument();
+  await user.selectOptions(group, "teacher-1");
 }
 
 async function fillForm(user: ReturnType<typeof userEvent.setup>, overrides: { password?: string } = {}) {
@@ -38,7 +47,7 @@ async function fillForm(user: ReturnType<typeof userEvent.setup>, overrides: { p
 describe("SignUpPage", () => {
   afterEach(cleanup);
   beforeEach(() => {
-    mocks.listRegistrationColleges.mockReset().mockResolvedValue([{ id: "college-1", name: "Colegio Uno" }]);
+    mocks.listRegistrationTeachers.mockReset().mockResolvedValue([{ id: "teacher-1", name: "Prof. Rosa Díaz" }]);
     mocks.validateStudentRegistration.mockReset()
       .mockResolvedValueOnce({ registration_id: "registration-1", email: "an*@example.com" })
       .mockResolvedValue({ registration_id: "registration-2", email: "an*@example.com" });
@@ -74,13 +83,13 @@ describe("SignUpPage", () => {
   it("validates the data, verifies the email code and reaches the payment step", async () => {
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Institución/ })).toHaveValue("college-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
 
     await waitFor(() => expect(mocks.validateStudentRegistration).toHaveBeenCalledTimes(1));
     expect(mocks.validateStudentRegistration.mock.calls[0]![0]).toEqual({
-      college_id: "college-1",
+      teacher_id: "teacher-1",
       given_names: "Ana María",
       family_names: "Quispe",
       email: "ana@example.com",
@@ -107,7 +116,7 @@ describe("SignUpPage", () => {
   it("replaces the previous registration when the user goes back to fix the email", async () => {
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Institución/ })).toHaveValue("college-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     await user.click(await screen.findByRole("button", { name: "Corregir mis datos" }));
@@ -132,7 +141,7 @@ describe("SignUpPage", () => {
     mocks.requestRegistrationCode.mockRejectedValueOnce(new AppError("email_unavailable", "No pudimos enviar el correo de verificación."));
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Institución/ })).toHaveValue("college-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
 
@@ -143,18 +152,18 @@ describe("SignUpPage", () => {
     expect(mocks.validateStudentRegistration).toHaveBeenCalledTimes(1);
   });
 
-  it("shows an error toast when the institutions cannot be loaded", async () => {
-    mocks.listRegistrationColleges.mockReset().mockRejectedValue(new AppError("network_error", "No se pudo conectar con el servicio."));
+  it("shows an error toast when the groups cannot be loaded", async () => {
+    mocks.listRegistrationTeachers.mockReset().mockRejectedValue(new AppError("network_error", "No se pudo conectar con el servicio."));
     renderPage();
-    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cargar la lista de instituciones. Recarga la página.");
-    expect(screen.getByRole("combobox", { name: /Institución/ })).toBeDisabled();
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cargar la lista de grupos. Recarga la página.");
+    expect(screen.getByRole("combobox", { name: /Grupo/ })).toBeDisabled();
   });
 
   it("shows server field errors next to the field", async () => {
     mocks.validateStudentRegistration.mockReset().mockRejectedValueOnce(new AppError("email_taken", "Este correo ya tiene una cuenta.", { field: "email" }));
     const user = userEvent.setup();
     renderPage();
-    await waitFor(() => expect(screen.getByRole("combobox", { name: /Institución/ })).toHaveValue("college-1"));
+    await chooseGroup(user);
     await fillForm(user);
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     expect(await screen.findByText("Este correo ya tiene una cuenta.")).toBeInTheDocument();

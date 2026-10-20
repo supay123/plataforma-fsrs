@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { LockKeyhole, LogIn, Mail, Phone, School, User } from "lucide-react";
+import { LockKeyhole, LogIn, Mail, Phone, User, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -14,7 +14,7 @@ import { DOCUMENT_TYPES } from "../../features/complaints/model";
 import { PaymentPanel } from "../../features/payments/PaymentPanel";
 import { PlanPicker } from "../../features/payments/PlanPicker";
 import {
-  createRegistrationPayment, getRegistrationPaymentStatus, listRegistrationColleges, requestRegistrationCode, simulateRegistrationPayment,
+  createRegistrationPayment, getRegistrationPaymentStatus, listRegistrationTeachers, requestRegistrationCode, simulateRegistrationPayment,
   validateRegistrationCode, validateStudentRegistration,
   type EmailCodeDelivery, type ValidatedRegistration,
 } from "../../features/registration/api";
@@ -31,13 +31,14 @@ const PENDING_HOURS = 24;
 
 const schema = z.object({
   ...studentFields,
+  teacher_id: z.string().min(1, "Selecciona tu grupo."),
   ...passwordFields,
   accepted_terms: z.boolean().refine((value) => value, "Debes aceptar los términos y la política de privacidad."),
 })
   .refine(documentIsValid, documentIssue)
   .refine(passwordsMatch, passwordMismatchIssue);
 type Values = z.infer<typeof schema>;
-type ServerField = "given_names" | "family_names" | "email" | "phone" | "identity_document_number" | "college_id" | "password";
+type ServerField = "given_names" | "family_names" | "email" | "phone" | "identity_document_number" | "teacher_id" | "password";
 
 const STEPS = ["Tus datos", "Verifica tu correo", "Pago"];
 
@@ -114,32 +115,28 @@ export function SignUpPage() {
   const navigate = useNavigate();
   const plan = findPlan(searchParams.get("plan"));
   const toast = useToast();
-  const colleges = useQuery({ queryKey: ["registration-colleges"], queryFn: listRegistrationColleges });
-  const { register, handleSubmit, control, setValue, getValues, setError, formState: { errors, isSubmitting } } = useForm<Values>({
+  const teachers = useQuery({ queryKey: ["registration-teachers"], queryFn: listRegistrationTeachers });
+  const { register, handleSubmit, control, setError, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
       given_names: "", family_names: "", email: "", phone: "", identity_document_type: "DNI", identity_document_number: "",
-      college_id: "", password: "", password_confirmation: "", accepted_terms: false,
+      teacher_id: "", password: "", password_confirmation: "", accepted_terms: false,
     },
   });
   const password = useWatch({ control, name: "password" });
   const passwordConfirmation = useWatch({ control, name: "password_confirmation" });
-  const collegeId = useWatch({ control, name: "college_id" });
+  const teacherId = useWatch({ control, name: "teacher_id" });
 
   useEffect(() => {
-    if (colleges.data?.length === 1 && !getValues("college_id")) setValue("college_id", colleges.data[0]!.id);
-  }, [colleges.data, getValues, setValue]);
-
-  useEffect(() => {
-    if (colleges.error) toast.error("No se pudo cargar la lista de instituciones. Recarga la página.");
-  }, [colleges.error, toast]);
+    if (teachers.error) toast.error("No se pudo cargar la lista de grupos. Recarga la página.");
+  }, [teachers.error, toast]);
 
   const submit = handleSubmit(async (values) => {
     setFormError("");
     try {
       const validated = await validateStudentRegistration({
-        college_id: values.college_id,
+        teacher_id: values.teacher_id,
         given_names: values.given_names,
         family_names: values.family_names,
         email: values.email,
@@ -196,11 +193,11 @@ export function SignUpPage() {
           <Field label="Tipo de documento" hideLabel><Select variant="soft" {...register("identity_document_type")}>{DOCUMENT_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field>
           <Field label="Número de documento" hideLabel error={errors.identity_document_number?.message}><Input variant="soft" placeholder="Nro. de documento" autoComplete="off" {...register("identity_document_number")} /></Field>
         </div>
-        <Field label="Institución" hideLabel error={errors.college_id?.message}>
-          {/* Sin institución elegida, el select se ve como placeholder. */}
-          <Select variant="soft" icon={<School size={20} />} disabled={!colleges.data} className={clsx(!collegeId && "text-slate-500", "[&>option]:text-slate-900")} {...register("college_id")}>
-            <option value="">{colleges.isPending ? "Cargando instituciones..." : "Selecciona tu institución"}</option>
-            {colleges.data?.map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}
+        <Field label="Grupo" hideLabel error={errors.teacher_id?.message}>
+          {/* Cada grupo es un profesor; sin grupo elegido, el select se ve como placeholder. */}
+          <Select variant="soft" icon={<Users size={20} />} disabled={!teachers.data} className={clsx(!teacherId && "text-slate-500", "[&>option]:text-slate-900")} {...register("teacher_id")}>
+            <option value="">{teachers.isPending ? "Cargando grupos..." : "Selecciona tu grupo"}</option>
+            {teachers.data?.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
           </Select>
         </Field>
       </div>
