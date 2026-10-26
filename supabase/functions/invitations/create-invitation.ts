@@ -8,15 +8,15 @@ import {
   assertDateOrder,
   date,
   limaDate,
-  uuid,
+  optionalUuid,
 } from "../_shared/validation.ts";
 import type { CreateInvitationBody } from "./interfaces.ts";
 
 /**
  * POST /invitations
- * Invita a un estudiante: guarda correo, institución y periodo de acceso, y le
- * envía el link para que complete sus datos. Invitar otra vez al mismo correo
- * reemplaza la invitación anterior.
+ * Invita a un estudiante: guarda correo, periodo de acceso y, opcionalmente, el
+ * grupo (profesor). Si no hay grupo, el estudiante lo elige al aceptar. Invitar
+ * otra vez al mismo correo reemplaza la invitación anterior.
  */
 export async function createInvitationHandler(
   request: Request,
@@ -25,7 +25,9 @@ export async function createInvitationHandler(
   const admin = await requireProfile(context, ["admin"]);
   const body = await readJson<CreateInvitationBody>(request);
   const email = parseEmail(body.email);
-  const collegeId = uuid(body.college_id, "college_id");
+  // college_id solo se acepta de clientes antiguos que elegían institución.
+  const teacherId = optionalUuid(body.teacher_id, "teacher_id");
+  const collegeId = optionalUuid(body.college_id, "college_id");
   const accessValidFrom = date(body.access_valid_from, "access_valid_from");
   const accessValidUntil = date(body.access_valid_until, "access_valid_until");
   assertDateOrder(accessValidFrom, accessValidUntil);
@@ -58,7 +60,8 @@ export async function createInvitationHandler(
 
   const invitation = await createInvitation(request, context, {
     email,
-    college_id: collegeId,
+    teacher_id: teacherId ?? null,
+    college_id: collegeId ?? null,
     access_valid_from: accessValidFrom,
     access_valid_until: accessValidUntil,
   }, admin.id);

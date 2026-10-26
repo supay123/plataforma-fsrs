@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
-import { AuthLayout } from "../../components/layout/AuthLayout";
+import { AuthLayout, type AuthCover } from "../../components/layout/AuthLayout";
 import { Alert, Button, Field, Input, PasswordInput } from "../../components/ui";
 import { useToast } from "../../components/ui/use-toast";
 import { requestPasswordResetLink } from "../account/api";
@@ -22,6 +22,11 @@ const portal = {
   teacher: { label: "Profesor", path: "/profesor" },
   student: { label: "Estudiante", path: "/estudiante" },
 } as const;
+const covers: Record<AppRole, AuthCover> = {
+  admin: { title: "Todo tu colegio en un solo lugar", description: "Gestiona colegios, profesores y estudiantes desde un mismo panel." },
+  teacher: { title: "Enseña con datos, no con suposiciones", description: "Arma tus cursos, importa tus preguntas y sigue el avance de cada estudiante." },
+  student: { title: "Repasa justo antes de olvidar", description: "Chancón programa cada pregunta con repaso espaciado para que estudies menos y recuerdes más." },
+};
 
 export function LoginPage({ role }: { role: AppRole }) {
   const auth = useAuth();
@@ -37,7 +42,7 @@ export function LoginPage({ role }: { role: AppRole }) {
     try { setError(""); await auth.login(values.code, values.password, role); navigate(portal[role].path, { replace: true }); }
     catch (reason) { setError((await normalizeError(reason)).message); }
   });
-  return <AuthLayout>
+  return <AuthLayout cover={covers[role]}>
       {recovering
         ? role === "student"
           ? <EmailRecoveryForm onBack={() => setRecovering(false)} />

@@ -679,6 +679,55 @@ Bitácora de acciones administrativas y de profesores.
 - `audit_logs_select`: solo administrador.
 - La inserción se realizará desde Edge Functions o procesos internos.
 
+---
+
+## public.student_invitations
+
+Invitaciones de estudiantes enviadas por un administrador. El administrador fija el correo, el periodo de acceso y, opcionalmente, el grupo (profesor); el estudiante recibe un link para completar sus datos y crear su cuenta, sin verificar el correo ni pagar. Del link solo se guarda el hash SHA-256 del código. La fila se borra al aceptarse o anularse, y las vencidas se conservan 30 días para poder reenviarlas.
+
+Migraciones: `20261013120000_student_invitations.sql` y `20261025120000_invitation_group_selection.sql`.
+
+**RLS:** activo, sin políticas. Solo se accede desde Edge Functions con `service_role` (`invitations` y `student-invitation`).
+
+| Columna | Tipo | Nulo | Valor por defecto | Descripción |
+|---|---|---:|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Identificador. |
+| `email` | `text` | No | — | Correo del estudiante invitado. |
+| `teacher_id` | `uuid` | Sí | — | Grupo (profesor) fijado por el administrador. Si es nulo, el estudiante elige su grupo al aceptar. |
+| `college_id` | `uuid` | Sí | — | Institución del grupo fijado. En invitaciones antiguas (sin grupo) limita los grupos que puede elegir el estudiante a los de esa institución. |
+| `access_valid_from` | `date` | No | — | Inicio del acceso del estudiante. |
+| `access_valid_until` | `date` | No | — | Fin del acceso del estudiante. |
+| `code_hash` | `text` | No | — | Hash SHA-256 del código del link. |
+| `expires_at` | `timestamptz` | No | — | Vencimiento del link (7 días, nunca después del último día de acceso). |
+| `invited_by` | `uuid` | Sí | — | Administrador que invitó. |
+| `created_at` | `timestamptz` | No | `now()` | Fecha de creación. |
+
+### Relaciones
+
+- `teacher_id → public.profiles.id` con `ON DELETE SET NULL`.
+- `college_id → public.colleges.id` con `ON DELETE CASCADE`.
+- `invited_by → public.profiles.id` con `ON DELETE SET NULL`.
+
+### Constraints
+
+- `student_invitations_pkey`: `PRIMARY KEY (id)`.
+- `student_invitations_email_not_blank`: `email` no puede estar vacío.
+- `student_invitations_dates_ordered`: `access_valid_from <= access_valid_until`.
+- `student_invitations_teacher_requires_college`: si hay `teacher_id`, debe haber `college_id`.
+- `student_invitations_email_unique_ci`: una invitación por correo (sin distinguir mayúsculas); invitar de nuevo reemplaza la anterior.
+- `student_invitations_code_hash_unique`: el hash del código es único.
+
+### Tareas programadas
+
+- `purge-expired-student-invitations` (pg_cron, cada hora): borra las invitaciones vencidas hace más de 30 días.
+
+### Funciones relacionadas
+
+Ambas son `SECURITY DEFINER`, con `search_path = ''`, y solo las ejecuta `service_role`.
+
+- `public.edge_registration_teachers()`: grupos que puede elegir un estudiante, tanto en el autoservicio como en la invitación. Devuelve `teacher_id`, `teacher_name`, `college_id` y `college_name` de los profesores activos, de un colegio activo, con al menos un curso no archivado.
+- `public.edge_accept_student_invitation(...)`: acepta una invitación en una sola transacción. Valida el grupo (el fijado por el administrador o, si no hay, el elegido por el estudiante entre los de `edge_registration_teachers()`), toma de él la institución, borra la invitación, crea el perfil del estudiante con el periodo de acceso de la invitación, lo matricula en los cursos no archivados del profesor y registra `invitation.accepted` en `audit_logs`. Si algo falla, todo vuelve atrás y la invitación no se pierde. Errores: `invalid_invitation`, `teacher_required`, `invalid_teacher`.
+
 # Funciones
 
 Las funciones de `private` son guards de autorización. Todas son `SECURITY DEFINER`, tienen `search_path = ''`, no son ejecutables por `PUBLIC` y están autorizadas para el rol PostgreSQL `authenticated`.

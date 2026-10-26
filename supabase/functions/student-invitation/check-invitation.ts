@@ -4,8 +4,8 @@ import { findValidInvitation } from "./find-invitation.ts";
 
 /**
  * GET /student-invitation?code=...
- * Datos fijos de la invitación (correo, institución y periodo de acceso) para
- * mostrarlos en el formulario. 404 si el link no sirve.
+ * Datos fijos de la invitación (correo, grupo, institución y periodo de acceso)
+ * para mostrarlos en el formulario. 404 si el link no sirve.
  */
 export async function checkInvitation(
   request: Request,
@@ -16,6 +16,9 @@ export async function checkInvitation(
   return json({
     invitation: {
       email: invitation.email,
+      teacher_id: invitation.teacher_id,
+      teacher_name: invitation.teacher_name,
+      college_id: invitation.college_id,
       college_name: invitation.college_name,
       access_valid_from: invitation.access_valid_from,
       access_valid_until: invitation.access_valid_until,

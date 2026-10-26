@@ -1206,34 +1206,37 @@ export type Database = {
           access_valid_from: string;
           access_valid_until: string;
           code_hash: string;
-          college_id: string;
+          college_id: string | null;
           created_at: string;
           email: string;
           expires_at: string;
           id: string;
           invited_by: string | null;
+          teacher_id: string | null;
         };
         Insert: {
           access_valid_from: string;
           access_valid_until: string;
           code_hash: string;
-          college_id: string;
+          college_id?: string | null;
           created_at?: string;
           email: string;
           expires_at: string;
           id?: string;
           invited_by?: string | null;
+          teacher_id?: string | null;
         };
         Update: {
           access_valid_from?: string;
           access_valid_until?: string;
           code_hash?: string;
-          college_id?: string;
+          college_id?: string | null;
           created_at?: string;
           email?: string;
           expires_at?: string;
           id?: string;
           invited_by?: string | null;
+          teacher_id?: string | null;
         };
         Relationships: [
           {
@@ -1267,6 +1270,20 @@ export type Database = {
           {
             foreignKeyName: "student_invitations_invited_by_fkey";
             columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["teacher_id"];
+          },
+          {
+            foreignKeyName: "student_invitations_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_invitations_teacher_id_fkey";
+            columns: ["teacher_id"];
             isOneToOne: false;
             referencedRelation: "v_export_all_data";
             referencedColumns: ["teacher_id"];
@@ -2241,6 +2258,22 @@ export type Database = {
         Args: { p_student_ids?: string[]; p_teacher_id: string };
         Returns: undefined;
       };
+      edge_accept_student_invitation: {
+        Args: {
+          p_email: string;
+          p_family_names: string;
+          p_given_names: string;
+          p_identity_document_number: string;
+          p_identity_document_type:
+            Database["public"]["Enums"]["identity_document_type"];
+          p_invitation_id: string;
+          p_phone: string;
+          p_teacher_id?: string;
+          p_user_code: string;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
       edge_activate_student_registration: {
         Args: {
           p_access_valid_from: string;
@@ -2344,6 +2377,8 @@ export type Database = {
       edge_registration_teachers: {
         Args: never;
         Returns: {
+          college_id: string;
+          college_name: string;
           teacher_id: string;
           teacher_name: string;
         }[];

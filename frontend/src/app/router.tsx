@@ -5,7 +5,6 @@ import { Spinner } from "../components/ui";
 import { LoginPage } from "../features/auth/LoginPage";
 import { HomePage, NotFoundPage } from "../pages/HomePage";
 import { RoleGuard } from "./guards";
-const PricingPage = lazy(() => import("../pages/public/PricingPage").then((m) => ({ default: m.PricingPage })));
 const SignUpPage = lazy(() => import("../pages/public/SignUpPage").then((m) => ({ default: m.SignUpPage })));
 const InvitationPage = lazy(() => import("../pages/public/InvitationPage").then((m) => ({ default: m.InvitationPage })));
 const ResetPasswordPage = lazy(() => import("../pages/public/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
@@ -33,7 +32,6 @@ const TopicsPage = lazy(() => import("../pages/teacher/TopicsPage").then((m) => 
 export function AppRouter() {
   return <Suspense fallback={<Spinner />}><Routes>
     <Route path="/" element={<HomePage />} />
-    <Route path="/precios" element={<PricingPage />} />
     <Route path="/terminos" element={<TermsPage />} />
     <Route path="/privacidad" element={<PrivacyPage />} />
     <Route path="/reembolsos" element={<RefundPolicyPage />} />

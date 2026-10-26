@@ -20,7 +20,7 @@ export function RenewPage() {
   if (!profile) return null;
   const expired = studentAccess(profile).state === "expired";
 
-  return <AuthLayout wide>
+  return <AuthLayout wide cover={{ title: "Sigue avanzando", description: "Renueva tu plan y vuelve a practicar justo donde te quedaste." }}>
     <div className="mb-4">
       <h1 className="text-2xl font-bold">Renueva tu plan</h1>
       <p className="mt-2 text-sm text-slate-600">

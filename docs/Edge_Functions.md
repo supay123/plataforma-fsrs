@@ -57,13 +57,13 @@ pnpm exec supabase gen types --local --schema public \
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
-| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose. |
+| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to. |
 | `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` creates the Kuti charge (QR, plus a bank code from S/ 50) of the chosen plan; `GET /registration/payment` reports its status and activates the account once Kuti confirms it. No account exists until the first payment is confirmed. |
 | `kuti` | Kuti signature | `POST /kuti/webhook` receives Kuti payment events (`payment.succeeded`, `failed`, `expired`, `cancelled`), verifies `X-Kuti-Signature` with the signing secret stored in Vault, and applies the payment. Called by Kuti, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
 | `password-reset` | Public | `POST /password-reset/request-link` emails the link from the student login ("¿Olvidaste tu contraseña?"); `GET /password-reset?code=...` says whether it is still valid without using it; `POST /password-reset` uses it once, saves the new password, and closes every session of that user only. |
-| `invitations` | Admin | Student invitations: `GET /invitations` lists the ones not accepted yet (pending or expired), `POST /invitations` invites a student by email, `POST /invitations/resend` sends a new link, and `DELETE /invitations?id=...` cancels one. Students are no longer created directly from the admin screen. |
-| `student-invitation` | Public | The invited student uses the emailed link: `GET /student-invitation?code=...` returns the fixed data (email, college, access period) and `POST /student-invitation` completes the profile and creates the account. |
+| `invitations` | Admin | Student invitations: `GET /invitations` lists the ones not accepted yet (pending or expired), `POST /invitations` invites a student by email with an optional group (teacher), `POST /invitations/resend` sends a new link, and `DELETE /invitations?id=...` cancels one. Students are no longer created directly from the admin screen. |
+| `student-invitation` | Public | The invited student uses the emailed link: `GET /student-invitation?code=...` returns the fixed data (email, group, college, access period) and `POST /student-invitation` completes the profile, creates the account and enrolls the student in the group's courses. If the admin did not fix a group, the student chooses one and the college is derived from it. |
 
 ## Main request bodies
 
@@ -101,9 +101,11 @@ pnpm exec supabase gen types --local --schema public \
   `details.sheet_number` so the retry reuses the number and leaves no gaps.
 - `GET public/colleges`: no body. Responds with `colleges` (`id`, `name`).
   Creates `Chancón – Particular` once if no college is active.
-- `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`):
-  active teachers of an active college with at least one non-archived course.
-  The sign-up form shows them as "Grupo".
+- `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`,
+  `college_id`, `college_name`): active teachers of an active college with at
+  least one non-archived course. The sign-up form, the admin invitation form
+  and the invitation page show them as "Grupo"; a teacher without courses does
+  not appear until they create one.
 - `POST registration/student/validate`: `teacher_id` (the group; the college
   is taken from the teacher, `400 invalid_teacher` if it is not listed by
   `public/teachers`),
@@ -188,8 +190,12 @@ pnpm exec supabase gen types --local --schema public \
   within that minute still answers `200`). Responds `200 { status: "requested" }`,
   `404 email_not_found` if no student account uses the email, or
   `403 account_inactive` if the account is deactivated.
-- `POST invitations`: `email`, `college_id`, `access_valid_from`,
-  `access_valid_until` (the end cannot be in the past). Emails a link to
+- `POST invitations`: `email`, `access_valid_from`, `access_valid_until`
+  (the end cannot be in the past) and an optional `teacher_id` (group), which
+  must be one of the groups listed by `GET public/teachers`; otherwise
+  `400 invalid_teacher`. The college is always derived from the group. Without a group, the student
+  chooses one while accepting. Legacy clients may still send `college_id`
+  instead, which limits the groups the student can choose. Emails a link to
   `<site>/estudiante/invitacion?code=...` that lasts 7 days, never beyond the
   last day of access. Inviting the same email again replaces the previous
   invitation. `409 email_taken` if the email already has an account. Responds
@@ -199,14 +205,18 @@ pnpm exec supabase gen types --local --schema public \
   already ended.
 - `DELETE invitations?id=...`: deletes the invitation (its link stops working).
 - `GET student-invitation?code=...`: responds with `invitation` (`email`,
-  `college_name`, `access_valid_from`, `access_valid_until`, `expires_at`) or
-  `404 invalid_invitation`.
-- `POST student-invitation`: `code`, `given_names`, `family_names`, `phone`,
+  `teacher_id`, `teacher_name`, `college_id`, `college_name`,
+  `access_valid_from`, `access_valid_until`, `expires_at`) or
+  `404 invalid_invitation`. A null `teacher_id` means the student must choose
+  a group.
+- `POST student-invitation`: `code`, optional `teacher_id` (required when the
+  invitation has no fixed group), `given_names`, `family_names`, `phone`,
   `identity_document_type`, `identity_document_number`, `password` (sign-up
   rules) and `accepted_terms: true`. Invalid data does not spend the link.
-  Creates the student with the invitation's email, college and access period
-  (the email is already proven by the link), deletes the invitation, and
-  responds `201 { status: "accepted" }`.
+  Creates the student with the invitation's email and access period, derives
+  the college from the group, enrolls the student in the group's courses (the
+  email is already proven by the link), deletes the invitation, and responds
+  `201 { status: "accepted" }`.
 - `GET password-reset?code=...`: responds `200 { status: "valid", expires_at }`
   or `404 invalid_reset_code`.
 - `POST password-reset`: `code`, `password` (sign-up password rule). The

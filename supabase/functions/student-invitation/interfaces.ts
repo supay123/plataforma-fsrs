@@ -1,5 +1,6 @@
 export interface AcceptInvitationBody {
   code?: unknown;
+  teacher_id?: unknown;
   given_names?: unknown;
   family_names?: unknown;
   phone?: unknown;

@@ -3,8 +3,13 @@ import type { PlanId } from "../../config/business";
 import type { PlanPayment, PlanPaymentState, SimulatedMethod } from "../payments/api";
 import type { DocumentType } from "../complaints/model";
 
-/** Grupo que elige el estudiante: un profesor. */
-export interface RegistrationTeacher { id: string; name: string }
+/** Grupo que elige el estudiante: un profesor, con su institución. */
+export interface RegistrationTeacher {
+  id: string;
+  name: string;
+  college_id: string;
+  college_name: string;
+}
 export interface ValidateStudentBody {
   /** Profesor del grupo; la institución y los cursos salen de él. */
   teacher_id: string;

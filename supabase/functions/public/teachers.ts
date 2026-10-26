@@ -4,8 +4,10 @@ import type { EdgeContext } from "../_shared/types.ts";
 
 /**
  * GET /public/teachers
- * Grupos (profesores) que puede elegir quien se registra: solo id y nombre de
- * los profesores activos que tienen al menos un curso vigente.
+ * Grupos (profesores) que puede elegir quien se registra o acepta una
+ * invitación: profesores activos, de un colegio activo, con al menos un curso
+ * vigente. La institución de cada grupo también se devuelve para que el
+ * autoservicio y las invitaciones usen la misma fuente.
  */
 export async function listTeachers(
   _request: Request,
@@ -21,6 +23,8 @@ export async function listTeachers(
     teachers: (data ?? []).map((teacher) => ({
       id: teacher.teacher_id,
       name: teacher.teacher_name,
+      college_id: teacher.college_id,
+      college_name: teacher.college_name,
     })),
   });
 }

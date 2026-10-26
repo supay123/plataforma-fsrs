@@ -7,8 +7,10 @@ import type { EdgeContext } from "../_shared/types.ts";
 export interface ValidInvitation {
   id: string;
   email: string;
-  college_id: string;
+  college_id: string | null;
   college_name: string | null;
+  teacher_id: string | null;
+  teacher_name: string | null;
   access_valid_from: string;
   access_valid_until: string;
   expires_at: string;
@@ -24,13 +26,17 @@ export async function findValidInvitation(
   const { data, error } = await context.supabaseAdmin
     .from(TABLES.studentInvitations)
     .select(
-      "id,email,college_id,access_valid_from,access_valid_until,expires_at,invited_by,college:colleges(name)",
+      "id,email,college_id,teacher_id,access_valid_from,access_valid_until,expires_at,invited_by,college:colleges(name),teacher:profiles!student_invitations_teacher_id_fkey(full_name)",
     )
     .eq("code_hash", await hashLinkCode(code))
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
   if (error) throw new AppError(500, "invitation_lookup_failed", error.message);
   if (!data) throw invalidInvitation();
-  const { college, ...invitation } = data;
-  return { ...invitation, college_name: college?.name ?? null };
+  const { college, teacher, ...invitation } = data;
+  return {
+    ...invitation,
+    college_name: college?.name ?? null,
+    teacher_name: teacher?.full_name ?? null,
+  };
 }

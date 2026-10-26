@@ -187,7 +187,7 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
 | Componente | Descripción |
 | --- | --- |
 | `PortalLayout` | Menú lateral, usuario y botón "Salir" de los portales. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. |
-| `AuthLayout` | Fondo degradado con una tarjeta y el logo, sin encabezado ni pie. Para pantallas de acceso: login, registro y nueva contraseña. Usa `wide` para formularios de dos columnas y `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro). |
+| `AuthLayout` | Pantalla partida para el acceso (login, registro, invitación, nueva contraseña y renovación): fondo blanco con el logo y el formulario a la izquierda, y a la derecha una portada en índigo con la vista previa `public/image/preview.webp` (en móvil aparece debajo del formulario). Usa `wide` para formularios de dos columnas, `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro) y `cover` (`{ title, description }`) para el texto de la portada. |
 | `PublicPage` | Página pública con el logo arriba y el pie de página legal. |
 | `PublicFooter` | Pie de página con enlaces legales y datos de la empresa (ya incluido en `PublicPage`). |
 | `ComplaintsBookIcon` | Ícono del Libro de Reclamaciones. |
@@ -219,8 +219,8 @@ según el plan; el navegador solo dice qué plan eligió.
 
 | Archivo | Qué ofrece |
 | --- | --- |
-| `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. |
-| `PlanCards.tsx` | Tarjetas grandes de los dos planes con sus beneficios y el botón «Elegir …» que lleva al registro con ese plan. Se usan en el home y en `/precios`; acepta `className` para el margen. |
+| `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. El semestral lleva siempre borde dorado, igual que su tarjeta en el home. |
+| `PlanCards.tsx` | Tarjetas grandes de los dos planes con sus beneficios y el botón «Elegir …» (con destello y leve crecimiento al pasar el mouse por el botón) que lleva al registro con ese plan. El semestral tiene borde dorado animado (`animate-orbit`), repite los beneficios del Plan Estudiante y resalta aparte sus extras. Se usan en el home (sección «Elige tu plan»); acepta `className` para el margen. |
 | `PaymentPanel.tsx` | Cobro de un plan: QR, código de pago de servicios (si el monto lo permite), cuenta regresiva y espera de la confirmación. Recibe `createPayment`, `fetchStatus`, `simulatePayment` y `onPaid`, así sirve para el registro y la renovación. En modo prueba muestra el botón «Simular pago». Sin Kuti configurado muestra el contacto por WhatsApp. |
 | `PlanExpiryBanner.tsx` | Aviso en el portal del estudiante cuando a su plan le quedan `RENEWAL_NOTICE_DAYS` días o menos. |
 | `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos que Kuti confirmó pero no se pudieron aplicar. Solo aparece si hay alguno. |

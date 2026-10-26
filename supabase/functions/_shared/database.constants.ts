@@ -31,6 +31,7 @@ export const VIEWS = {
 } as const;
 
 export const RPCS = {
+  acceptStudentInvitation: "edge_accept_student_invitation",
   activateStudentRegistration: "edge_activate_student_registration",
   applyRenewalPayment: "edge_apply_renewal_payment",
   applyAnswer: "edge_apply_answer",

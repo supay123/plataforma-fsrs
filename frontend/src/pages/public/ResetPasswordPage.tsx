@@ -82,7 +82,7 @@ export function ResetPasswordPage() {
     if (failed) toast.error(check.error.message);
   }, [failed, check.error, toast]);
 
-  return <AuthLayout>
+  return <AuthLayout cover={{ title: "Vuelve a tu práctica", description: "Crea una nueva contraseña y sigue donde te quedaste." }}>
       {denied
         ? <AccessDenied />
         : failed

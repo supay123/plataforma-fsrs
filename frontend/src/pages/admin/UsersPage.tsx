@@ -126,7 +126,7 @@ export function UsersPage() {
           <Field label="Rol"><Select value={role} onChange={(event) => setRole(event.target.value as "student" | "teacher")}><option value="student">Estudiante</option><option value="teacher">Profesor</option></Select></Field>
           <div className="mt-3">
             {role === "student"
-              ? <InviteStudentForm colleges={activeColleges} />
+              ? <InviteStudentForm />
               : <>
                 {create.error && <Alert tone="error">{create.error.message}</Alert>}
                 {credentials && <Alert tone="success">

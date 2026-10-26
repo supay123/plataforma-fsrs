@@ -166,7 +166,7 @@ export function SignUpPage() {
     }
   });
 
-  return <AuthLayout wide action={<Link
+  return <AuthLayout wide cover={{ title: "Empieza a prepararte hoy", description: "Practica con las preguntas de tu grupo y recibe la explicación de cada respuesta al instante." }} action={<Link
     to="/estudiante/login"
     className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
   ><LogIn className="h-4 w-4" aria-hidden />Iniciar sesión</Link>}>
