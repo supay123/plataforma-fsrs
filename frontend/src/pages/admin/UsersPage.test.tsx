@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   createInvitation: vi.fn(),
   resendInvitation: vi.fn(),
   cancelInvitation: vi.fn(),
+  listRegistrationTeachers: vi.fn(),
 }));
 
 vi.mock("../../features/colleges/api", () => ({
@@ -28,6 +29,9 @@ vi.mock("../../features/invitations/api", () => ({
   createInvitation: mocks.createInvitation,
   resendInvitation: mocks.resendInvitation,
   cancelInvitation: mocks.cancelInvitation,
+}));
+vi.mock("../../features/registration/api", () => ({
+  listRegistrationTeachers: mocks.listRegistrationTeachers,
 }));
 vi.mock("../../features/users/api", () => ({
   createUser: mocks.createUser,
@@ -57,10 +61,13 @@ describe("UsersPage", () => {
     ]);
     mocks.deleteUser.mockResolvedValue({ user_id: "teacher-1" });
     mocks.listInvitations.mockResolvedValue([{
-      id: "invitation-1", email: "pendiente@example.com", college_id: "college-1", college_name: "Ciencias",
+      id: "invitation-1", email: "pendiente@example.com", college_id: null, college_name: null, teacher_id: null, teacher_name: null,
       access_valid_from: "2026-03-01", access_valid_until: "2026-12-31",
       expires_at: new Date(Date.now() + 86_400_000).toISOString(), created_at: new Date().toISOString(),
     }]);
+    mocks.listRegistrationTeachers.mockResolvedValue([
+      { id: "teacher-1", name: "Profesor Carlos", college_id: "college-1", college_name: "Ciencias" },
+    ]);
     mocks.createInvitation.mockResolvedValue({ id: "invitation-2" });
     mocks.resendInvitation.mockResolvedValue({ id: "invitation-1" });
     mocks.cancelInvitation.mockResolvedValue({ invitation_id: "invitation-1" });
@@ -70,9 +77,9 @@ describe("UsersPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await screen.findByText("Profesor Carlos");
+    await screen.findByText("PROFE-1");
     await user.selectOptions(screen.getByRole("combobox", { name: "Filtrar por colegio" }), "college-1");
-    expect(screen.getByText("Profesor Carlos")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("Profesor Carlos")).toBeInTheDocument();
     expect(screen.queryByText("Ana Torres")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Eliminar" }));
@@ -102,11 +109,11 @@ describe("UsersPage", () => {
   it("invites students by email instead of creating them directly", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Profesor Carlos");
+    await screen.findByRole("option", { name: "Profesor Carlos" });
     expect(screen.getByRole("combobox", { name: "Rol" })).toHaveValue("student");
     expect(screen.queryByLabelText("Código")).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Colegio" }), "college-2");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Grupo (opcional)" }), "teacher-1");
     await user.type(screen.getByLabelText("Correo del estudiante"), "nueva@example.com");
     await user.type(screen.getByLabelText("Inicio"), "2026-03-01");
     await user.type(screen.getByLabelText("Vencimiento"), "2026-12-31");
@@ -114,15 +121,31 @@ describe("UsersPage", () => {
 
     expect(await screen.findByText("Enviamos la invitación a nueva@example.com.")).toBeInTheDocument();
     expect(mocks.createInvitation.mock.calls[0]?.[0]).toEqual({
-      email: "nueva@example.com", college_id: "college-2", access_valid_from: "2026-03-01", access_valid_until: "2026-12-31",
+      email: "nueva@example.com", teacher_id: "teacher-1", access_valid_from: "2026-03-01", access_valid_until: "2026-12-31",
     });
     expect(screen.getByLabelText("Correo del estudiante")).toHaveValue("");
+  });
+
+  it("lets the student choose a group when the admin does not fix one", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("option", { name: "Profesor Carlos" });
+
+    await user.type(screen.getByLabelText("Correo del estudiante"), "libre@example.com");
+    await user.type(screen.getByLabelText("Inicio"), "2026-03-01");
+    await user.type(screen.getByLabelText("Vencimiento"), "2026-12-31");
+    await user.click(screen.getByRole("button", { name: "Enviar invitación" }));
+
+    expect(await screen.findByText("Enviamos la invitación a libre@example.com.")).toBeInTheDocument();
+    expect(mocks.createInvitation.mock.calls[0]?.[0]).toEqual({
+      email: "libre@example.com", access_valid_from: "2026-03-01", access_valid_until: "2026-12-31",
+    });
   });
 
   it("keeps creating teachers with a code", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Profesor Carlos");
+    await screen.findByText("PROFE-1");
     await user.selectOptions(screen.getByRole("combobox", { name: "Rol" }), "teacher");
     expect(screen.getByLabelText("Código")).toBeInTheDocument();
     expect(screen.queryByLabelText("Correo del estudiante")).not.toBeInTheDocument();
@@ -132,6 +155,7 @@ describe("UsersPage", () => {
     const user = userEvent.setup();
     renderPage();
     expect(await screen.findByText("pendiente@example.com")).toBeInTheDocument();
+    expect(screen.getByText(/El estudiante elegirá su grupo · Acceso del/)).toBeInTheDocument();
     expect(screen.getByText(/Acceso del 01\/03\/2026 al 31\/12\/2026/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Reenviar" }));

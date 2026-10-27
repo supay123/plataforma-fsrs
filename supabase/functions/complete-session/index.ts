@@ -5,7 +5,10 @@ import { RPCS, TABLES, VIEWS } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
 import { scheduleAnswer } from "../_shared/fsrs.ts";
 import type { Json } from "../_shared/database.types.ts";
-import type { FsrsConfig, StoredCard } from "../_shared/interfaces/fsrs.interfaces.ts";
+import type {
+  FsrsConfig,
+  StoredCard,
+} from "../_shared/interfaces/fsrs.interfaces.ts";
 import { nonNegativeInteger, option, uuid } from "../_shared/validation.ts";
 import type { CompleteSessionBody, SubmittedAnswer } from "./interfaces.ts";
 
@@ -20,17 +23,35 @@ function parseAnswers(value: unknown): SubmittedAnswer[] {
   const seen = new Set<string>();
   return value.map((entry) => {
     if (!entry || typeof entry !== "object") {
-      throw new AppError(400, "validation_error", "Each answer must be an object.");
+      throw new AppError(
+        400,
+        "validation_error",
+        "Each answer must be an object.",
+      );
     }
     const input = entry as Record<string, unknown>;
-    const sessionQuestionId = uuid(input.session_question_id, "session_question_id");
+    const sessionQuestionId = uuid(
+      input.session_question_id,
+      "session_question_id",
+    );
     if (seen.has(sessionQuestionId)) {
-      throw new AppError(400, "duplicate_answer", "Each question can be submitted only once.");
+      throw new AppError(
+        400,
+        "duplicate_answer",
+        "Each question can be submitted only once.",
+      );
     }
     seen.add(sessionQuestionId);
-    const responseTime = nonNegativeInteger(input.response_time_ms, "response_time_ms");
+    const responseTime = nonNegativeInteger(
+      input.response_time_ms,
+      "response_time_ms",
+    );
     if (responseTime === null) {
-      throw new AppError(400, "validation_error", "response_time_ms is required.");
+      throw new AppError(
+        400,
+        "validation_error",
+        "response_time_ms is required.",
+      );
     }
     return {
       session_question_id: sessionQuestionId,
@@ -48,7 +69,8 @@ export default {
         const student = await requireProfile(context, ["student"], true);
         const body = await readJson<CompleteSessionBody>(request);
         const sessionId = uuid(body.session_id, "session_id");
-        const requestId = request.headers.get("x-client-request-id") ?? crypto.randomUUID();
+        const requestId = request.headers.get("x-client-request-id") ??
+          crypto.randomUUID();
         let completedId: string | null = null;
         let completionError: { message: string } | null = null;
 
@@ -61,7 +83,8 @@ export default {
           completionError = legacy.error;
         } else {
           const answers = parseAnswers(body.answers);
-          const { data: session, error: sessionError } = await context.supabaseAdmin
+          const { data: session, error: sessionError } = await context
+            .supabaseAdmin
             .from(TABLES.assessmentSessions)
             .select("id,student_id,status,fsrs_config_id")
             .eq("id", sessionId)
@@ -74,14 +97,24 @@ export default {
           if (session.status === "in_progress") {
             const { data: rows, error: rowsError } = await context.supabaseAdmin
               .from(TABLES.assessmentSessionQuestions)
-              .select("id,question_id,selected_option,questions!inner(correct_option)")
+              .select(
+                "id,question_id,selected_option,questions!inner(correct_option)",
+              )
               .eq("session_id", sessionId);
             if (rowsError) {
-              throw new AppError(500, "session_questions_failed", rowsError.message);
+              throw new AppError(
+                500,
+                "session_questions_failed",
+                rowsError.message,
+              );
             }
 
-            const unanswered = (rows ?? []).filter((row) => row.selected_option === null);
-            const answersById = new Map(answers.map((answer) => [answer.session_question_id, answer]));
+            const unanswered = (rows ?? []).filter((row) =>
+              row.selected_option === null
+            );
+            const answersById = new Map(
+              answers.map((answer) => [answer.session_question_id, answer]),
+            );
             if (
               unanswered.length !== answers.length ||
               unanswered.some((row) => !answersById.has(row.id))
@@ -94,36 +127,55 @@ export default {
             }
 
             const questionIds = unanswered.map((row) => row.question_id);
-            const [{ data: config, error: configError }, cardsResult] = await Promise.all([
-              context.supabaseAdmin
-                .from(TABLES.fsrsConfigs)
-                .select("library_name,library_version,parameters")
-                .eq("id", session.fsrs_config_id)
-                .single(),
-              questionIds.length
-                ? context.supabaseAdmin
-                  .from(TABLES.studentQuestionCards)
-                  .select("question_id,due_at,stability,difficulty,elapsed_days,scheduled_days,learning_steps,reps,lapses,state,last_review_at")
-                  .eq("student_id", student.id)
-                  .in("question_id", questionIds)
-                : Promise.resolve({ data: [], error: null }),
-            ]);
+            const [{ data: config, error: configError }, cardsResult] =
+              await Promise.all([
+                context.supabaseAdmin
+                  .from(TABLES.fsrsConfigs)
+                  .select("library_name,library_version,parameters")
+                  .eq("id", session.fsrs_config_id)
+                  .single(),
+                questionIds.length
+                  ? context.supabaseAdmin
+                    .from(TABLES.studentQuestionCards)
+                    .select(
+                      "question_id,due_at,stability,difficulty,elapsed_days,scheduled_days,learning_steps,reps,lapses,state,last_review_at",
+                    )
+                    .eq("student_id", student.id)
+                    .in("question_id", questionIds)
+                  : Promise.resolve({ data: [], error: null }),
+              ]);
             if (configError || !config) {
-              throw new AppError(500, "fsrs_config_failed", configError?.message);
+              throw new AppError(
+                500,
+                "fsrs_config_failed",
+                configError?.message,
+              );
             }
             if (cardsResult.error) {
-              throw new AppError(500, "card_lookup_failed", cardsResult.error.message);
+              throw new AppError(
+                500,
+                "card_lookup_failed",
+                cardsResult.error.message,
+              );
             }
 
             const cards = new Map(
-              (cardsResult.data ?? []).map((card) => [card.question_id, card as StoredCard]),
+              (cardsResult.data ?? []).map((
+                card,
+              ) => [card.question_id, card as StoredCard]),
             );
             const reviewedAt = new Date();
             results = unanswered.map((row) => {
               const answer = answersById.get(row.id)!;
-              const question = Array.isArray(row.questions) ? row.questions[0] : row.questions;
+              const question = Array.isArray(row.questions)
+                ? row.questions[0]
+                : row.questions;
               if (!question) {
-                throw new AppError(500, "question_lookup_failed", "Question not found.");
+                throw new AppError(
+                  500,
+                  "question_lookup_failed",
+                  "Question not found.",
+                );
               }
               return {
                 session_question_id: row.id,
@@ -157,7 +209,13 @@ export default {
           );
         }
 
-        console.info(JSON.stringify({ event: "session.completed", request_id: requestId, session_id: completedId }));
+        console.info(
+          JSON.stringify({
+            event: "session.completed",
+            request_id: requestId,
+            session_id: completedId,
+          }),
+        );
 
         const { data: result, error: resultError } = await context.supabaseAdmin
           .from(VIEWS.sessionResults)

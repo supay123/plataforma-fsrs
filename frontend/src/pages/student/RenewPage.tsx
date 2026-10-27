@@ -2,7 +2,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthLayout } from "../../components/layout/AuthLayout";
 import { findPlan } from "../../config/business";
 import { useAuth } from "../../features/auth/AuthProvider";
-import { createRenewalPayment, getRenewalPaymentStatus, simulateRenewalPayment } from "../../features/payments/api";
+import { createRenewalPayment, getRenewalPaymentStatus } from "../../features/payments/api";
 import { PaymentPanel } from "../../features/payments/PaymentPanel";
 import { PlanPicker } from "../../features/payments/PlanPicker";
 import { formatDay } from "../../lib/dates";
@@ -20,7 +20,7 @@ export function RenewPage() {
   if (!profile) return null;
   const expired = studentAccess(profile).state === "expired";
 
-  return <AuthLayout wide>
+  return <AuthLayout wide cover={{ title: "Sigue avanzando", description: "Renueva tu plan y vuelve a practicar justo donde te quedaste." }}>
     <div className="mb-4">
       <h1 className="text-2xl font-bold">Renueva tu plan</h1>
       <p className="mt-2 text-sm text-slate-600">
@@ -30,7 +30,7 @@ export function RenewPage() {
       </p>
     </div>
     <div className="mb-5"><PlanPicker plan={plan} onChange={(id) => setSearchParams({ plan: id }, { replace: true })} /></div>
-    <PaymentPanel plan={plan} payerKey={profile.id} createPayment={createRenewalPayment} fetchStatus={getRenewalPaymentStatus} simulatePayment={simulateRenewalPayment}
+    <PaymentPanel plan={plan} createPayment={createRenewalPayment} fetchStatus={getRenewalPaymentStatus}
       onPaid={() => void refreshProfile().then(() => navigate("/estudiante", { replace: true }))} />
     <div className="mt-6 text-center text-sm">
       {expired

@@ -1,7 +1,7 @@
-import { TABLES } from "../_shared/database.constants.ts";
-import type { Tables } from "../_shared/database.types.ts";
-import { AppError } from "../_shared/errors.ts";
-import type { EdgeContext } from "../_shared/types.ts";
+import { TABLES } from "./database.constants.ts";
+import type { Tables } from "./database.types.ts";
+import { AppError } from "./errors.ts";
+import type { EdgeContext } from "./types.ts";
 
 const PROFILE_COLUMNS =
   "given_names,family_names,email,phone,identity_document_type,identity_document_number,college_id,college:colleges(name)";

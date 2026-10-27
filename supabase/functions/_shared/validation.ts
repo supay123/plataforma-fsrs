@@ -41,6 +41,20 @@ export function uuid(value: unknown, field: string): string {
   return normalized;
 }
 
+/** UUID opcional: null, undefined y la cadena vacía cuentan como ausentes. */
+export function optionalUuid(
+  value: unknown,
+  field: string,
+): string | undefined {
+  if (
+    value === undefined || value === null ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    return undefined;
+  }
+  return uuid(value, field);
+}
+
 export function date(value: unknown, field: string): string {
   const normalized = requiredString(value, field, 10);
   if (!DATE_PATTERN.test(normalized) || Number.isNaN(Date.parse(normalized))) {

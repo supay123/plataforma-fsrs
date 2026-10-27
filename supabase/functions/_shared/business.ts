@@ -4,7 +4,8 @@ export const BUSINESS = {
   tradeName: "Chancón - entrenador preuniversitario",
   legalName: "Miguel Ángel Llacta Pereira",
   ruc: "10774172578",
-  address: "Av. Carlos Ugarte Mza. B Lote. 62 Coripata Sur, Santiago, Cusco, Cusco",
+  address:
+    "Av. Carlos Ugarte Mza. B Lote. 62 Coripata Sur, Santiago, Cusco, Cusco",
   email: "pesupay@gmail.com",
   complaintsBookCode: "001",
 };

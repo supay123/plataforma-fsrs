@@ -7,6 +7,14 @@ import { normalizeError } from "../../lib/api/errors";
 import { formatDate, formatDay } from "../../lib/dates";
 import { cancelInvitation, invitationsQueryKey, listInvitations, resendInvitation, type Invitation } from "./api";
 
+/** Grupo fijo de la invitación o, si el estudiante lo elige, la institución que limita su elección. */
+function groupLabel(invitation: Invitation) {
+  if (invitation.teacher_name) {
+    return invitation.college_name ? `${invitation.teacher_name} · ${invitation.college_name}` : invitation.teacher_name;
+  }
+  return invitation.college_name ? `El estudiante elegirá su grupo · ${invitation.college_name}` : "El estudiante elegirá su grupo";
+}
+
 /** Invitaciones que el estudiante todavía no acepta, para reenviarlas o anularlas. */
 export function PendingInvitations() {
   const toast = useToast();
@@ -55,7 +63,7 @@ export function PendingInvitations() {
             <strong className="break-all text-slate-900">{invitation.email}</strong>
             <Badge tone={expired ? "warning" : "success"}>{expired ? "Vencida" : "Pendiente"}</Badge>
           </div>
-          <p className="text-slate-600">{invitation.college_name ?? "—"} · Acceso del {formatDay(invitation.access_valid_from)} al {formatDay(invitation.access_valid_until)}</p>
+          <p className="text-slate-600">{groupLabel(invitation)} · Acceso del {formatDay(invitation.access_valid_from)} al {formatDay(invitation.access_valid_until)}</p>
           <p className="text-xs text-slate-500">{expired ? "El link venció" : "El link vence"} el {formatDate(invitation.expires_at)}.</p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" disabled={resend.isPending} onClick={() => void resendTo(invitation)}>Reenviar</Button>

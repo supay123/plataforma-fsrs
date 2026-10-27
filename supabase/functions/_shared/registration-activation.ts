@@ -29,13 +29,13 @@ export async function freeUserCode(
   if (error) {
     throw new AppError(500, "user_code_lookup_failed", error.message);
   }
-  const taken = new Set((data ?? []).map((code) => code.toLowerCase()));
+  const taken = new Set((data ?? []).map((code: string) => code.toLowerCase()));
   return candidates.find((code) => !taken.has(code.toLowerCase())) ??
     `est-${crypto.randomUUID().slice(0, 12)}`;
 }
 
 /**
- * Crea la cuenta y el perfil del registro que pagó. Se llama cuando Kuti
+ * Crea la cuenta y el perfil del registro que pagó. Se llama cuando Mercado Pago
  * confirma el pago: el acceso empieza el día del pago y dura los meses del
  * plan pagado. El pago queda aplicado en la misma transacción que el perfil.
  */

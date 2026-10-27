@@ -50,6 +50,19 @@ describe("Modal", () => {
     expect(screen.getByRole("button", { name: "Confirmar" })).toHaveClass("bg-amber-600");
   });
 
+  it("opens an informative modal with a single Entendido button", async () => {
+    const user = userEvent.setup();
+    const { onConfirm } = renderOpener("info", { title: "Ayuda" });
+    await user.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(screen.getByRole("dialog", { name: "Ayuda" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Entendido" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Entendido" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // El modal informativo no ejecuta ninguna acción.
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("closes after the action succeeds and blocks the buttons while it runs", async () => {
     const user = userEvent.setup();
     let finish: () => void = () => undefined;

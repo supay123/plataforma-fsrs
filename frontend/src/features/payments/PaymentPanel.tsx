@@ -1,36 +1,66 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import clsx from "clsx";
-import { CheckCircle2, Copy, Download, ExternalLink, LoaderCircle, MessageCircle, QrCode, RefreshCw, Ticket } from "lucide-react";
-import { QRCodeCanvas } from "qrcode.react";
+import { CheckCircle2, CircleHelp, KeyRound, LoaderCircle, MessageCircle, Smartphone } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button } from "../../components/ui";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Alert, Button, Field, Input } from "../../components/ui";
+import { useModal } from "../../components/ui/use-modal";
 import { useToast } from "../../components/ui/use-toast";
 import { BUSINESS, formatSoles, type Plan, type PlanId } from "../../config/business";
 import { normalizeError, type AppError } from "../../lib/api/errors";
-import { secondsUntil, useNow } from "../../lib/use-now";
-import type { PlanPayment, PlanPaymentState, SimulatedMethod } from "./api";
+import { getPaymentConfig, type PlanPaymentState, type YapePayment } from "./api";
+import { createYapeToken } from "./yape";
 
-// Cada cuánto se pregunta si ya se pagó.
+function onlyDigits(phone: string) {
+  return phone.replace(/\D/g, "").replace(/^51(?=\d{9}$)/, "");
+}
+
+// Cada cuánto se pregunta si ya se aplicó un pago en proceso.
 const POLL_MS = 4000;
 
-const linkButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50";
+// Los celulares de prueba de Mercado Pago (111111111…) no empiezan con 9.
+const schema = z.object({
+  phone: z.string().refine((value) => /^\d{9}$/.test(onlyDigits(value)), "Ingresa el celular de tu Yape, 9 dígitos."),
+  otp: z.string().trim().regex(/^\d{6}$/, "El código de aprobación tiene 6 dígitos."),
+});
+type Values = z.infer<typeof schema>;
+
+/** Motivos de rechazo de Mercado Pago (status_detail de la orden) con una salida clara. */
+const REJECTIONS: Record<string, string> = {
+  bad_filled_card_data: "El celular o el código de aprobación no son correctos. Revisa tu celular y genera un código nuevo en Yape.",
+  invalid_card_token: "El código de aprobación ya se usó o venció. Genera uno nuevo en Yape.",
+  insufficient_amount: "No tienes saldo suficiente en Yape, o el monto supera el límite de tu Yape.",
+  max_attempts_exceeded: "Superaste los intentos permitidos. Espera un momento e inténtalo otra vez.",
+  required_call_for_authorize: "Yape no autorizó el pago. Revisa tu app de Yape e inténtalo otra vez.",
+};
+
+function rejectionMessage(detail: string | null) {
+  return (detail && REJECTIONS[detail]) ?? "El pago fue rechazado. Revisa tus datos e inténtalo otra vez.";
+}
 
 function WhatsAppLink({ children }: { children: string }) {
   return <a href={`https://wa.me/${BUSINESS.whatsapp}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 font-semibold text-white hover:bg-indigo-500"><MessageCircle size={18} />{children}</a>;
 }
 
-function formatCountdown(seconds: number) {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+/** Indicaciones para encontrar el código de aprobación en la app de Yape. */
+function ApprovalCodeHelp() {
+  return <div className="grid gap-4">
+    <ol className="grid list-decimal gap-1 pl-5">
+      <li>Abre tu app de Yape y entra a <strong>Aprobar compras</strong>.</li>
+      <li>En <strong>Código de aprobación</strong> verás 6 dígitos. Tócalo para copiarlo.</li>
+      <li>Vuelve aquí, escríbelo junto con tu celular y paga antes de que termine el contador.</li>
+    </ol>
+    <img src="/image/codigo-yape.webp" alt="Pantalla Aprobar compras de Yape con el código de aprobación de 6 dígitos" className="mx-auto max-h-80 w-auto rounded-2xl" />
+    <p className="text-xs text-slate-500">No compartas este código con nadie: escríbelo solo en este formulario.</p>
+  </div>;
 }
 
 interface PaymentPanelProps {
   plan: Plan;
-  /** Quién paga (registro o estudiante); junto con el plan identifica el cobro. */
-  payerKey: string;
-  createPayment: (plan: PlanId) => Promise<PlanPayment>;
+  /** Cobra el plan con el token de Yape y su celular (registro o renovación). */
+  createPayment: (plan: PlanId, yape: YapePayment) => Promise<PlanPaymentState>;
   fetchStatus: (paymentId: string) => Promise<PlanPaymentState>;
-  /** Solo modo prueba: da el cobro por pagado sin dinero real. */
-  simulatePayment: (paymentId: string, method: SimulatedMethod) => Promise<PlanPaymentState>;
   /** Se llama una vez, cuando el pago ya se aplicó. */
   onPaid: () => void;
   /** Texto extra cuando el pago en línea aún no está configurado. */
@@ -38,124 +68,90 @@ interface PaymentPanelProps {
 }
 
 /**
- * Cobro de un plan con Kuti: muestra el QR (y el código de pago de servicios
- * si el plan lo permite) y espera a que Kuti confirme el pago.
+ * Pago de un plan con Yape a través de Mercado Pago: pide el celular y el
+ * código de aprobación de la app de Yape, cobra y espera a que se aplique.
  */
-export function PaymentPanel({ plan, payerKey, createPayment, fetchStatus, simulatePayment, onPaid, unavailableNote }: PaymentPanelProps) {
-  const now = useNow();
+export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavailableNote }: PaymentPanelProps) {
   const toast = useToast();
-  const qrRef = useRef<HTMLCanvasElement>(null);
-  // Cada intento pide un cobro nuevo; al cambiar de plan también, y el anterior se anula.
-  const [attempt, setAttempt] = useState(0);
-  const [method, setMethod] = useState<SimulatedMethod>("qr");
-  const [copied, setCopied] = useState(false);
-  const [simulating, setSimulating] = useState(false);
-  const created = useQuery({
-    queryKey: ["plan-payment", payerKey, plan.id, attempt],
-    queryFn: () => createPayment(plan.id),
-    retry: false, staleTime: Infinity, gcTime: 0, refetchOnWindowFocus: false,
-  });
-  const payment = created.data ?? null;
+  const modal = useModal();
+  const config = useQuery({ queryKey: ["payment-config"], queryFn: getPaymentConfig, retry: false, staleTime: Infinity, refetchOnWindowFocus: false });
+  const [payment, setPayment] = useState<PlanPaymentState | null>(null);
+  const inProcess = payment?.status === "pending" || payment?.status === "processing";
   const tracked = useQuery({
     queryKey: ["plan-payment-status", payment?.payment_id],
     queryFn: () => fetchStatus(payment!.payment_id),
-    enabled: payment !== null,
+    enabled: inProcess,
     refetchInterval: (query) => ["pending", "processing"].includes(query.state.data?.status ?? "pending") ? POLL_MS : false,
   });
-  const status = tracked.data?.payment_id === payment?.payment_id ? tracked.data?.status ?? "pending" : "pending";
+  const current = tracked.data?.payment_id === payment?.payment_id ? tracked.data ?? payment : payment;
+  const status = current?.status;
+
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { phone: "", otp: "" } });
 
   const paidHandler = useRef(onPaid);
   useEffect(() => { paidHandler.current = onPaid; }, [onPaid]);
   useEffect(() => { if (status === "paid") paidHandler.current(); }, [status]);
 
-  const createError = created.error as AppError | null;
-  if (createError?.code === "payments_unavailable") {
+  const configError = config.error as AppError | null;
+  if (configError?.code === "payments_unavailable") {
     return <div className="grid gap-4">
       <h2 className="text-lg font-bold text-slate-950">Muy pronto podrás completar el pago aquí</h2>
-      <p className="text-sm text-slate-600">Estamos terminando el pago en línea a través de Kuti. Mientras tanto, escríbenos y te ayudamos a activar tu {plan.name.toLowerCase()}.</p>
+      <p className="text-sm text-slate-600">Estamos terminando el pago en línea con Yape. Mientras tanto, escríbenos y te ayudamos a activar tu {plan.name.toLowerCase()}.</p>
       <WhatsAppLink>Escribir por WhatsApp</WhatsAppLink>
       {unavailableNote && <p className="text-xs text-slate-500">{unavailableNote}</p>}
     </div>;
   }
 
-  const generate = () => setAttempt((value) => value + 1);
-  const secondsLeft = payment ? secondsUntil(payment.expires_at, now) : 0;
-  const expired = status === "expired" || (status === "pending" && payment !== null && secondsLeft === 0);
-  const code = method === "code" ? payment?.bank_code ?? null : null;
+  if (status === "needs_support") {
+    return <div className="grid gap-3">
+      <Alert tone="error">Recibimos tu pago, pero no pudimos aplicarlo. Escríbenos y lo resolvemos.</Alert>
+      <WhatsAppLink>Escribir por WhatsApp</WhatsAppLink>
+    </div>;
+  }
+  if (status === "paid" || status === "processing" || status === "pending") {
+    return <p className="flex items-center justify-center gap-2 py-8 text-sm font-semibold text-slate-700">
+      {status === "paid" ? <CheckCircle2 className="text-emerald-600" size={18} /> : <LoaderCircle className="animate-spin" size={18} />}
+      {status === "pending" ? "Mercado Pago está procesando tu pago…" : "Pago recibido. Lo estamos aplicando…"}
+    </p>;
+  }
 
-  const downloadQr = () => {
-    const canvas = qrRef.current;
-    if (!canvas) return;
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
-    link.download = `qr-pago-${BUSINESS.brand.toLowerCase()}.png`;
-    link.click();
-  };
-  const copyCode = async () => {
-    if (!code) return;
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-  };
-  const simulate = async () => {
-    if (!payment) return;
+  const submit = handleSubmit(async ({ phone, otp }) => {
     try {
-      setSimulating(true);
-      await simulatePayment(payment.payment_id, method);
-      await tracked.refetch();
-    } catch (reason) { toast.error((await normalizeError(reason)).message); }
-    finally { setSimulating(false); }
-  };
+      const publicKey = config.data?.public_key ?? (await config.refetch({ throwOnError: true })).data!.public_key;
+      const yapePhone = onlyDigits(phone);
+      const token = await createYapeToken(publicKey, yapePhone, otp);
+      setPayment(await createPayment(plan.id, { token, phone: yapePhone }));
+    } catch (reason) {
+      toast.error((await normalizeError(reason)).message);
+    }
+    // El código de aprobación sirve una sola vez.
+    setValue("otp", "");
+  });
 
-  return <div className="grid gap-3">
-    {payment && !payment.livemode && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Modo prueba: este cobro no mueve dinero real.</p>}
-    {createError && <Alert tone="error">{createError.message}</Alert>}
-
-    {status === "needs_support"
-      ? <div className="grid gap-3">
-        <Alert tone="error">Recibimos tu pago, pero no pudimos aplicarlo. Escríbenos y lo resolvemos.</Alert>
-        <WhatsAppLink>Escribir por WhatsApp</WhatsAppLink>
+  return <form onSubmit={submit} className="grid gap-4" noValidate>
+    {(status === "failed" || status === "cancelled") && <Alert tone="error">{rejectionMessage(current?.status_detail ?? null)}</Alert>}
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm text-slate-500">Total a pagar · {plan.months} {plan.months === 1 ? "mes" : "meses"} de acceso</p>
+        <p className="text-2xl font-bold text-slate-950">{formatSoles(plan.priceSoles)}</p>
       </div>
-      : status === "processing" || status === "paid"
-        ? <p className="flex items-center justify-center gap-2 py-8 text-sm font-semibold text-slate-700">{status === "paid" ? <CheckCircle2 className="text-emerald-600" size={18} /> : <LoaderCircle className="animate-spin" size={18} />}Pago recibido. Lo estamos aplicando…</p>
-        : expired || status === "failed" || status === "cancelled"
-          ? <div className="grid justify-items-center gap-3 py-6 text-center">
-            <p className="text-sm text-slate-700">{status === "failed" ? "El pago fue rechazado." : "El cobro venció."} Genera uno nuevo para pagar.</p>
-            <Button type="button" className="gap-2" disabled={created.isFetching} onClick={generate}><RefreshCw size={16} />{created.isFetching ? "Generando…" : "Generar otro cobro"}</Button>
-          </div>
-          : !payment
-            ? <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-600">{created.isFetching ? <><LoaderCircle className="animate-spin" size={18} />Generando tu cobro…</> : <Button type="button" onClick={generate}>Reintentar</Button>}</p>
-            : <div className="grid items-center gap-5 sm:grid-cols-[auto_1fr]">
-              <div className="justify-self-center">
-                {code
-                  ? <div className="grid w-48 justify-items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-center">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Código de pago</span>
-                    <span className="font-mono text-2xl font-bold tracking-[0.15em] text-slate-950">{code}</span>
-                    <button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800" onClick={() => void copyCode()}><Copy size={14} />{copied ? "Copiado" : "Copiar"}</button>
-                  </div>
-                  : <div className="rounded-2xl border border-slate-200 bg-white p-3"><QRCodeCanvas ref={qrRef} value={payment.qr_payload} size={176} marginSize={1} title="QR de pago" /></div>}
-              </div>
-              <div className="grid gap-3 text-center sm:text-left">
-                <div>
-                  <p className="text-sm text-slate-500">Total a pagar · {plan.months} {plan.months === 1 ? "mes" : "meses"} de acceso</p>
-                  <p className="text-2xl font-bold text-slate-950">{formatSoles(plan.priceSoles)}</p>
-                </div>
-                {payment.bank_code && <div role="tablist" aria-label="Forma de pago" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
-                  {([["qr", "QR", QrCode], ["code", "Código de pago", Ticket]] as const).map(([value, label, Icon]) =>
-                    <button key={value} type="button" role="tab" aria-selected={method === value} onClick={() => setMethod(value)}
-                      className={clsx("inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition", method === value ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-slate-900")}>
-                      <Icon size={16} />{label}
-                    </button>)}
-                </div>}
-                {code
-                  ? <p className="text-sm text-slate-600">En la app de tu banco o de Yape entra a <strong>Pago de servicios</strong>, busca <strong>KUTI</strong> e ingresa el código.</p>
-                  : <p className="text-sm text-slate-600">Escanéalo con Yape, Plin o la billetera de tu banco.<span className="sm:hidden"> Si pagas desde este celular, descárgalo y súbelo desde la galería de tu app.</span></p>}
-                <p className="flex items-center justify-center gap-2 text-xs text-slate-500 sm:justify-start"><LoaderCircle className="animate-spin" size={14} />Esperando tu pago · vence en <strong className="tabular-nums text-slate-700">{formatCountdown(secondsLeft)}</strong></p>
-                <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
-                  {!code && <Button type="button" variant="secondary" className="gap-2" onClick={downloadQr}><Download size={16} />Descargar QR</Button>}
-                  {payment.checkout_url && <a href={payment.checkout_url} target="_blank" rel="noreferrer" className={linkButton}><ExternalLink size={16} />Página de pago</a>}
-                  {!payment.livemode && <Button type="button" className="gap-2" disabled={simulating} onClick={() => void simulate()}><CheckCircle2 size={16} />{simulating ? "Simulando…" : "Simular pago"}</Button>}
-                </div>
-              </div>
-            </div>}
-  </div>;
+      <img src="/image/yape-logo.svg" alt="Paga con Yape" className="h-11 w-auto shrink-0 rounded-xl" />
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Celular de Yape" error={errors.phone?.message}><Input icon={<Smartphone size={20} />} type="tel" inputMode="numeric" autoComplete="tel" placeholder="987654321" {...register("phone")} /></Field>
+      {/* La ayuda va junto al título del campo, pero fuera del <label> para no volverse su control. */}
+      <div className="grid content-start gap-1.5">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span aria-hidden className="font-medium text-slate-700">Código de aprobación</span>
+          <button type="button" aria-label="¿Dónde está el código de aprobación?" className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800"
+            onClick={() => modal.info({ title: "¿Dónde encuentro mi código?", body: <ApprovalCodeHelp /> })}>
+            <CircleHelp size={16} aria-hidden />¿Dónde está?
+          </button>
+        </div>
+        <Field label="Código de aprobación" hideLabel error={errors.otp?.message}><Input icon={<KeyRound size={20} />} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" {...register("otp")} /></Field>
+      </div>
+    </div>
+    <Button type="submit" disabled={isSubmitting || config.isPending}>{isSubmitting ? "Procesando pago…" : `Pagar ${formatSoles(plan.priceSoles)} con Yape`}</Button>
+    <p className="text-center text-xs text-slate-500">Pago procesado por Mercado Pago. Chancón no guarda tu código.</p>
+  </form>;
 }

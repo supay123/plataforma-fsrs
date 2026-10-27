@@ -12,6 +12,7 @@ import {
   isWithinDateRange,
   limaDate,
   option,
+  optionalUuid,
   uuid,
 } from "../validation.ts";
 
@@ -22,6 +23,15 @@ Deno.test("validates UUIDs and answer options", () => {
   );
   assert.equal(option("b"), "B");
   assert.throws(() => option("E"), AppError);
+});
+
+Deno.test("treats missing and blank optional UUIDs as absent", () => {
+  const id = "a51ec034-3e1b-4fa2-9e7a-8bc641de87d1";
+  assert.equal(optionalUuid(undefined, "id"), undefined);
+  assert.equal(optionalUuid(null, "id"), undefined);
+  assert.equal(optionalUuid("   ", "id"), undefined);
+  assert.equal(optionalUuid(id, "id"), id);
+  assert.throws(() => optionalUuid("nope", "id"), AppError);
 });
 
 Deno.test("uses Lima calendar dates for access checks", () => {

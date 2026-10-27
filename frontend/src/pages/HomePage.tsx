@@ -1,28 +1,19 @@
 import clsx from "clsx";
-import { BookOpen, ClipboardCheck, Crosshair, Gauge, LogIn, Target, Volume2, Zap, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, BookOpen, ChevronDown, ClipboardCheck, Crosshair, Gauge, LogIn, Pause, Play, RotateCcw, RotateCw, Target, Volume2, Zap, type LucideIcon } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Logo } from "../components/layout/Logo";
 import { PublicFooter } from "../components/layout/PublicLayout";
 import { BUSINESS, PLAN, formatSoles } from "../config/business";
 import { useAuth } from "../features/auth/AuthProvider";
 import { PlanCards } from "../features/payments/PlanCards";
-import { loadYouTubeApi, type YouTubePlayer } from "../lib/youtube";
-
-const VIDEO_ID = "nE8ms_B1G7M";
 // El video intenta empezar con sonido; si el navegador lo bloquea, sigue en
-// silencio y el botón "Activar sonido" lo habilita. Esta URL solo se usa si
-// la API de YouTube no carga.
-const MUTED_VIDEO_URL = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${VIDEO_ID}&playsinline=1&rel=0`;
+// silencio y "Toca para escuchar" lo reinicia desde 0 con sonido.
+const VIDEO_URL = "/video/videoplayback.webm";
+const POSTER_URL = "/image/poster.webp";
 
-const signUpPath = `/estudiante/sign-up?plan=${PLAN.id}`;
 // Tope redondeado hacia arriba a 10 céntimos, siempre mayor al precio diario real.
 const dailyCap = Math.floor((PLAN.priceSoles / 30) * 10 + 1) / 10;
-
-const sections = [
-  { id: "pasos", label: "Cómo funciona" },
-  { id: "planes", label: "Planes" },
-];
 
 const benefits: Array<{ icon: LucideIcon; text: string }> = [
   { icon: Gauge, text: "Mide tu acierto real, tema por tema" },
@@ -35,6 +26,36 @@ const steps: Array<{ icon: LucideIcon; title: string; text: string }> = [
   { icon: ClipboardCheck, title: "Sesión de estudio", text: "Selecciona tu tema, resuelve 20 preguntas y mira al instante en qué fallaste." },
   { icon: Target, title: "Corrige y domina", text: `${BUSINESS.brand} te vuelve a poner tus errores hasta que domines el 100% del tema.` },
 ];
+
+// Borra las preguntas que no quieras mostrar; el orden del array es el de la página.
+const faqs = [
+  { question: `¿${BUSINESS.brand} reemplaza a mi academia?`, answer: "No. La teoría la aprendes en tu academia o en tus libros. Aquí compruebas con preguntas si de verdad la dominas y entrenas justo en lo que te falta." },
+  { question: "¿Cuánto tiempo al día necesito?", answer: "Con unos 15 minutos al día es suficiente: es lo que toma una sesión de estudio de 20 preguntas. La haces cuando quieras; lo importante es practicar seguido para que tus repasos lleguen a tiempo." },
+  { question: "¿Funciona en el celular? ¿Tengo que instalar algo?", answer: `No necesitas instalar nada. ${BUSINESS.brand} funciona desde el navegador de tu celular, tablet o computadora. Solo necesitas conexión a internet.` },
+  { question: "¿Qué es el repaso espaciado?", answer: `Es un método que te vuelve a mostrar cada pregunta justo cuando estás por olvidarla. ${BUSINESS.brand} usa un algoritmo de repetición espaciada para programar tus repasos y te insiste más en las preguntas que fallas, hasta que domines el tema.` },
+  { question: "¿Se renueva automáticamente?", answer: "No. No hay débitos ni renovaciones automáticas, así que no necesitas cancelar nada: solo pagas cuando decides seguir." },
+  { question: "Soy menor de edad, ¿puedo registrarme?", answer: "Sí, pero la cuenta debe crearla y el plan pagarlo tu padre, madre o apoderado." },
+  { question: "¿Cómo los contacto si tengo otra duda?", answer: "Escríbenos por WhatsApp, llámanos o envíanos un correo. Encontrarás todos los datos de contacto al final de esta página." },
+];
+
+/** Pregunta desplegable: se abre con una animación corta y la flecha gira. */
+function FaqItem({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return <div className={clsx("rounded-2xl border bg-white shadow-sm transition", open ? "border-indigo-200 shadow-md" : "border-slate-200")}>
+    <h3>
+      <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}
+        className={clsx("flex w-full items-center justify-between gap-4 p-5 text-left font-semibold transition", open && "text-indigo-700")}>
+        {question}
+        <ChevronDown size={20} aria-hidden className={clsx("shrink-0 text-indigo-500 transition-transform duration-300", open && "rotate-180")} />
+      </button>
+    </h3>
+    {/* La fila pasa de 0fr a 1fr para animar la altura sin medirla. */}
+    <div id={id} role="region" className={clsx("grid transition-all duration-300 ease-out motion-reduce:transition-none", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+      <div className="overflow-hidden" inert={!open}><p className="px-5 pb-5 text-sm leading-6 text-slate-600">{answer}</p></div>
+    </div>
+  </div>;
+}
 
 function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -65,159 +86,243 @@ function Reveal({ children, delay = 0, className, as: Tag = "div" }: { children:
   )}>{children}</Tag>;
 }
 
+/** Indica si la página ya se desplazó desde el inicio. */
+function useScrolled() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 8);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, []);
+  return scrolled;
+}
+
 function Header() {
-  return <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
+  // En el inicio el header se funde con el hero (sin línea, fondo ni logo, que ya está grande en el centro);
+  // al desplazarse aparecen el fondo desenfocado, la línea inferior y el logo.
+  // En celular no hay logo: los dos botones usan todo el ancho.
+  const scrolled = useScrolled();
+  return <header className={clsx("sticky top-0 z-20 border-b transition-colors duration-300",
+    scrolled ? "border-slate-800/80 bg-slate-950/80 backdrop-blur" : "border-transparent bg-transparent")}>
     <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-      <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Ir al inicio"><Logo className="h-6 sm:h-7" /></button>
-      <nav aria-label="Secciones" className="flex items-center gap-1 sm:gap-2">
-        {sections.map((section) => <button key={section.id} type="button" onClick={() => scrollToSection(section.id)} className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-slate-300 transition hover:text-white sm:inline-flex">{section.label}</button>)}
-        <Link to="/estudiante/login" className="ml-1 inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold transition hover:border-indigo-400 hover:bg-slate-900">
-          <LogIn size={16} aria-hidden />Iniciar sesión
+      <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Ir al inicio" tabIndex={scrolled ? 0 : -1}
+        className={clsx("hidden transition-opacity duration-300 sm:block", scrolled ? "opacity-100" : "pointer-events-none opacity-0")}><Logo className="h-6 sm:h-7" /></button>
+      <nav aria-label="Secciones" className="flex w-full items-center justify-end gap-2 whitespace-nowrap sm:w-auto">
+        <Link to="/estudiante/login" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold transition hover:border-indigo-400 hover:bg-slate-900">
+          <LogIn size={16} aria-hidden className="hidden sm:block" />Iniciar sesión
         </Link>
+        <StartButton compact />
       </nav>
     </div>
   </header>;
 }
 
-function IntroVideo() {
-  const host = useRef<HTMLDivElement>(null);
-  const player = useRef<YouTubePlayer | null>(null);
+function IntroVideo({ onEnded }: { onEnded: () => void }) {
+  const video = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(false);
-  const [apiFailed, setApiFailed] = useState(false);
+  const [paused, setPaused] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
-    let fallback: number | undefined;
-    const playMuted = (target: YouTubePlayer) => { target.mute(); target.playVideo(); setMuted(true); };
-    loadYouTubeApi().then((YT) => {
-      if (cancelled || !host.current) return;
-      // YouTube reemplaza el elemento por su iframe: se le da uno propio para
-      // que React no intente quitar un nodo que ya no existe.
-      const element = document.createElement("div");
-      host.current.append(element);
-      player.current = new YT.Player(element, {
-        videoId: VIDEO_ID,
-        host: "https://www.youtube-nocookie.com",
-        width: "100%",
-        height: "100%",
-        playerVars: { autoplay: 1, loop: 1, playlist: VIDEO_ID, playsinline: 1, rel: 0 },
-        events: {
-          // Primero intenta con sonido.
-          onReady: ({ target }) => {
-            host.current?.querySelector("iframe")?.setAttribute("title", `Conoce ${BUSINESS.brand}`);
-            target.unMute();
-            target.playVideo();
-            // Si en 2 s no arrancó, el navegador lo bloqueó sin avisar.
-            fallback = window.setTimeout(() => {
-              const state = target.getPlayerState();
-              if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING) playMuted(target);
-            }, 2000);
-          },
-          onAutoplayBlocked: ({ target }) => playMuted(target),
-          // YouTube también puede silenciarlo por su cuenta para poder reproducirlo.
-          onStateChange: ({ target, data }) => { if (data === YT.PlayerState.PLAYING) setMuted(target.isMuted()); },
-        },
-      });
-    }).catch(() => { if (!cancelled) setApiFailed(true); });
-    return () => {
-      cancelled = true;
-      window.clearTimeout(fallback);
-      player.current?.destroy();
-      player.current = null;
-    };
+    const element = video.current;
+    if (!element) return;
+    // Primero intenta con sonido; si el navegador lo bloquea, sigue en silencio.
+    element.muted = false;
+    element.play()?.catch(() => {
+      element.muted = true;
+      void element.play()?.catch(() => undefined);
+    });
   }, []);
 
-  const unmute = () => { player.current?.unMute(); player.current?.playVideo(); setMuted(false); };
+  // Al activar el sonido vuelve a empezar para no perderse el inicio.
+  const unmute = () => {
+    const element = video.current;
+    if (!element) return;
+    element.currentTime = 0;
+    element.muted = false;
+    void element.play()?.catch(() => undefined);
+  };
+
+  // Repite a mano en vez de usar `loop`, que no dispara `ended`.
+  const restart = () => {
+    const element = video.current;
+    if (!element) return;
+    onEnded();
+    element.currentTime = 0;
+    void element.play()?.catch(() => undefined);
+  };
+
+  // Controles: con mouse se muestran al pasar por encima; en celular, al tocar el video.
+  // Mientras el video está pausado siguen visibles; si está reproduciéndose se ocultan al salir
+  // el mouse o, en celular, a los 2 s.
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const hovering = useRef(false);
+  const hideTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(hideTimer.current), []);
+
+  const showControls = () => {
+    window.clearTimeout(hideTimer.current);
+    setControlsVisible(true);
+  };
+
+  const hideControlsLater = (delay = 2000) => {
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => {
+      if (!video.current?.paused) setControlsVisible(false);
+    }, delay);
+  };
+
+  // Tras tocar un control en celular, vuelve a contar los 2 s.
+  const afterControl = () => { if (!hovering.current) hideControlsLater(); };
+
+  const togglePlay = () => {
+    const element = video.current;
+    if (!element) return;
+    if (element.paused) void element.play()?.catch(() => undefined);
+    else element.pause();
+    showControls();
+    afterControl();
+  };
+
+  const seek = (seconds: number) => {
+    const element = video.current;
+    if (!element) return;
+    element.currentTime = Math.max(0, Math.min(element.currentTime + seconds, element.duration || 0));
+    showControls();
+    afterControl();
+  };
+
+  const controlClass = "relative grid place-items-center rounded-full bg-slate-950/75 text-white shadow-lg transition hover:bg-violet-600";
 
   return <div className="relative">
     <div aria-hidden className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-indigo-600/40 via-transparent to-emerald-500/30 blur-2xl" />
-    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900 shadow-2xl shadow-indigo-950/60">
-      {apiFailed
-        // Sin la API (bloqueada o sin red) queda el video en silencio; se activa con los controles de YouTube.
-        ? <iframe className="absolute inset-0 h-full w-full" src={MUTED_VIDEO_URL} title={`Conoce ${BUSINESS.brand}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-        : <div ref={host} className="absolute inset-0 [&_iframe]:h-full [&_iframe]:w-full" />}
-      {muted && <button type="button" onClick={unmute} className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-slate-950/85 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-950">
-        <Volume2 size={18} aria-hidden />Activar sonido
+    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900 shadow-2xl shadow-indigo-950/60"
+      onPointerEnter={(event) => { if (event.pointerType === "mouse") { hovering.current = true; showControls(); } }}
+      onPointerLeave={(event) => { if (event.pointerType === "mouse") { hovering.current = false; hideControlsLater(0); } }}>
+      <video ref={video} className="absolute inset-0 h-full w-full object-cover" src={VIDEO_URL} poster={POSTER_URL} aria-label={`Conoce ${BUSINESS.brand}`}
+        playsInline preload="auto" onEnded={restart} onPlay={() => setPaused(false)} onPause={() => { setPaused(true); showControls(); }}
+        onVolumeChange={(event) => setMuted(event.currentTarget.muted)} />
+      {!muted && <>
+        {/* Tocar el video pausa o reanuda y muestra los controles. */}
+        <button type="button" tabIndex={-1} aria-hidden onClick={togglePlay} className="absolute inset-0 cursor-pointer" />
+        <div className={clsx("pointer-events-none absolute inset-0 flex items-center justify-center gap-4 transition-opacity duration-600 focus-within:opacity-100 sm:gap-6",
+          controlsVisible ? "opacity-100" : "opacity-0")}>
+          <button type="button" onClick={() => seek(-5)} onFocus={showControls} onBlur={afterControl} aria-label="Retroceder 5 segundos"
+            className={clsx(controlClass, "h-12 w-12", controlsVisible && "pointer-events-auto")}>
+            <RotateCcw size={34} strokeWidth={1.75} aria-hidden /><span aria-hidden className="absolute text-[10px] font-bold">5s</span>
+          </button>
+          <button type="button" onClick={togglePlay} onFocus={showControls} onBlur={afterControl} aria-label={paused ? "Reproducir" : "Pausar"}
+            className={clsx(controlClass, "h-16 w-16", controlsVisible && "pointer-events-auto")}>
+            {paused ? <Play size={28} aria-hidden className="ml-1" /> : <Pause size={28} aria-hidden />}
+          </button>
+          <button type="button" onClick={() => seek(5)} onFocus={showControls} onBlur={afterControl} aria-label="Adelantar 5 segundos"
+            className={clsx(controlClass, "h-12 w-12", controlsVisible && "pointer-events-auto")}>
+            <RotateCw size={34} strokeWidth={1.75} aria-hidden /><span aria-hidden className="absolute text-[10px] font-bold">5s</span>
+          </button>
+        </div>
+      </>}
+      {muted && <button type="button" onClick={unmute} className="group absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/45 text-white transition hover:bg-slate-950/30">
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-violet-600 shadow-xl shadow-violet-900/60 transition group-hover:scale-110 motion-safe:animate-pulse sm:h-20 sm:w-20">
+          <Volume2 aria-hidden className="h-8 w-8 sm:h-10 sm:w-10" />
+        </span>
+        <span className="text-2xl font-extrabold drop-shadow-lg sm:text-3xl">Toca para escuchar</span>
       </button>}
     </div>
   </div>;
 }
 
-const outlineButton = "inline-flex min-h-14 items-center justify-center rounded-2xl border border-slate-600 bg-slate-950/40 px-6 font-semibold transition hover:border-indigo-400 hover:bg-slate-900";
-
-function SignUpButton() {
-  return <Link to={signUpPath} className="relative inline-flex min-h-14 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-8 text-base font-bold text-white shadow-lg shadow-indigo-700/40 transition hover:-translate-y-0.5 hover:shadow-indigo-600/60">
-    {/* Destello que cruza el botón cada pocos segundos. */}
-    <span aria-hidden className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/25 to-transparent motion-safe:animate-shine motion-reduce:hidden" />
-    <span className="relative">Empieza ahora</span>
-  </Link>;
+/** Llamada principal: lleva a la sección de planes. */
+function StartButton({ compact = false }: { compact?: boolean }) {
+  // Morado sólido y forma de píldora para diferenciarlo del resto de botones.
+  return <button type="button" onClick={() => scrollToSection("planes")} className={clsx(
+    "group inline-flex items-center justify-center gap-2 rounded-full bg-violet-600 font-bold text-white transition duration-300 hover:-translate-y-0.5 hover:bg-violet-500 hover:shadow-lg hover:shadow-violet-500/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400",
+    compact ? "min-h-10 px-4 text-sm sm:px-5" : "min-h-14 px-8 text-lg hover:shadow-xl",
+  )}>
+    Empieza ahora
+    <ArrowRight size={16} aria-hidden className={clsx("transition group-hover:translate-x-0.5", compact && "hidden sm:block")} />
+  </button>;
 }
 
 export function HomePage() {
   const { profile, loading } = useAuth();
+  // Se activa cada vez que termina el video para animar el botón principal.
+  const [popStart, setPopStart] = useState(false);
   if (!loading && profile) return <Navigate to={profile.role === "teacher" ? "/profesor" : `/${profile.role === "student" ? "estudiante" : "admin"}`} replace />;
   // Cada sección ocupa una pantalla debajo del header fijo (4rem).
   return <div className="overflow-x-clip bg-slate-950 text-white">
     <Header />
 
-    <section className="relative flex min-h-[calc(100svh-4rem)] items-center px-4 py-10">
+    {/* Encima del pie fijo (z-0), que queda descubierto al terminar la página. */}
+    <main className="relative z-10 bg-slate-950 shadow-xl shadow-black/40">
+    <section className="relative flex min-h-[calc(100svh-4rem)] flex-col items-center px-4 pb-10">
       <div aria-hidden className="bg-grid absolute inset-0" />
       <Glow className="-left-32 top-10 h-96 w-96 bg-indigo-600/30" />
       <Glow className="-right-24 bottom-0 h-80 w-80 bg-emerald-500/20 [animation-delay:-4s]" />
-      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
-        <Reveal><IntroVideo /></Reveal>
-        <Reveal delay={150} className="text-center lg:text-left">
-          <h1 className="mt-5 text-4xl font-extrabold tracking-tight sm:text-5xl">
-            Estudia lo que <span className="bg-gradient-to-r from-indigo-300 to-emerald-300 bg-clip-text text-transparent">no sabes</span>
-          </h1>
-          <p className="mt-4 text-lg text-slate-300">Deja de estudiar sin rumbo. {BUSINESS.brand} te muestra en qué fallas y te entrena justo en lo que te falta para ingresar.</p>
-          <ul className="mx-auto mt-6 grid max-w-md gap-3 text-left lg:mx-0">
+      <Reveal className="relative flex flex-col items-center pt-8 text-center">
+        <Logo className="h-10 sm:h-15" />
+        <h1 className="mt-4 text-4xl font-extrabold tracking-tight sm:text-5xl">
+          Estudia lo que no sabes e <span className="bg-gradient-to-r from-indigo-300 to-emerald-300 bg-clip-text text-transparent">ingresa a la UNSAAC</span>
+        </h1>
+      </Reveal>
+      <div className="relative mx-auto my-auto grid pt-8 w-full max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
+        <Reveal><IntroVideo onEnded={() => setPopStart(true)} /></Reveal>
+        {/* Mismo ancho para el texto y la lista, así quedan alineados en celular. */}
+        <Reveal delay={150} className="mx-auto max-w-md text-center lg:mx-0 lg:text-left">
+          <p className="text-lg text-slate-300">Deja de estudiar sin rumbo. {BUSINESS.brand} te muestra en qué fallas y te entrena justo en lo que te falta para ingresar.</p>
+          <ul className="mt-6 grid gap-3 text-left">
             {benefits.map(({ icon: Icon, text }) => <li key={text} className="flex items-center gap-3 text-slate-200">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300"><Icon size={17} aria-hidden /></span>{text}
             </li>)}
           </ul>
-          <p className="mt-6 text-lg">Comienza con <strong className="text-2xl text-emerald-400">{formatSoles(PLAN.priceSoles)}</strong> al mes <span className="text-sm text-slate-400">· menos de {formatSoles(dailyCap)} al día</span></p>
-          <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start">
-            <button type="button" onClick={() => scrollToSection("planes")} className={outlineButton}>Ver planes</button>
-            <SignUpButton />
-            <button type="button" onClick={() => scrollToSection("pasos")} className={outlineButton}>Conoce más</button>
+          <div className={clsx("mt-8 flex justify-center", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
+            <StartButton compact />
           </div>
         </Reveal>
       </div>
     </section>
 
-    <section id="pasos" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center px-4 py-12 text-center">
-      <Glow className="left-1/2 top-1/3 h-96 w-[36rem] -translate-x-1/2 bg-indigo-700/20" />
+    {/* Las secciones alternan fondo oscuro, blanco, índigo y claro para que se distinga dónde empieza cada una. */}
+    <section id="pasos" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-white px-4 py-16 text-center text-slate-900">
+      <Glow className="left-1/2 top-1/3 h-96 w-[36rem] -translate-x-1/2 bg-indigo-100/70" />
       <div className="relative mx-auto max-w-5xl">
         <Reveal>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-400">Cómo funciona</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">¿3 pasos para ingresar con {BUSINESS.brand.toUpperCase()}?</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-slate-300">{BUSINESS.brand} no reemplaza a tu academia: la teoría la aprendes allí o en tus libros, y aquí compruebas con preguntas si de verdad la dominas.</p>
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-indigo-600">Cómo funciona</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">3 pasos para ingresar con {BUSINESS.brand.toUpperCase()}</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-slate-600">{BUSINESS.brand} no reemplaza a tu academia: la teoría la aprendes allí o en tus libros, y aquí compruebas con preguntas si de verdad la dominas.</p>
         </Reveal>
         <ol className="mt-12 grid gap-6 md:grid-cols-3">
           {steps.map(({ icon: Icon, title, text }, index) => <Reveal as="li" key={title} delay={index * 120}>
-            <div className="group flex h-full flex-col items-center rounded-3xl border border-slate-800 bg-slate-900/80 p-8 transition duration-300 hover:-translate-y-1 hover:border-indigo-500/50 hover:shadow-xl hover:shadow-indigo-950/60">
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-indigo-600/15 text-indigo-300 ring-1 ring-indigo-500/20 transition group-hover:bg-indigo-600/25"><Icon size={32} aria-hidden /></span>
-              <span className="mt-5 text-sm font-bold text-emerald-400">Paso {index + 1}</span>
+            <div className="group flex h-full flex-col items-center rounded-3xl border border-indigo-100 bg-indigo-50/60 p-8 transition duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:bg-white hover:shadow-xl hover:shadow-indigo-200/60">
+              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-300/60 transition group-hover:bg-indigo-700"><Icon size={32} aria-hidden /></span>
+              <span className="mt-5 text-sm font-bold text-indigo-600">Paso {index + 1}</span>
               <h3 className="mt-1 text-xl font-bold uppercase">{title}</h3>
-              <p className="mt-3 text-slate-300">{text}</p>
+              <p className="mt-3 text-slate-600">{text}</p>
             </div>
           </Reveal>)}
         </ol>
-        <Reveal delay={200} className="mt-12"><SignUpButton /></Reveal>
       </div>
     </section>
 
-    <section id="planes" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center px-4 py-10 text-center">
-      <Glow className="-right-40 top-1/4 h-96 w-96 bg-emerald-500/15" />
-      <Glow className="-left-40 bottom-10 h-96 w-96 bg-indigo-600/20 [animation-delay:-3s]" />
+    <section id="planes" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-gradient-to-b from-indigo-950 via-indigo-900 to-indigo-950 px-4 py-16 text-center">
+      <div aria-hidden className="bg-grid absolute inset-0" />
+      <Glow className="-right-40 top-1/4 h-96 w-96 bg-indigo-400/20" />
+      <Glow className="-left-40 bottom-10 h-96 w-96 bg-sky-400/10 [animation-delay:-3s]" />
       <Reveal className="relative">
-        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Elige tu plan</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-slate-300">Menos de {formatSoles(dailyCap)} al día. Sin renovación automática: vuelves a pagar solo si decides seguir.</p>
+        <p className="text-sm font-bold uppercase tracking-[0.2em] text-indigo-300">Planes</p>
+        <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Elige tu plan</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-indigo-100/80">Menos de {formatSoles(dailyCap)} al día. Sin renovación automática: vuelves a pagar solo si decides seguir.</p>
       </Reveal>
-      <Reveal delay={150} className="relative"><PlanCards className="mt-8 w-full" /></Reveal>
-      <Link to="/precios" className="relative mt-5 text-sm font-semibold text-indigo-300 hover:text-indigo-200">Preguntas frecuentes sobre los planes</Link>
+      <Reveal delay={150} className="relative"><PlanCards className="mt-10 w-full" /></Reveal>
     </section>
+
+    <section id="preguntas" className="scroll-mt-16 bg-slate-100 px-4 py-20 text-slate-900">
+      <Reveal className="mx-auto max-w-3xl">
+        <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-indigo-600">Dudas</p>
+        <h2 className="mt-3 text-center text-3xl font-bold tracking-tight">Preguntas frecuentes</h2>
+        <div className="mt-8 grid gap-3">{faqs.map((faq) => <FaqItem key={faq.question} {...faq} />)}</div>
+      </Reveal>
+    </section>
+    </main>
 
     <PublicFooter />
   </div>;

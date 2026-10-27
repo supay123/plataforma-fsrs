@@ -10,11 +10,13 @@ import { AuthLayout } from "../../components/layout/AuthLayout";
 import { Alert, Button, Field, Input, PasswordInput, Select } from "../../components/ui";
 import { useToast } from "../../components/ui/use-toast";
 import { findPlan } from "../../config/business";
+import { useAuth } from "../../features/auth/AuthProvider";
+import { saveCredentials } from "../../features/auth/save-credentials";
 import { DOCUMENT_TYPES } from "../../features/complaints/model";
 import { PaymentPanel } from "../../features/payments/PaymentPanel";
 import { PlanPicker } from "../../features/payments/PlanPicker";
 import {
-  createRegistrationPayment, getRegistrationPaymentStatus, listRegistrationTeachers, requestRegistrationCode, simulateRegistrationPayment,
+  createRegistrationPayment, getRegistrationPaymentStatus, listRegistrationTeachers, requestRegistrationCode,
   validateRegistrationCode, validateStudentRegistration,
   type EmailCodeDelivery, type ValidatedRegistration,
 } from "../../features/registration/api";
@@ -115,6 +117,9 @@ export function SignUpPage() {
   const navigate = useNavigate();
   const plan = findPlan(searchParams.get("plan"));
   const toast = useToast();
+  const auth = useAuth();
+  // Correo y contraseña del registro en curso: solo en memoria, para entrar al confirmarse el pago.
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
   const teachers = useQuery({ queryKey: ["registration-teachers"], queryFn: listRegistrationTeachers });
   const { register, handleSubmit, control, setError, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -148,6 +153,7 @@ export function SignUpPage() {
         // Si volvió a corregir sus datos, el registro anterior se reemplaza.
         replaces_registration_id: registration?.registration_id,
       });
+      setCredentials({ email: values.email, password: values.password });
       // Los datos ya quedaron guardados: si el correo falla, se reintenta desde
       // el paso de verificación sin volver a llenar el formulario.
       let next: FirstCode = { delivery: null, error: "" };
@@ -166,7 +172,20 @@ export function SignUpPage() {
     }
   });
 
-  return <AuthLayout wide action={<Link
+  // Con el pago confirmado la cuenta ya existe: entra directo y ofrece guardar
+  // las credenciales. Si el login falla, el login muestra "Pago confirmado".
+  const enterAfterPayment = async () => {
+    try {
+      if (!credentials) throw new Error("Sin credenciales en memoria.");
+      void saveCredentials(credentials.email, credentials.password);
+      await auth.login(credentials.email, credentials.password, "student");
+      navigate("/estudiante", { replace: true });
+    } catch {
+      navigate("/estudiante/login?pago=confirmado", { replace: true });
+    }
+  };
+
+  return <AuthLayout wide cover={{ title: "Empieza a prepararte hoy", description: "Practica con las preguntas de tu grupo y recibe la explicación de cada respuesta al instante." }} action={<Link
     to="/estudiante/login"
     className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
   ><LogIn className="h-4 w-4" aria-hidden />Iniciar sesión</Link>}>
@@ -175,11 +194,10 @@ export function SignUpPage() {
     </div>
     <div className="mb-4"><PlanPicker plan={plan} onChange={(id) => setSearchParams({ plan: id }, { replace: true })} /></div>
     <Steps current={step} />
-    {step === 2 && registration && <PaymentPanel plan={plan} payerKey={registration.registration_id}
-      createPayment={(planId) => createRegistrationPayment(registration.registration_id, planId)}
+    {step === 2 && registration && <PaymentPanel plan={plan}
+      createPayment={(planId, yape) => createRegistrationPayment(registration.registration_id, planId, yape)}
       fetchStatus={getRegistrationPaymentStatus}
-      simulatePayment={simulateRegistrationPayment}
-      onPaid={() => navigate("/estudiante/login?pago=confirmado", { replace: true })}
+      onPaid={() => void enterAfterPayment()}
       unavailableNote={`Guardamos tus datos durante ${PENDING_HOURS} horas para que completes el pago. Si no se completa, los eliminamos.`} />}
     {step === 1 && registration && <VerifyEmail key={registration.registration_id} registration={registration} firstCode={firstCode} onVerified={() => setStep(2)} onBack={() => setStep(0)} />}
     {step === 0 && <form onSubmit={submit} className="grid gap-4" noValidate>
@@ -187,7 +205,7 @@ export function SignUpPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nombres" hideLabel error={errors.given_names?.message}><Input variant="soft" icon={<User size={20} />} placeholder="Nombres" autoComplete="given-name" {...register("given_names")} /></Field>
         <Field label="Apellidos" hideLabel error={errors.family_names?.message}><Input variant="soft" placeholder="Apellidos" autoComplete="family-name" {...register("family_names")} /></Field>
-        <Field label="Correo electrónico" hideLabel error={errors.email?.message}><Input variant="soft" icon={<Mail size={20} />} type="email" placeholder="tu@correo.com" autoComplete="email" {...register("email")} /></Field>
+        <Field label="Correo electrónico" hideLabel error={errors.email?.message}><Input variant="soft" icon={<Mail size={20} />} type="email" placeholder="tu@correo.com" autoComplete="username" {...register("email")} /></Field>
         <Field label="Celular" hideLabel error={errors.phone?.message}><Input variant="soft" icon={<Phone size={20} />} type="tel" placeholder="Celular" autoComplete="tel" {...register("phone")} /></Field>
         <div className="grid grid-cols-[8.5rem_1fr] gap-2">
           <Field label="Tipo de documento" hideLabel><Select variant="soft" {...register("identity_document_type")}>{DOCUMENT_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field>
@@ -201,6 +219,7 @@ export function SignUpPage() {
           </Select>
         </Field>
       </div>
+      <p className="-mb-2 text-sm text-slate-600">Con tu <strong>correo</strong> y esta <strong>contraseña</strong> ingresarás a Chancón.</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Contraseña" hideLabel error={errors.password?.message}><PasswordInput variant="soft" icon={<LockKeyhole size={20} />} placeholder="Contraseña" autoComplete="new-password" {...register("password")} /></Field>
         <Field label="Repite tu contraseña" hideLabel error={errors.password_confirmation?.message}><PasswordInput variant="soft" icon={<LockKeyhole size={20} />} placeholder="Repite tu contraseña" autoComplete="new-password" {...register("password_confirmation")} /></Field>

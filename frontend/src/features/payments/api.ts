@@ -2,28 +2,36 @@ import type { PlanId } from "../../config/business";
 import { invokeFunction } from "../../lib/api/functions";
 import { supabase } from "../../lib/supabase/client";
 
-/** Cobro de un plan. El monto lo fija el servidor según el plan. */
-export interface PlanPayment {
+/**
+ * Estado de un pago de plan. El monto lo fija el servidor según el plan.
+ * - paid: ya se aplicó (cuenta creada o plan extendido).
+ * - processing: Mercado Pago lo aprobó y se está aplicando.
+ * - pending: Mercado Pago todavía lo está procesando.
+ * - needs_support: se pagó, pero no se pudo aplicar; lo revisa el administrador.
+ */
+export interface PlanPaymentState {
   payment_id: string;
   plan: PlanId;
   amount: number;
-  /** Contenido del QR (EMVCo) que se escanea con Yape, Plin u otra billetera. */
-  qr_payload: string;
-  /** Código de pago de servicios (solo desde S/ 50, como el plan semestral). */
-  bank_code: string | null;
-  checkout_url: string | null;
-  expires_at: string;
-  /** false: cobro de prueba de Kuti, no mueve dinero. */
+  status: PlanPaymentStatus;
+  /** Motivo de Mercado Pago, por ejemplo al rechazar el pago. */
+  status_detail: string | null;
+  /** false: pago de prueba, no mueve dinero real. */
   livemode: boolean;
 }
 export type PlanPaymentStatus = "pending" | "processing" | "paid" | "failed" | "expired" | "cancelled" | "needs_support";
-export interface PlanPaymentState { payment_id: string; status: PlanPaymentStatus; expires_at: string }
-/** Forma de pago que se simula en modo prueba. */
-export type SimulatedMethod = "qr" | "code";
 
-/** POST /account/payment: crea (o reutiliza) el cobro para renovar el plan. */
-export function createRenewalPayment(plan: PlanId) {
-  return invokeFunction<PlanPayment, { plan: PlanId }>("account/payment", { plan });
+/** GET /public/payment-config: Public Key de Mercado Pago para generar el token de Yape. */
+export function getPaymentConfig() {
+  return invokeFunction<{ public_key: string }, Record<string, never>>("public/payment-config", {}, { method: "GET" });
+}
+
+/** Token de Yape (de un solo uso) y el celular con el que se generó. */
+export interface YapePayment { token: string; phone: string }
+
+/** POST /account/payment: cobra con Yape la renovación del plan. */
+export function createRenewalPayment(plan: PlanId, yape: YapePayment) {
+  return invokeFunction<PlanPaymentState, { plan: PlanId } & YapePayment>("account/payment", { plan, ...yape });
 }
 
 /** GET /account/payment?payment_id=...: estado del pago; al pagarse extiende el plan. */
@@ -33,18 +41,13 @@ export function getRenewalPaymentStatus(paymentId: string) {
   );
 }
 
-/** POST /account/payment/simulate: solo modo prueba, da por pagada la renovación. */
-export function simulateRenewalPayment(paymentId: string, method: SimulatedMethod) {
-  return invokeFunction<PlanPaymentState, { payment_id: string; method: SimulatedMethod }>("account/payment/simulate", { payment_id: paymentId, method });
-}
-
-/** Pago confirmado por Kuti que no se pudo aplicar porque ya no existe el registro ni la cuenta. */
-export interface PaymentToReview { id: string; email: string | null; plan: PlanId; amount: number; paid_at: string; kuti_payment_intent_id: string; livemode: boolean }
+/** Pago confirmado que no se pudo aplicar porque ya no existe el registro ni la cuenta. */
+export interface PaymentToReview { id: string; email: string | null; plan: PlanId; amount: number; paid_at: string; provider: "kuti" | "mercadopago"; provider_payment_id: string | null; livemode: boolean }
 
 /** Pagos por revisar del administrador (lectura directa con RLS de administrador). */
 export async function listPaymentsToReview() {
   const { data, error } = await supabase.from("plan_payments")
-    .select("id,email,plan,amount,paid_at,kuti_payment_intent_id,livemode")
+    .select("id,email,plan,amount,paid_at,provider,provider_payment_id,livemode")
     .eq("status", "succeeded").is("applied_at", null).is("resolved_at", null)
     .is("profile_id", null).is("registration_id", null)
     .order("paid_at", { ascending: false });

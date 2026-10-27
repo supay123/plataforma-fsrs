@@ -1,10 +1,15 @@
 import { invokeFunction } from "../../lib/api/functions";
 import type { PlanId } from "../../config/business";
-import type { PlanPayment, PlanPaymentState, SimulatedMethod } from "../payments/api";
+import type { PlanPaymentState, YapePayment } from "../payments/api";
 import type { DocumentType } from "../complaints/model";
 
-/** Grupo que elige el estudiante: un profesor. */
-export interface RegistrationTeacher { id: string; name: string }
+/** Grupo que elige el estudiante: un profesor, con su institución. */
+export interface RegistrationTeacher {
+  id: string;
+  name: string;
+  college_id: string;
+  college_name: string;
+}
 export interface ValidateStudentBody {
   /** Profesor del grupo; la institución y los cursos salen de él. */
   teacher_id: string;
@@ -49,11 +54,11 @@ export function validateRegistrationCode(registrationId: string, code: string) {
   );
 }
 
-/** POST /registration/payment: crea (o reutiliza) el cobro del plan elegido. */
-export function createRegistrationPayment(registrationId: string, plan: PlanId) {
-  return invokeFunction<PlanPayment, { registration_id: string; plan: PlanId }>(
+/** POST /registration/payment: cobra con Yape el plan elegido; si se aprueba, activa la cuenta. */
+export function createRegistrationPayment(registrationId: string, plan: PlanId, yape: YapePayment) {
+  return invokeFunction<PlanPaymentState, { registration_id: string; plan: PlanId } & YapePayment>(
     "registration/payment",
-    { registration_id: registrationId, plan },
+    { registration_id: registrationId, plan, ...yape },
   );
 }
 
@@ -62,9 +67,4 @@ export function getRegistrationPaymentStatus(paymentId: string) {
   return invokeFunction<PlanPaymentState, Record<string, never>>(
     `registration/payment?payment_id=${encodeURIComponent(paymentId)}`, {}, { method: "GET" },
   );
-}
-
-/** POST /registration/payment/simulate: solo modo prueba, da por pagado el cobro y activa la cuenta. */
-export function simulateRegistrationPayment(paymentId: string, method: SimulatedMethod) {
-  return invokeFunction<PlanPaymentState, { payment_id: string; method: SimulatedMethod }>("registration/payment/simulate", { payment_id: paymentId, method });
 }

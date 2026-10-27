@@ -23,7 +23,8 @@ toast y el modal, que tienen archivos propios (ver abajo).
 - **Alert**: información que debe quedarse visible dentro de la página o el
   formulario (por ejemplo, "Agrega un correo a tu perfil...").
 - **Modal** (`useModal`): confirmar una acción antes de hacerla, sobre todo si
-  no se puede deshacer.
+  no se puede deshacer. La variante `info` muestra indicaciones o ayuda que no
+  caben en la página (por ejemplo, dónde encontrar el código de Yape).
 - Los errores de un campo concreto van debajo del campo, con la prop `error`
   de `Field`.
 
@@ -53,13 +54,14 @@ En tests, envuelve el componente con `<ToastProvider>`.
 
 ## Modal
 
-Ventana de confirmación con título y cuerpo. Tiene tres variantes:
+Ventana con título y cuerpo. Tiene cuatro variantes:
 
 | Método | Botón principal | Uso |
 | --- | --- | --- |
 | `modal.delete(opciones)` | Rojo, "Eliminar" | Acciones destructivas. |
 | `modal.create(opciones)` | Morado, "Crear" | Crear o confirmar algo. |
 | `modal.warning(opciones)` | Ámbar, "Confirmar" (con ícono de advertencia) | Acciones que afectan directamente a otro usuario (cambiar sus datos, su credencial o su vigencia). |
+| `modal.info({ title, body, confirmLabel? })` | Morado, "Entendido" (sin "Cancelar") | Indicaciones o ayuda; no ejecuta ninguna acción, solo se cierra. |
 
 - Archivos: `components/ui/modal.tsx` (`ModalProvider`) y
   `components/ui/use-modal.ts` (`useModal`).
@@ -97,7 +99,8 @@ modal.delete({
 ```
 
 Ejemplos reales: `pages/admin/CollegesPage.tsx`, `UsersPage.tsx`,
-`AssignmentsPage.tsx` y `UserAccountPage.tsx` (variante `warning`). En tests, envuelve el componente con `<ModalProvider>`.
+`AssignmentsPage.tsx`, `UserAccountPage.tsx` (variante `warning`) y
+`features/payments/PaymentPanel.tsx` (variante `info`). En tests, envuelve el componente con `<ModalProvider>`.
 
 ---
 
@@ -187,7 +190,7 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
 | Componente | Descripción |
 | --- | --- |
 | `PortalLayout` | Menú lateral, usuario y botón "Salir" de los portales. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. |
-| `AuthLayout` | Fondo degradado con una tarjeta y el logo, sin encabezado ni pie. Para pantallas de acceso: login, registro y nueva contraseña. Usa `wide` para formularios de dos columnas y `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro). |
+| `AuthLayout` | Pantalla partida para el acceso (login, registro, invitación, nueva contraseña y renovación): fondo blanco con el logo y el formulario a la izquierda, y a la derecha una portada en índigo con la vista previa `public/image/preview.webp` (en móvil aparece debajo del formulario). Usa `wide` para formularios de dos columnas, `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro) y `cover` (`{ title, description }`) para el texto de la portada. |
 | `PublicPage` | Página pública con el logo arriba y el pie de página legal. |
 | `PublicFooter` | Pie de página con enlaces legales y datos de la empresa (ya incluido en `PublicPage`). |
 | `ComplaintsBookIcon` | Ícono del Libro de Reclamaciones. |
@@ -214,17 +217,19 @@ Los tipos de documento (`DNI`, `CE`, `PASAPORTE`, `RUC`) están en
 
 ## Pagos de planes (`features/payments/`)
 
-Cobros con Kuti para el registro y la renovación. El monto lo fija el servidor
-según el plan; el navegador solo dice qué plan eligió.
+Pagos con Yape a través de Mercado Pago para el registro y la renovación. El
+monto lo fija el servidor según el plan; el navegador solo dice qué plan eligió
+y envía el token de Yape.
 
 | Archivo | Qué ofrece |
 | --- | --- |
-| `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. |
-| `PlanCards.tsx` | Tarjetas grandes de los dos planes con sus beneficios y el botón «Elegir …» que lleva al registro con ese plan. Se usan en el home y en `/precios`; acepta `className` para el margen. |
-| `PaymentPanel.tsx` | Cobro de un plan: QR, código de pago de servicios (si el monto lo permite), cuenta regresiva y espera de la confirmación. Recibe `createPayment`, `fetchStatus`, `simulatePayment` y `onPaid`, así sirve para el registro y la renovación. En modo prueba muestra el botón «Simular pago». Sin Kuti configurado muestra el contacto por WhatsApp. |
+| `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. El semestral lleva siempre borde dorado, igual que su tarjeta en el home. |
+| `PlanCards.tsx` | Tarjetas grandes de los dos planes con sus beneficios y el botón «Elegir …» (con destello y leve crecimiento al pasar el mouse por el botón) que lleva al registro con ese plan. El semestral tiene borde dorado animado (`animate-orbit`), repite los beneficios del Plan Estudiante y resalta aparte sus extras. Se usan en el home (sección «Elige tu plan»); acepta `className` para el margen. |
+| `PaymentPanel.tsx` | Pago de un plan con Yape: pide el celular y el código de aprobación de la app de Yape, genera el token, cobra y espera a que se aplique. Explica los rechazos de Mercado Pago y deja reintentar con un código nuevo. Recibe `createPayment(plan, { token, phone })`, `fetchStatus` y `onPaid`, así sirve para el registro y la renovación. Sin Mercado Pago configurado muestra el contacto por WhatsApp. |
 | `PlanExpiryBanner.tsx` | Aviso en el portal del estudiante cuando a su plan le quedan `RENEWAL_NOTICE_DAYS` días o menos. |
-| `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos que Kuti confirmó pero no se pudieron aplicar. Solo aparece si hay alguno. |
-| `api.ts` | `createRenewalPayment`, `getRenewalPaymentStatus`, `listPaymentsToReview`, `resolvePayment` y los tipos `PlanPayment` y `PlanPaymentStatus`. Los cobros del registro están en `features/registration/api.ts`. |
+| `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos confirmados que no se pudieron aplicar (de Mercado Pago o, los antiguos, de Kuti). Solo aparece si hay alguno. |
+| `yape.ts` | `createYapeToken(publicKey, celular, otp)`: carga el SDK de Mercado Pago y devuelve el token de un solo uso. |
+| `api.ts` | `getPaymentConfig` (Public Key), `createRenewalPayment`, `getRenewalPaymentStatus`, `listPaymentsToReview`, `resolvePayment` y los tipos `PlanPaymentState` y `PlanPaymentStatus`. Los cobros del registro están en `features/registration/api.ts`. |
 
 Los planes y precios están en `config/business.ts` (`PLANS`, `findPlan`,
 `planPriceLabel`) y deben coincidir con `supabase/functions/_shared/plans.ts`.

@@ -1,33 +1,25 @@
-// Pagos de planes con Kuti, para el registro y para la renovación. El estado
-// que manda es el de Kuti: llega por el webhook firmado o consultándolo
-// directamente, y se aplica igual en ambos casos. Aplicar un pago es
-// idempotente: un aviso repetido o una consulta en paralelo nunca activan ni
-// extienden el acceso dos veces.
+// Pagos de planes con Mercado Pago (Yape), para el registro y para la
+// renovación. El estado que manda es el de Mercado Pago: llega en la respuesta
+// del cobro, por el webhook firmado o consultándolo directamente, y se aplica
+// igual en los tres casos. Aplicar un pago es idempotente: un aviso repetido o
+// una consulta en paralelo nunca activan ni extienden el acceso dos veces.
 
 import { RPCS, TABLES } from "./database.constants.ts";
 import { AppError } from "./errors.ts";
 import {
-  cancelPayment,
-  createCharge,
-  getPayment,
-  type KutiCustomer,
-  kutiMode,
-  type KutiPaymentIntent,
-  type KutiPaymentStatus,
-  registerWebhook,
-  simulatePayment,
-} from "./kuti.ts";
+  createYapeOrder,
+  getOrder,
+  type MercadoPagoOrder,
+  type MercadoPagoOrderStatus,
+  orderStatusDetail,
+} from "./mercadopago.ts";
 import { type PlanId, planId, PLANS } from "./plans.ts";
 import { activateStudentRegistration } from "./registration-activation.ts";
 import type { EdgeContext } from "./types.ts";
 
 type SupabaseAdmin = EdgeContext["supabaseAdmin"];
 
-/** Minutos que dura el QR (y el código) antes de vencer. */
-const CHARGE_MINUTES = 30;
-/** Un cobro al que le queda menos que esto se reemplaza por uno nuevo. */
-const REUSE_MARGIN_MS = 2 * 60_000;
-
+/** expired solo aparece en cobros antiguos de Kuti. */
 export type PlanPaymentStatus =
   | "pending"
   | "succeeded"
@@ -37,36 +29,42 @@ export type PlanPaymentStatus =
 
 export interface PlanPayment {
   id: string;
-  kuti_payment_intent_id: string;
+  provider: "kuti" | "mercadopago";
+  provider_payment_id: string | null;
   livemode: boolean;
   plan: string;
   amount: number;
   registration_id: string | null;
   profile_id: string | null;
   status: PlanPaymentStatus;
-  qr_payload: string;
-  bank_code: string | null;
-  checkout_url: string | null;
-  expires_at: string;
+  status_detail: string | null;
   paid_at: string | null;
   applied_at: string | null;
 }
 
 const PAYMENT_COLUMNS =
-  "id,kuti_payment_intent_id,livemode,plan,amount,registration_id,profile_id,status,qr_payload,bank_code,checkout_url,expires_at,paid_at,applied_at";
+  "id,provider,provider_payment_id,livemode,plan,amount,registration_id,profile_id,status,status_detail,paid_at,applied_at";
 
-const STATUS_FROM_KUTI: Record<KutiPaymentStatus, PlanPaymentStatus> = {
-  PENDING: "pending",
-  SUCCEEDED: "succeeded",
-  FAILED: "failed",
-  EXPIRED: "expired",
-  CANCELLED: "cancelled",
+/**
+ * Estados de la orden que cambian el pago. refunded y charged_back solo
+ * ocurren después de aprobada y no quitan el acceso: los revisa el
+ * administrador desde el panel de Mercado Pago.
+ */
+const STATUS_FROM_ORDER: Partial<
+  Record<MercadoPagoOrderStatus, PlanPaymentStatus>
+> = {
+  created: "pending",
+  processing: "pending",
+  action_required: "pending",
+  processed: "succeeded",
+  failed: "failed",
+  canceled: "cancelled",
 };
 
 /**
  * Estado que ve quien paga:
  * - paid: el pago ya se aplicó (cuenta creada o plan extendido).
- * - processing: Kuti confirmó el pago y se está aplicando.
+ * - processing: Mercado Pago aprobó el pago y se está aplicando.
  * - needs_support: se pagó, pero ya no existe el registro ni la cuenta; lo
  *   revisa el administrador.
  */
@@ -89,61 +87,52 @@ export function publicPaymentStatus(
     : "needs_support";
 }
 
-/** Lo que recibe el navegador para mostrar el cobro. */
+/** Lo que recibe el navegador al pagar y al consultar el estado. */
 export function paymentResponse(payment: PlanPayment) {
   return {
     payment_id: payment.id,
     plan: payment.plan,
     amount: payment.amount,
-    qr_payload: payment.qr_payload,
-    bank_code: payment.bank_code,
-    checkout_url: payment.checkout_url,
-    expires_at: payment.expires_at,
+    status: publicPaymentStatus(payment),
+    status_detail: payment.status_detail,
     livemode: payment.livemode,
   };
 }
 
-/** Respuesta de la consulta de estado. */
-export function statusResponse(payment: PlanPayment) {
-  return {
-    payment_id: payment.id,
-    status: publicPaymentStatus(payment),
-    expires_at: payment.expires_at,
-  };
-}
-
-async function findBy(
+export async function findPayment(
   supabaseAdmin: SupabaseAdmin,
-  column: "id" | "kuti_payment_intent_id",
-  value: string,
+  id: string,
 ): Promise<PlanPayment | null> {
   const { data, error } = await supabaseAdmin
     .from(TABLES.planPayments)
     .select(PAYMENT_COLUMNS)
-    .eq(column, value)
+    .eq("id", id)
     .maybeSingle();
   if (error) throw new AppError(500, "payment_lookup_failed", error.message);
   return data as PlanPayment | null;
 }
 
-export function findPayment(supabaseAdmin: SupabaseAdmin, id: string) {
-  return findBy(supabaseAdmin, "id", id);
+/** Token de Yape que generó el navegador con la Public Key. */
+export function yapeToken(value: unknown): string {
+  if (typeof value !== "string" || !/^[\w-]{8,255}$/.test(value)) {
+    throw new AppError(400, "validation_error", "token is required.", {
+      field: "token",
+    });
+  }
+  return value;
 }
 
-export function findPaymentByKutiId(
-  supabaseAdmin: SupabaseAdmin,
-  kutiPaymentIntentId: string,
-) {
-  return findBy(supabaseAdmin, "kuti_payment_intent_id", kutiPaymentIntentId);
-}
-
-/** Nombres y apellidos para Kuti a partir de un nombre completo. */
-export function splitFullName(fullName: string): {
-  first_name: string;
-  last_name: string;
-} {
-  const [first, ...rest] = fullName.trim().split(/\s+/);
-  return { first_name: first ?? fullName, last_name: rest.join(" ") || "-" };
+/** Celular de Yape: 9 dígitos (los de prueba de Mercado Pago empiezan con 1). */
+export function yapePhone(value: unknown): string {
+  const digits = typeof value === "string"
+    ? value.replace(/\D/g, "").replace(/^51(?=\d{9}$)/, "")
+    : "";
+  if (!/^\d{9}$/.test(digits)) {
+    throw new AppError(400, "validation_error", "phone must have 9 digits.", {
+      field: "phone",
+    });
+  }
+  return digits;
 }
 
 export interface PaymentOwner {
@@ -152,80 +141,76 @@ export interface PaymentOwner {
 }
 
 /**
- * Crea el cobro del plan para un registro o un estudiante. Si ya tiene uno
- * vigente del mismo plan lo devuelve; si no, anula los pendientes (así nunca
- * paga dos veces) y crea otro.
+ * Consulta a Mercado Pago un pago suyo que sigue pendiente y lo actualiza.
+ * Los cobros antiguos de Kuti ya no se consultan.
+ */
+export async function refreshPayment(
+  supabaseAdmin: SupabaseAdmin,
+  payment: PlanPayment,
+): Promise<PlanPayment> {
+  const status = publicPaymentStatus(payment);
+  if (status !== "pending" && status !== "processing") return payment;
+  if (payment.provider !== "mercadopago" || !payment.provider_payment_id) {
+    return status === "processing"
+      ? await syncPayment(supabaseAdmin, payment, null)
+      : payment;
+  }
+  const remote = await getOrder(payment.provider_payment_id);
+  return await syncPayment(supabaseAdmin, payment, remote);
+}
+
+/**
+ * Cobra el plan con Yape para un registro o un estudiante. La fila se guarda
+ * antes de llamar a Mercado Pago, así un pago aprobado nunca queda sin dueño.
+ * Si hay un pago anterior todavía en proceso no se cobra otra vez.
  */
 export async function createPlanPayment(
   supabaseAdmin: SupabaseAdmin,
   input: {
     owner: PaymentOwner;
     plan: PlanId;
-    customer: KutiCustomer;
     email: string | null;
+    token: string;
+    phone: string;
   },
 ): Promise<PlanPayment> {
+  if (!input.email) {
+    throw new AppError(
+      409,
+      "payment_email_required",
+      "Add an email to your profile before paying.",
+    );
+  }
+
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from(TABLES.planPayments)
     .select(PAYMENT_COLUMNS)
     .eq(input.owner.column, input.owner.id)
+    .eq("provider", "mercadopago")
     .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    .not("provider_payment_id", "is", null);
   if (pendingError) {
     throw new AppError(500, "payment_lookup_failed", pendingError.message);
   }
-
-  const reusable = (pending as PlanPayment[]).find((payment) =>
-    payment.plan === input.plan &&
-    new Date(payment.expires_at).getTime() - Date.now() > REUSE_MARGIN_MS
-  );
-  if (reusable) return reusable;
-
   for (const old of pending as PlanPayment[]) {
-    try {
-      await cancelPayment(old.kuti_payment_intent_id);
-      await supabaseAdmin
-        .from(TABLES.planPayments)
-        .update({ status: "cancelled" })
-        .eq("id", old.id)
-        .eq("status", "pending");
-    } catch (cancelError) {
-      // Si ya se pagó o venció, el webhook o la consulta lo actualizan.
-      console.error("Could not cancel Kuti payment", old.id, cancelError);
+    const current = await refreshPayment(supabaseAdmin, old);
+    if (current.status === "pending" || current.status === "succeeded") {
+      throw new AppError(
+        409,
+        "payment_in_process",
+        "A previous payment is still being processed.",
+      );
     }
-  }
-
-  try {
-    await ensureKutiWebhook(supabaseAdmin);
-  } catch (webhookError) {
-    // Sin webhook el pago igual se confirma consultando a Kuti.
-    console.error("Could not register the Kuti webhook", webhookError);
   }
 
   const paymentId = crypto.randomUUID();
   const plan = PLANS[input.plan];
-  const intent = await createCharge({
-    reference: paymentId,
-    amount: plan.amount,
-    description: `${plan.name} - Chancón`,
-    expiresAt: new Date(Date.now() + CHARGE_MINUTES * 60_000),
-    customer: input.customer,
-  });
-  const qr = intent.payment_method?.qr;
-  if (!qr?.payload) {
-    throw new AppError(
-      502,
-      "payment_provider_error",
-      "Kuti did not return a QR code.",
-    );
-  }
-
-  const { data: payment, error } = await supabaseAdmin
+  const { data: inserted, error } = await supabaseAdmin
     .from(TABLES.planPayments)
     .insert({
       id: paymentId,
-      kuti_payment_intent_id: intent.id,
-      livemode: intent.livemode,
+      provider: "mercadopago",
+      livemode: false,
       plan: input.plan,
       amount: Number(plan.amount),
       registration_id: input.owner.column === "registration_id"
@@ -233,15 +218,48 @@ export async function createPlanPayment(
         : null,
       profile_id: input.owner.column === "profile_id" ? input.owner.id : null,
       email: input.email,
-      qr_payload: qr.payload,
-      bank_code: intent.payment_method?.payment_code?.code ?? null,
-      checkout_url: intent.checkout_url ?? null,
-      expires_at: qr.expires_at,
     })
     .select(PAYMENT_COLUMNS)
     .single();
   if (error) throw new AppError(500, "payment_save_failed", error.message);
-  return payment as PlanPayment;
+  const payment = inserted as PlanPayment;
+
+  let remote: MercadoPagoOrder;
+  try {
+    remote = await createYapeOrder({
+      reference: paymentId,
+      amount: plan.amount,
+      token: input.token,
+      email: input.email,
+      phone: input.phone,
+    });
+  } catch (providerError) {
+    // Si de todos modos se cobró, el webhook lo encuentra por la referencia.
+    const rejected = providerError instanceof AppError &&
+      providerError.code === "payment_rejected";
+    const details = rejected
+      ? providerError.details as { provider_code?: string } | undefined
+      : undefined;
+    await supabaseAdmin
+      .from(TABLES.planPayments)
+      .update({
+        status: "failed",
+        status_detail: details?.provider_code ?? null,
+      })
+      .eq("id", paymentId)
+      .eq("status", "pending");
+    // Un rechazo de Yape no es un error: el navegador explica el motivo.
+    if (rejected) return await findPayment(supabaseAdmin, paymentId) ?? payment;
+    throw providerError;
+  }
+  try {
+    return await syncPayment(supabaseAdmin, payment, remote);
+  } catch (syncError) {
+    // Ya se cobró: el navegador sigue consultando el estado y el webhook lo
+    // vuelve a aplicar.
+    console.error("Could not apply Mercado Pago payment", paymentId, syncError);
+    return await findPayment(supabaseAdmin, paymentId) ?? payment;
+  }
 }
 
 /** Aplica un pago confirmado: crea la cuenta del registro o extiende el plan. */
@@ -263,26 +281,30 @@ async function applyPayment(
 }
 
 /**
- * Lleva el pago al estado que informa Kuti y, si ya está pagado, lo aplica.
- * Un pago confirmado nunca vuelve atrás; Kuti sí puede pasar un cobro vencido
- * a pagado si el dinero llega tarde.
+ * Lleva el pago al estado que informa Mercado Pago (si llega) y, si ya está
+ * pagado, lo aplica. Un pago confirmado nunca vuelve atrás; un pago marcado
+ * como fallido sí pasa a pagado si Mercado Pago lo aprobó.
  */
 export async function syncPayment(
   supabaseAdmin: SupabaseAdmin,
   payment: PlanPayment,
-  intent: KutiPaymentIntent,
+  remote: MercadoPagoOrder | null,
 ): Promise<PlanPayment> {
-  if (intent.id !== payment.kuti_payment_intent_id) {
-    throw new AppError(409, "payment_mismatch", "Payment does not match.");
-  }
-  const status = STATUS_FROM_KUTI[intent.status];
-  if (status && status !== payment.status && payment.status !== "succeeded") {
+  if (remote && payment.status !== "succeeded") {
+    if (remote.external_reference !== payment.id) {
+      throw new AppError(409, "payment_mismatch", "Payment does not match.");
+    }
+    const status = STATUS_FROM_ORDER[remote.status] ?? payment.status;
     const { error } = await supabaseAdmin
       .from(TABLES.planPayments)
       .update({
+        provider_payment_id: remote.id,
+        // La orden no dice si es de prueba; solo el aviso del webhook.
+        livemode: remote.live_mode ?? payment.livemode,
         status,
+        status_detail: orderStatusDetail(remote),
         paid_at: status === "succeeded"
-          ? intent.paid_with?.paid_at ?? new Date().toISOString()
+          ? remote.last_updated_date ?? new Date().toISOString()
           : null,
       })
       .eq("id", payment.id)
@@ -301,72 +323,4 @@ export async function syncPayment(
     if (!current.applied_at) throw error;
   }
   return await findPayment(supabaseAdmin, payment.id) ?? current;
-}
-
-/** Forma de pago que se simula: QR o código de pago de servicios. */
-export function simulatedMethod(
-  value: unknown,
-): "INTEROPERABLE_QR" | "BANK_TRANSFER" {
-  if (value === undefined || value === "qr") return "INTEROPERABLE_QR";
-  if (value === "code") return "BANK_TRANSFER";
-  throw new AppError(400, "validation_error", "method must be qr or code.", {
-    field: "method",
-  });
-}
-
-/**
- * Solo modo prueba: Kuti da el cobro por pagado sin dinero real y se aplica
- * en el acto, igual que un pago de verdad.
- */
-export async function simulateTestPayment(
-  supabaseAdmin: SupabaseAdmin,
-  payment: PlanPayment,
-  method: "INTEROPERABLE_QR" | "BANK_TRANSFER",
-): Promise<PlanPayment> {
-  if (payment.livemode) {
-    throw new AppError(
-      403,
-      "test_mode_only",
-      "Only test-mode payments can be simulated.",
-    );
-  }
-  if (payment.status === "pending") {
-    await simulatePayment(
-      payment.kuti_payment_intent_id,
-      payment.bank_code ? method : "INTEROPERABLE_QR",
-    );
-  }
-  const intent = await getPayment(payment.kuti_payment_intent_id);
-  return await syncPayment(supabaseAdmin, payment, intent);
-}
-
-/**
- * Registra el webhook de Kuti la primera vez que se cobra en cada modo y
- * guarda su secreto en Vault. Kuti solo envía avisos a URLs HTTPS: en local
- * no se registra y el estado se consulta directamente.
- */
-export async function ensureKutiWebhook(
-  supabaseAdmin: SupabaseAdmin,
-): Promise<void> {
-  const baseUrl = Deno.env.get("SUPABASE_URL");
-  if (!baseUrl?.startsWith("https://")) return;
-
-  const mode = kutiMode();
-  const { data: secret, error } = await supabaseAdmin.rpc(
-    RPCS.kutiWebhookSecret,
-    { p_mode: mode },
-  );
-  if (error) throw new AppError(500, "webhook_lookup_failed", error.message);
-  if (secret) return;
-
-  const signingSecret = await registerWebhook(
-    `${baseUrl}/functions/v1/kuti/webhook`,
-  );
-  const { error: saveError } = await supabaseAdmin.rpc(
-    RPCS.saveKutiWebhookSecret,
-    { p_mode: mode, p_secret: signingSecret },
-  );
-  if (saveError) {
-    throw new AppError(500, "webhook_save_failed", saveError.message);
-  }
 }

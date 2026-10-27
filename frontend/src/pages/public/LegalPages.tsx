@@ -4,7 +4,7 @@ import { PublicPage } from "../../components/layout/PublicLayout";
 import { BUSINESS, PLANS, PRICE_CHANGE_NOTICE_DAYS, SEMESTER_PLAN, planPriceLabel } from "../../config/business";
 import { EXPIRED_REVIEW_DAYS, RENEWAL_NOTICE_DAYS } from "../../lib/student-access";
 
-const UPDATED_AT = "12 de octubre de 2026";
+const UPDATED_AT = "26 de octubre de 2026";
 
 function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   return <PublicPage>
@@ -36,7 +36,7 @@ export function TermsPage() {
     <h2>3. Planes y pagos</h2>
     <ul>
       {PLANS.map((plan) => <li key={plan.id}>El {plan.name} cuesta {planPriceLabel(plan)} de acceso.</li>)}
-      <li>Los precios se expresan en soles. Los pagos se procesan a través de Kuti (kuti.pe): pagas escaneando un código QR con Yape, Plin u otra billetera. El {SEMESTER_PLAN.name} también puede pagarse con un código de pago de servicios desde la app de tu banco o de Yape (institución KUTI).</li>
+      <li>Los precios se expresan en soles. Los pagos se procesan a través de Mercado Pago (mercadopago.com.pe) y se hacen con Yape: ingresas tu celular y el código de aprobación que te muestra la app de Yape.</li>
       <li>Cada pago es único. No hay débitos ni renovaciones automáticas: solo pagas cuando decides seguir usando la plataforma.</li>
       <li>Tu acceso empieza el día en que se confirma el pago y dura los meses del plan que pagaste.</li>
       <li>{BUSINESS.brand} no tiene acceso a las claves de tus aplicaciones de pago ni las almacena.</li>
@@ -75,7 +75,7 @@ export function PrivacyPage() {
     <ul>
       <li><strong>Identificación y contacto:</strong> nombres, apellidos, correo electrónico, teléfono, tipo y número de documento de identidad, colegio y código de usuario.</li>
       <li><strong>Uso académico:</strong> cursos asignados, respuestas, resultados, tiempos de respuesta y progreso.</li>
-      <li><strong>Pagos:</strong> los procesa Kuti (QR con Yape, Plin u otra billetera, o pago de servicios). Solo recibimos la información necesaria para identificar el pago, como el plan, la fecha, el monto y el número de operación. Nunca recibimos las claves de tus aplicaciones de pago.</li>
+      <li><strong>Pagos:</strong> los procesa Mercado Pago con Yape. Tu celular y tu código de aprobación se envían directamente a Mercado Pago; no los guardamos. Solo recibimos la información necesaria para identificar el pago, como el plan, la fecha, el monto, el resultado y el número de operación. Nunca recibimos las claves de tus aplicaciones de pago.</li>
       <li><strong>Reclamos:</strong> los datos que registres en el Libro de reclamaciones, que se envían a nuestro correo electrónico.</li>
     </ul>
     <h2>2. Para qué los usamos</h2>
@@ -90,7 +90,7 @@ export function PrivacyPage() {
     <h2>3. Con quién los compartimos</h2>
     <ul>
       <li>Los profesores y la institución a la que perteneces pueden ver tus resultados y progreso en los cursos que te asignan.</li>
-      <li>Proveedores que nos ayudan a operar el servicio: Kuti (pagos), Supabase (base de datos y autenticación), Netlify (alojamiento web) y Google (envío de correos mediante Gmail, incluidas las hojas del Libro de reclamaciones). Algunos de ellos almacenan la información en servidores fuera del Perú, con medidas de seguridad adecuadas.</li>
+      <li>Proveedores que nos ayudan a operar el servicio: Mercado Pago (pagos), Supabase (base de datos y autenticación), Netlify (alojamiento web) y Google (envío de correos mediante Gmail, incluidas las hojas del Libro de reclamaciones). Algunos de ellos almacenan la información en servidores fuera del Perú, con medidas de seguridad adecuadas.</li>
       <li>Autoridades competentes, cuando la ley lo exija.</li>
     </ul>
     <h2>4. Menores de edad</h2>

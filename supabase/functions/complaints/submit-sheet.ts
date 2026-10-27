@@ -2,8 +2,8 @@ import { RPCS } from "../_shared/database.constants.ts";
 import { renderComplaintPdf } from "../_shared/complaint-pdf.ts";
 import {
   clientIp,
-  complaintEmail,
   type ComplaintData,
+  complaintEmail,
   type ComplaintRecord,
   EVIDENCE_MAX_BYTES,
   parseComplaintData,
@@ -24,8 +24,10 @@ async function sha256(value: string): Promise<string> {
     "SHA-256",
     new TextEncoder().encode(value),
   );
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 function retrySheetNumber(value: FormDataEntryValue | null): number | null {
@@ -86,7 +88,11 @@ export async function submitSheet(
   context: EdgeContext,
 ): Promise<Response> {
   if (Number(request.headers.get("content-length") ?? 0) > REQUEST_MAX_BYTES) {
-    throw new AppError(413, "attachments_too_large", "The request is too large.");
+    throw new AppError(
+      413,
+      "attachments_too_large",
+      "The request is too large.",
+    );
   }
   let form: FormData;
   try {

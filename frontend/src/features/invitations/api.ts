@@ -4,8 +4,10 @@ import type { DocumentType } from "../complaints/model";
 export interface Invitation {
   id: string;
   email: string;
-  college_id: string;
+  college_id: string | null;
   college_name: string | null;
+  teacher_id: string | null;
+  teacher_name: string | null;
   access_valid_from: string;
   access_valid_until: string;
   expires_at: string;
@@ -13,13 +15,17 @@ export interface Invitation {
 }
 export interface CreateInvitationBody {
   email: string;
-  college_id: string;
+  /** Grupo fijado por el administrador; si falta, el estudiante lo elige. */
+  teacher_id?: string;
   access_valid_from: string;
   access_valid_until: string;
 }
 /** Datos fijos que ve el estudiante al abrir el link. */
 export interface StudentInvitation {
   email: string;
+  teacher_id: string | null;
+  teacher_name: string | null;
+  college_id: string | null;
   college_name: string | null;
   access_valid_from: string;
   access_valid_until: string;
@@ -27,6 +33,8 @@ export interface StudentInvitation {
 }
 export interface AcceptInvitationBody {
   code: string;
+  /** Solo hace falta si la invitación no trae un grupo fijo. */
+  teacher_id?: string;
   given_names: string;
   family_names: string;
   phone: string;

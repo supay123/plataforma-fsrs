@@ -12,7 +12,7 @@ import { AppError, json, readJson } from "../_shared/errors.ts";
 import { maskEmail, parseEmail } from "../_shared/registration.ts";
 import type { EdgeContext } from "../_shared/types.ts";
 import type { RequestEmailChangeBody } from "./interfaces.ts";
-import { loadStudentProfile } from "./profile.ts";
+import { loadStudentProfile } from "../_shared/student-profile.ts";
 
 /**
  * POST /account/email-change

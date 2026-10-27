@@ -8,6 +8,7 @@ function_dirs=(
   admin-delete-user
   admin-renew-access
   admin-reset-user-credentials
+  admin-student-account
   admin-update-user
   answer-question
   complaints
@@ -25,7 +26,7 @@ function_dirs=(
   password-reset
   invitations
   student-invitation
-  kuti
+  mercadopago
 )
 
 for function_dir in "${function_dirs[@]}"; do

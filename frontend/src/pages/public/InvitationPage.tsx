@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { LockKeyhole, Mail, Phone, School, User } from "lucide-react";
+import { LockKeyhole, Mail, Phone, User, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -10,6 +10,7 @@ import { Button, Field, Input, PasswordInput, Select, Spinner } from "../../comp
 import { useToast } from "../../components/ui/use-toast";
 import { DOCUMENT_TYPES } from "../../features/complaints/model";
 import { acceptStudentInvitation, checkStudentInvitation, type StudentInvitation } from "../../features/invitations/api";
+import { listRegistrationTeachers } from "../../features/registration/api";
 import {
   SERVER_FIELD_MESSAGES, documentIsValid, documentIssue, passwordFields, passwordMismatchIssue, passwordsMatch, studentFields,
 } from "../../features/registration/fields";
@@ -18,7 +19,7 @@ import { normalizeIdentityDocument } from "../../features/registration/rules";
 import { normalizeError, type AppError } from "../../lib/api/errors";
 import { formatDay } from "../../lib/dates";
 
-// El correo y la institución los fija la invitación; el estudiante completa el resto.
+// El correo y, a veces, el grupo los fija la invitación; el estudiante completa el resto.
 const schema = z.object({
   ...studentFields,
   ...passwordFields,
@@ -49,11 +50,27 @@ function AcceptForm({ code, invitation, onInvalid }: { code: string; invitation:
   });
   const password = useWatch({ control, name: "password" });
   const passwordConfirmation = useWatch({ control, name: "password_confirmation" });
+  // Si el administrador fijó el grupo, se muestra tal cual; si no, el
+  // estudiante lo elige entre los grupos de su institución (invitaciones
+  // antiguas) o entre todos los disponibles.
+  const [teacherId, setTeacherId] = useState(invitation.teacher_id ?? "");
+  const [teacherError, setTeacherError] = useState("");
+  const teachers = useQuery({
+    queryKey: ["registration-teachers"],
+    queryFn: listRegistrationTeachers,
+    enabled: !invitation.teacher_id,
+  });
+  const availableTeachers = invitation.college_id
+    ? teachers.data?.filter((teacher) => teacher.college_id === invitation.college_id)
+    : teachers.data;
+  const inviter = invitation.teacher_name ?? invitation.college_name;
 
   const submit = handleSubmit(async (values) => {
+    if (!teacherId) return setTeacherError("Selecciona tu grupo.");
     try {
       await acceptStudentInvitation({
         code,
+        teacher_id: teacherId,
         given_names: values.given_names,
         family_names: values.family_names,
         phone: values.phone,
@@ -66,6 +83,9 @@ function AcceptForm({ code, invitation, onInvalid }: { code: string; invitation:
     } catch (reason) {
       const error = await normalizeError(reason);
       if (error.code === "invalid_invitation") return onInvalid();
+      if (error.code === "teacher_required" || error.code === "invalid_teacher") {
+        return setTeacherError(error.code === "teacher_required" ? "Selecciona tu grupo." : "Selecciona un grupo válido.");
+      }
       const field = (error.details as { field?: keyof Values } | undefined)?.field;
       if (field && field in values) {
         setError(field, { message: error.code === "validation_error" ? SERVER_FIELD_MESSAGES[field] ?? error.message : error.message }, { shouldFocus: true });
@@ -75,11 +95,18 @@ function AcceptForm({ code, invitation, onInvalid }: { code: string; invitation:
 
   return <>
     <h1 className="text-2xl font-bold">Crea tu cuenta</h1>
-    <p className="mt-2 text-sm text-slate-600">{invitation.college_name} te invitó a Chancón. Tu acceso es del {formatDay(invitation.access_valid_from)} al {formatDay(invitation.access_valid_until)}.</p>
+    <p className="mt-2 text-sm text-slate-600">{inviter ? `${inviter} te invitó` : "Te invitaron"} a Chancón. Tu acceso es del {formatDay(invitation.access_valid_from)} al {formatDay(invitation.access_valid_until)}.</p>
     <form onSubmit={submit} className="mt-6 grid gap-4" noValidate>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Correo electrónico" hideLabel><Input variant="soft" icon={<Mail size={20} />} readOnly value={invitation.email} className="cursor-default read-only:text-slate-500 read-only:focus:border-indigo-100 read-only:focus:bg-indigo-50/50 read-only:focus:ring-0" /></Field>
-        <Field label="Institución" hideLabel><Input variant="soft" icon={<School size={20} />} readOnly value={invitation.college_name ?? ""} className="cursor-default read-only:text-slate-500 read-only:focus:border-indigo-100 read-only:focus:bg-indigo-50/50 read-only:focus:ring-0" /></Field>
+        {invitation.teacher_id
+          ? <Field label="Grupo" hideLabel><Input variant="soft" icon={<Users size={20} />} readOnly value={invitation.teacher_name ?? ""} className="cursor-default read-only:text-slate-500 read-only:focus:border-indigo-100 read-only:focus:bg-indigo-50/50 read-only:focus:ring-0" /></Field>
+          : <Field label="Grupo" hideLabel error={teacherError}>
+            <Select variant="soft" icon={<Users size={20} />} value={teacherId} disabled={!teachers.data} onChange={(event) => { setTeacherId(event.target.value); setTeacherError(""); }}>
+              <option value="">{teachers.isPending ? "Cargando grupos…" : teachers.isError ? "No se pudieron cargar los grupos" : "Selecciona tu grupo"}</option>
+              {availableTeachers?.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
+            </Select>
+          </Field>}
         <Field label="Nombres" hideLabel error={errors.given_names?.message}><Input variant="soft" icon={<User size={20} />} placeholder="Nombres" autoComplete="given-name" {...register("given_names")} /></Field>
         <Field label="Apellidos" hideLabel error={errors.family_names?.message}><Input variant="soft" placeholder="Apellidos" autoComplete="family-name" {...register("family_names")} /></Field>
         <Field label="Celular" hideLabel error={errors.phone?.message}><Input variant="soft" icon={<Phone size={20} />} type="tel" placeholder="Celular" autoComplete="tel" {...register("phone")} /></Field>
@@ -122,7 +149,7 @@ export function InvitationPage() {
     if (failed) toast.error(check.error.message);
   }, [failed, check.error, toast]);
 
-  return <AuthLayout wide={!invalid && Boolean(check.data)}>
+  return <AuthLayout wide={!invalid && Boolean(check.data)} cover={{ title: "Tu grupo te espera", description: "Completa tu registro y empieza a practicar con las preguntas de tu profesor." }}>
     {invalid
       ? <InvalidInvitation />
       : failed

@@ -963,21 +963,19 @@ Deno.test({
     });
     assert.equal(verified.status, "verified");
 
-    // Kuti confirmó el pago del plan semestral (no se llama a Kuti en el test).
+    // Mercado Pago aprobó el pago del plan semestral (no se le llama en el test).
     const paymentId = crypto.randomUUID();
     const { error: paymentError } = await adminClient
       .from(TABLES.planPayments)
       .insert({
         id: paymentId,
-        kuti_payment_intent_id: `pi_test_${suffix}`,
+        provider_payment_id: `mp_test_${suffix}`,
         livemode: false,
         plan: "semestral",
         amount: 77.4,
         registration_id: registrationId,
         email: correctedEmail,
         status: "succeeded",
-        qr_payload: "000201",
-        expires_at: new Date(Date.now() + 1_800_000).toISOString(),
         paid_at: new Date().toISOString(),
       });
     assert.ifError(paymentError);
@@ -1488,12 +1486,46 @@ Deno.test({
     assert.ifError(adminSignInError);
     const token = adminSession.session!.access_token;
 
+    // Grupo (profesor) con un curso en la institución: es lo que fija la
+    // invitación y de donde salen la institución y la inscripción.
+    const teacherEmail = `teacher.${suffix}@example.com`;
+    const { data: teacherUser, error: teacherError } = await adminClient.auth
+      .admin.createUser({
+        email: teacherEmail,
+        password: "Teacher1234",
+        email_confirm: true,
+      });
+    assert.ifError(teacherError);
+    const teacherId = created.user(teacherUser.user.id);
+    const { error: teacherProfileError } = await adminClient
+      .from(TABLES.profiles)
+      .insert({
+        id: teacherId,
+        college_id: college.id,
+        role: "teacher",
+        user_code: `TEACHER-INV-${suffix}`,
+        full_name: "Profesor Invitaciones",
+        is_active: true,
+      });
+    assert.ifError(teacherProfileError);
+    const { data: teacherCourse, error: teacherCourseError } = await adminClient
+      .from(TABLES.courses)
+      .insert({
+        college_id: college.id,
+        teacher_id: teacherId,
+        name: `Curso invitaciones ${suffix}`,
+        created_by: teacherId,
+      })
+      .select("id")
+      .single();
+    assert.ifError(teacherCourseError);
+
     // Solo el administrador invita, y no a un correo que ya tiene cuenta.
     await call("invitations", { method: "GET" }, 401);
     const studentEmail = `invitada.${suffix}@example.com`;
     const invitationBody = {
       email: studentEmail.toUpperCase(),
-      college_id: college.id,
+      teacher_id: teacherId,
       access_valid_from: "2026-01-01",
       access_valid_until: "2099-12-31",
     };
@@ -1515,9 +1547,11 @@ Deno.test({
     const invitation = createdInvitation.invitation as {
       id: string;
       email: string;
+      teacher_name: string;
       college_name: string;
     };
     assert.equal(invitation.email, studentEmail);
+    assert.equal(invitation.teacher_name, "Profesor Invitaciones");
     assert.equal(invitation.college_name, `Invitaciones ${suffix}`);
     const listed = await call("invitations", { method: "GET", token });
     assert.ok(
@@ -1564,13 +1598,19 @@ Deno.test({
     assert.deepEqual(
       {
         email: (checked.invitation as { email: string }).email,
+        teacher: (checked.invitation as { teacher_name: string }).teacher_name,
         college: (checked.invitation as { college_name: string }).college_name,
       },
-      { email: studentEmail, college: `Invitaciones ${suffix}` },
+      {
+        email: studentEmail,
+        teacher: "Profesor Invitaciones",
+        college: `Invitaciones ${suffix}`,
+      },
     );
 
     const form = {
       code: linkCode,
+      teacher_id: teacherId,
       given_names: "Lucía",
       family_names: "Mamani",
       phone: "987654321",
@@ -1615,6 +1655,14 @@ Deno.test({
         access_valid_until: "2099-12-31",
       },
     );
+    // La institución sale del grupo y el estudiante queda inscrito en su curso.
+    const { count: enrollmentCount, error: enrollmentError } = await adminClient
+      .from(TABLES.courseEnrollments)
+      .select("*", { count: "exact", head: true })
+      .eq("course_id", teacherCourse.id)
+      .eq("student_id", student.id);
+    assert.ifError(enrollmentError);
+    assert.equal(enrollmentCount, 1);
     // El link se borró al usarse.
     await call("student-invitation", { body: form }, 404);
     const { count: leftover } = await adminClient

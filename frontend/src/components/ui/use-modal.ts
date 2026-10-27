@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 
-export type ModalVariant = "delete" | "create" | "warning";
+export type ModalVariant = "delete" | "create" | "warning" | "info";
 export interface ModalOptions {
   title: string;
   body: ReactNode;
@@ -13,16 +13,25 @@ export interface ModalOptions {
   /** Texto del botón principal; por defecto "Eliminar", "Crear" o "Confirmar". */
   confirmLabel?: string;
 }
+/** Modal informativo: solo un botón para cerrarlo, sin acción que confirmar. */
+export interface InfoModalOptions {
+  title: string;
+  body: ReactNode;
+  /** Texto del botón para cerrar; por defecto "Entendido". */
+  confirmLabel?: string;
+}
 export interface ModalApi {
   delete: (options: ModalOptions) => void;
   create: (options: ModalOptions) => void;
   /** Advierte antes de una acción que afecta directamente a otra persona. */
   warning: (options: ModalOptions) => void;
+  /** Muestra indicaciones o ayuda; se cierra con un solo botón. */
+  info: (options: InfoModalOptions) => void;
 }
 
 export const ModalContext = createContext<ModalApi | null>(null);
 
-/** Abre modales de eliminación, de creación o de advertencia; requiere ModalProvider en un nivel superior. */
+/** Abre modales de eliminación, de creación, de advertencia o informativos; requiere ModalProvider en un nivel superior. */
 export function useModal(): ModalApi {
   const api = useContext(ModalContext);
   if (!api) throw new Error("useModal debe usarse dentro de ModalProvider.");

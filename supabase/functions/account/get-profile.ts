@@ -1,7 +1,7 @@
 import { requireProfile } from "../_shared/auth.ts";
 import { json } from "../_shared/errors.ts";
 import type { EdgeContext } from "../_shared/types.ts";
-import { loadStudentProfile } from "./profile.ts";
+import { loadStudentProfile } from "../_shared/student-profile.ts";
 
 /**
  * GET /account/profile

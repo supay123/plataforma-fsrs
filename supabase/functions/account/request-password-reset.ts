@@ -3,7 +3,7 @@ import { AppError, json } from "../_shared/errors.ts";
 import { sendPasswordResetLink } from "../_shared/password-reset-link.ts";
 import { maskEmail } from "../_shared/registration.ts";
 import type { EdgeContext } from "../_shared/types.ts";
-import { loadStudentProfile } from "./profile.ts";
+import { loadStudentProfile } from "../_shared/student-profile.ts";
 
 /**
  * POST /account/password-reset

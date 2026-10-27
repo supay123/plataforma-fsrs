@@ -4,7 +4,7 @@ import { AppError, json, readJson } from "../_shared/errors.ts";
 import { parseStudentProfile } from "../_shared/registration.ts";
 import type { EdgeContext } from "../_shared/types.ts";
 import type { UpdateProfileBody } from "./interfaces.ts";
-import { loadStudentProfile } from "./profile.ts";
+import { loadStudentProfile } from "../_shared/student-profile.ts";
 
 /**
  * PUT /account/profile

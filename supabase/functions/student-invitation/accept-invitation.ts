@@ -1,4 +1,4 @@
-import { RPCS, TABLES } from "../_shared/database.constants.ts";
+import { RPCS } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
 import { invalidInvitation } from "../_shared/invitations.ts";
 import { freeUserCode } from "../_shared/registration-activation.ts";
@@ -7,16 +7,56 @@ import {
   parseStudentProfile,
 } from "../_shared/registration.ts";
 import type { EdgeContext } from "../_shared/types.ts";
+import { optionalUuid } from "../_shared/validation.ts";
 import type { AcceptInvitationBody } from "./interfaces.ts";
 import { findValidInvitation } from "./find-invitation.ts";
 
 const CODE_ATTEMPTS = 3;
 
+/** Traduce los errores de la RPC a la respuesta que espera el formulario. */
+function invitationFailure(error: {
+  message?: string;
+  code?: string;
+}): AppError {
+  const message = error.message ?? "";
+  if (message.includes("invalid_invitation")) return invalidInvitation();
+  if (message.includes("teacher_required")) {
+    return new AppError(
+      400,
+      "teacher_required",
+      "Select your group.",
+      { field: "teacher_id" },
+    );
+  }
+  if (message.includes("invalid_teacher")) {
+    return new AppError(
+      400,
+      "invalid_teacher",
+      "Select a valid group.",
+      { field: "teacher_id" },
+    );
+  }
+  if (message.includes("profiles_email_unique_ci")) {
+    return new AppError(
+      409,
+      "email_taken",
+      "The email already has an account.",
+    );
+  }
+  return new AppError(
+    500,
+    "invitation_failed",
+    message || "Unable to create the account.",
+  );
+}
+
 /**
  * POST /student-invitation
- * El estudiante completa sus datos y crea su cuenta con el correo, la
- * institución y el periodo que fijó el administrador. El link se borra al
- * usarse; si algo falla, se restaura para poder intentarlo otra vez.
+ * El estudiante completa sus datos y crea su cuenta con el correo y el periodo
+ * que fijó el administrador. El grupo lo fija el administrador o lo elige el
+ * estudiante; la institución y los cursos salen de ese profesor. La RPC consume
+ * la invitación, crea el perfil y matricula al estudiante en una sola
+ * transacción.
  */
 export async function acceptInvitation(
   request: Request,
@@ -35,6 +75,17 @@ export async function acceptInvitation(
     );
   }
   const invitation = await findValidInvitation(context, body.code);
+  const chosenTeacherId = optionalUuid(body.teacher_id, "teacher_id");
+
+  // Si la invitación no trae grupo, el estudiante debe elegir uno.
+  if (!invitation.teacher_id && !chosenTeacherId) {
+    throw new AppError(
+      400,
+      "teacher_required",
+      "Select your group.",
+      { field: "teacher_id" },
+    );
+  }
 
   const { data: inUse, error: inUseError } = await context.supabaseAdmin.rpc(
     RPCS.emailInUse,
@@ -47,23 +98,6 @@ export async function acceptInvitation(
     throw new AppError(409, "email_taken", "The email already has an account.");
   }
 
-  // Se consume borrando la fila; si llegan dos pedidos a la vez, solo uno la
-  // encuentra.
-  const { data: consumed, error: consumeError } = await context.supabaseAdmin
-    .from(TABLES.studentInvitations)
-    .delete()
-    .eq("id", invitation.id)
-    .select(
-      "id,email,college_id,access_valid_from,access_valid_until,code_hash,expires_at,invited_by,created_at",
-    )
-    .maybeSingle();
-  if (consumeError) {
-    throw new AppError(500, "invitation_failed", consumeError.message);
-  }
-  if (!consumed) throw invalidInvitation();
-  const restoreInvitation = () =>
-    context.supabaseAdmin.from(TABLES.studentInvitations).insert(consumed);
-
   const { data: created, error: createError } = await context.supabaseAdmin
     .auth.admin.createUser({
       email: invitation.email,
@@ -72,7 +106,6 @@ export async function acceptInvitation(
       app_metadata: { role: "student" },
     });
   if (createError || !created.user) {
-    await restoreInvitation();
     throw new AppError(
       400,
       "auth_user_creation_failed",
@@ -82,44 +115,30 @@ export async function acceptInvitation(
 
   let lastError: { message: string; code?: string } | null = null;
   for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
-    const { error } = await context.supabaseAdmin.from(TABLES.profiles).insert({
-      id: created.user.id,
-      college_id: invitation.college_id,
-      role: "student",
-      user_code: await freeUserCode(context.supabaseAdmin, invitation.email),
-      // El trigger de profiles compone full_name con nombres y apellidos.
-      full_name: `${profile.given_names} ${profile.family_names}`,
-      ...profile,
-      email: invitation.email,
-      is_active: true,
-      access_valid_from: invitation.access_valid_from,
-      access_valid_until: invitation.access_valid_until,
-      created_by: invitation.invited_by,
-    });
-    if (!error) {
-      const { error: auditError } = await context.supabaseAdmin
-        .from(TABLES.auditLogs)
-        .insert({
-          actor_user_id: created.user.id,
-          college_id: invitation.college_id,
-          action: "invitation.accepted",
-          entity_type: "profile",
-          entity_id: created.user.id,
-          metadata: {},
-        });
-      if (auditError) console.error("Audit log insert failed", auditError);
-      return json({ status: "accepted" }, 201);
-    }
+    const { error } = await context.supabaseAdmin.rpc(
+      RPCS.acceptStudentInvitation,
+      {
+        p_invitation_id: invitation.id,
+        p_user_id: created.user.id,
+        p_teacher_id: invitation.teacher_id ?? chosenTeacherId,
+        p_user_code: await freeUserCode(
+          context.supabaseAdmin,
+          invitation.email,
+        ),
+        p_given_names: profile.given_names,
+        p_family_names: profile.family_names,
+        p_email: invitation.email,
+        p_phone: profile.phone,
+        p_identity_document_type: profile.identity_document_type,
+        p_identity_document_number: profile.identity_document_number,
+      },
+    );
+    if (!error) return json({ status: "accepted" }, 201);
     lastError = error;
-    // Solo se reintenta si otra cuenta tomó el mismo código a la vez.
+    // Solo se reintenta si otro perfil tomó el mismo código a la vez.
     if (error.code !== "23505") break;
   }
 
   await context.supabaseAdmin.auth.admin.deleteUser(created.user.id);
-  await restoreInvitation();
-  throw new AppError(
-    500,
-    "invitation_failed",
-    lastError?.message ?? "Unable to create the account.",
-  );
+  throw invitationFailure(lastError ?? {});
 }

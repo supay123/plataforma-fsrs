@@ -171,7 +171,7 @@ export function passwordResetEmail(
 
 export function invitationEmail(
   to: string,
-  collegeName: string,
+  inviter: { teacher_name?: string | null; college_name?: string | null },
   link: string,
   expiresAt: string,
 ): EmailMessage {
@@ -179,21 +179,30 @@ export function invitationEmail(
     dateStyle: "long",
     timeZone: "America/Lima",
   }).format(new Date(expiresAt));
-  const subject = `${collegeName} te invita a Chancón`;
+  // El grupo (profesor) es lo que ve el estudiante en el autoservicio; si la
+  // invitación es antigua, se usa la institución.
+  const inviterName = inviter.teacher_name ?? inviter.college_name ?? null;
+  const subject = "Te invitaron a Chancón";
+  const intro = inviterName
+    ? `Te invitaron al grupo de ${inviterName} a usar Chancón para practicar y repasar.`
+    : "Te invitaron a usar Chancón para practicar y repasar.";
   const text = [
     "Hola:",
     "",
-    `${collegeName} te invitó a usar Chancón para practicar y repasar.`,
+    intro,
     "Para crear tu cuenta, abre este link y completa tus datos:",
     link,
     "",
     `La invitación vence el ${deadline} y solo se puede usar una vez.`,
     "Si no esperabas esta invitación, ignora este correo.",
   ].join("\n");
+  const introHtml = inviterName
+    ? `<p> Te invitaron al grupo de 
+    <strong>${escapeHtml(inviterName)}</strong> 
+    a usar Chancón para practicar y repasar.</p>`
+    : "<p>Te invitaron a usar Chancón para practicar y repasar.</p>";
   const html = `<p>Hola:</p>
-<p><strong>${
-    escapeHtml(collegeName)
-  }</strong> te invitó a usar Chancón para practicar y repasar.</p>
+${introHtml}
 <p><a href="${
     escapeHtml(link)
   }" style="display:inline-block;padding:12px 20px;border-radius:12px;background:#4f46e5;color:#ffffff;font-weight:bold;text-decoration:none">Crear mi cuenta</a></p>
