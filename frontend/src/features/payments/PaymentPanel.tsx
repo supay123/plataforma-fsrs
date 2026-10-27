@@ -1,10 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, KeyRound, LoaderCircle, MessageCircle, Smartphone } from "lucide-react";
+import { CheckCircle2, CircleHelp, KeyRound, LoaderCircle, MessageCircle, Smartphone } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Alert, Button, Field, Input } from "../../components/ui";
+import { useModal } from "../../components/ui/use-modal";
 import { useToast } from "../../components/ui/use-toast";
 import { BUSINESS, formatSoles, type Plan, type PlanId } from "../../config/business";
 import { normalizeError, type AppError } from "../../lib/api/errors";
@@ -42,6 +43,19 @@ function WhatsAppLink({ children }: { children: string }) {
   return <a href={`https://wa.me/${BUSINESS.whatsapp}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 font-semibold text-white hover:bg-indigo-500"><MessageCircle size={18} />{children}</a>;
 }
 
+/** Indicaciones para encontrar el código de aprobación en la app de Yape. */
+function ApprovalCodeHelp() {
+  return <div className="grid gap-4">
+    <ol className="grid list-decimal gap-1 pl-5">
+      <li>Abre tu app de Yape y entra a <strong>Aprobar compras</strong>.</li>
+      <li>En <strong>Código de aprobación</strong> verás 6 dígitos. Tócalo para copiarlo.</li>
+      <li>Vuelve aquí, escríbelo junto con tu celular y paga antes de que termine el contador.</li>
+    </ol>
+    <img src="/image/codigo-yape.webp" alt="Pantalla Aprobar compras de Yape con el código de aprobación de 6 dígitos" className="mx-auto max-h-80 w-auto rounded-2xl" />
+    <p className="text-xs text-slate-500">No compartas este código con nadie: escríbelo solo en este formulario.</p>
+  </div>;
+}
+
 interface PaymentPanelProps {
   plan: Plan;
   /** Cobra el plan con el token de Yape y su celular (registro o renovación). */
@@ -59,6 +73,7 @@ interface PaymentPanelProps {
  */
 export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavailableNote }: PaymentPanelProps) {
   const toast = useToast();
+  const modal = useModal();
   const config = useQuery({ queryKey: ["payment-config"], queryFn: getPaymentConfig, retry: false, staleTime: Infinity, refetchOnWindowFocus: false });
   const [payment, setPayment] = useState<PlanPaymentState | null>(null);
   const inProcess = payment?.status === "pending" || payment?.status === "processing";
@@ -115,16 +130,28 @@ export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavail
 
   return <form onSubmit={submit} className="grid gap-4" noValidate>
     {(status === "failed" || status === "cancelled") && <Alert tone="error">{rejectionMessage(current?.status_detail ?? null)}</Alert>}
-    <div>
-      <p className="text-sm text-slate-500">Total a pagar · {plan.months} {plan.months === 1 ? "mes" : "meses"} de acceso</p>
-      <p className="text-2xl font-bold text-slate-950">{formatSoles(plan.priceSoles)}</p>
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm text-slate-500">Total a pagar · {plan.months} {plan.months === 1 ? "mes" : "meses"} de acceso</p>
+        <p className="text-2xl font-bold text-slate-950">{formatSoles(plan.priceSoles)}</p>
+      </div>
+      <img src="/image/yape-logo.svg" alt="Paga con Yape" className="h-11 w-auto shrink-0 rounded-xl" />
     </div>
-    <p className="text-sm text-slate-600">Paga con <strong>Yape</strong>: en tu app de Yape busca <strong>Código de aprobación</strong> y escribe aquí los 6 dígitos junto con tu celular. El código dura poco, así que genéralo justo antes de pagar.</p>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Celular de Yape" error={errors.phone?.message}><Input icon={<Smartphone size={20} />} type="tel" inputMode="numeric" autoComplete="tel" placeholder="987654321" {...register("phone")} /></Field>
-      <Field label="Código de aprobación" error={errors.otp?.message}><Input icon={<KeyRound size={20} />} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" {...register("otp")} /></Field>
+      {/* La ayuda va junto al título del campo, pero fuera del <label> para no volverse su control. */}
+      <div className="grid content-start gap-1.5">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span aria-hidden className="font-medium text-slate-700">Código de aprobación</span>
+          <button type="button" aria-label="¿Dónde está el código de aprobación?" className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800"
+            onClick={() => modal.info({ title: "¿Dónde encuentro mi código?", body: <ApprovalCodeHelp /> })}>
+            <CircleHelp size={16} aria-hidden />¿Dónde está?
+          </button>
+        </div>
+        <Field label="Código de aprobación" hideLabel error={errors.otp?.message}><Input icon={<KeyRound size={20} />} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" {...register("otp")} /></Field>
+      </div>
     </div>
     <Button type="submit" disabled={isSubmitting || config.isPending}>{isSubmitting ? "Procesando pago…" : `Pagar ${formatSoles(plan.priceSoles)} con Yape`}</Button>
-    <p className="text-xs text-slate-500">El pago lo procesa Mercado Pago. Chancón no recibe ni guarda tu código de aprobación.</p>
+    <p className="text-center text-xs text-slate-500">Pago procesado por Mercado Pago. Chancón no guarda tu código.</p>
   </form>;
 }

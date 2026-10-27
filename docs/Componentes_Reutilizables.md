@@ -23,7 +23,8 @@ toast y el modal, que tienen archivos propios (ver abajo).
 - **Alert**: información que debe quedarse visible dentro de la página o el
   formulario (por ejemplo, "Agrega un correo a tu perfil...").
 - **Modal** (`useModal`): confirmar una acción antes de hacerla, sobre todo si
-  no se puede deshacer.
+  no se puede deshacer. La variante `info` muestra indicaciones o ayuda que no
+  caben en la página (por ejemplo, dónde encontrar el código de Yape).
 - Los errores de un campo concreto van debajo del campo, con la prop `error`
   de `Field`.
 
@@ -53,13 +54,14 @@ En tests, envuelve el componente con `<ToastProvider>`.
 
 ## Modal
 
-Ventana de confirmación con título y cuerpo. Tiene tres variantes:
+Ventana con título y cuerpo. Tiene cuatro variantes:
 
 | Método | Botón principal | Uso |
 | --- | --- | --- |
 | `modal.delete(opciones)` | Rojo, "Eliminar" | Acciones destructivas. |
 | `modal.create(opciones)` | Morado, "Crear" | Crear o confirmar algo. |
 | `modal.warning(opciones)` | Ámbar, "Confirmar" (con ícono de advertencia) | Acciones que afectan directamente a otro usuario (cambiar sus datos, su credencial o su vigencia). |
+| `modal.info({ title, body, confirmLabel? })` | Morado, "Entendido" (sin "Cancelar") | Indicaciones o ayuda; no ejecuta ninguna acción, solo se cierra. |
 
 - Archivos: `components/ui/modal.tsx` (`ModalProvider`) y
   `components/ui/use-modal.ts` (`useModal`).
@@ -97,7 +99,8 @@ modal.delete({
 ```
 
 Ejemplos reales: `pages/admin/CollegesPage.tsx`, `UsersPage.tsx`,
-`AssignmentsPage.tsx` y `UserAccountPage.tsx` (variante `warning`). En tests, envuelve el componente con `<ModalProvider>`.
+`AssignmentsPage.tsx`, `UserAccountPage.tsx` (variante `warning`) y
+`features/payments/PaymentPanel.tsx` (variante `info`). En tests, envuelve el componente con `<ModalProvider>`.
 
 ---
 

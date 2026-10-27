@@ -7,6 +7,7 @@ const VARIANTS: Record<ModalVariant, { confirmLabel: string; pendingLabel: strin
   delete: { confirmLabel: "Eliminar", pendingLabel: "Eliminando…", buttonVariant: "danger" },
   create: { confirmLabel: "Crear", pendingLabel: "Creando…", buttonVariant: "primary" },
   warning: { confirmLabel: "Confirmar", pendingLabel: "Aplicando…", buttonVariant: "warning" },
+  info: { confirmLabel: "Entendido", pendingLabel: "Entendido", buttonVariant: "primary" },
 };
 
 interface OpenModal extends ModalOptions { id: number; variant: ModalVariant }
@@ -14,6 +15,7 @@ interface OpenModal extends ModalOptions { id: number; variant: ModalVariant }
 function ModalDialog({ modal, onClose }: { modal: OpenModal; onClose: () => void }) {
   const [pending, setPending] = useState(false);
   const variant = VARIANTS[modal.variant];
+  const informative = modal.variant === "info";
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -43,8 +45,8 @@ function ModalDialog({ modal, onClose }: { modal: OpenModal; onClose: () => void
       </h2>
       <div className="mt-3 text-sm leading-6 text-slate-600">{modal.body}</div>
       <div className="mt-6 flex justify-end gap-3">
-        <Button autoFocus type="button" variant="secondary" disabled={pending} onClick={onClose}>Cancelar</Button>
-        <Button type="button" variant={variant.buttonVariant} disabled={pending} onClick={() => void confirm()}>
+        {!informative && <Button autoFocus type="button" variant="secondary" disabled={pending} onClick={onClose}>Cancelar</Button>}
+        <Button autoFocus={informative} type="button" variant={variant.buttonVariant} disabled={pending} onClick={() => void confirm()}>
           {pending ? variant.pendingLabel : modal.confirmLabel ?? variant.confirmLabel}
         </Button>
       </div>
@@ -52,7 +54,7 @@ function ModalDialog({ modal, onClose }: { modal: OpenModal; onClose: () => void
   </div>;
 }
 
-/** Modales de eliminación, de creación y de advertencia con título y cuerpo; se abren con useModal(). */
+/** Modales de eliminación, de creación, de advertencia e informativos con título y cuerpo; se abren con useModal(). */
 export function ModalProvider({ children }: { children: ReactNode }) {
   const [modal, setModal] = useState<OpenModal | null>(null);
   const nextId = useRef(0);
@@ -61,6 +63,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     delete: (options) => setModal({ ...options, id: ++nextId.current, variant: "delete" }),
     create: (options) => setModal({ ...options, id: ++nextId.current, variant: "create" }),
     warning: (options) => setModal({ ...options, id: ++nextId.current, variant: "warning" }),
+    info: (options) => setModal({ ...options, onConfirm: () => undefined, id: ++nextId.current, variant: "info" }),
   }), []);
 
   return <ModalContext.Provider value={api}>

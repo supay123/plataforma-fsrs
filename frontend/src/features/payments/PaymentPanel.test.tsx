@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PLAN, SEMESTER_PLAN, type Plan } from "../../config/business";
+import { ModalProvider } from "../../components/ui/modal";
 import { ToastProvider } from "../../components/ui/toast";
 import { AppError } from "../../lib/api/errors";
 import { PaymentPanel } from "./PaymentPanel";
@@ -21,14 +22,14 @@ function payment(status: string, overrides: Record<string, unknown> = {}) {
 
 function renderPanel(plan: Plan = PLAN) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}><ToastProvider>
+  return render(<QueryClientProvider client={queryClient}><ToastProvider><ModalProvider>
     <PaymentPanel plan={plan} createPayment={createPayment} fetchStatus={fetchStatus} onPaid={onPaid} unavailableNote="Guardamos tus datos 24 horas." />
-  </ToastProvider></QueryClientProvider>);
+  </ModalProvider></ToastProvider></QueryClientProvider>);
 }
 
 async function pay(user: ReturnType<typeof userEvent.setup>, phone = "111111111", otp = "123456") {
   if (phone) await user.type(await screen.findByLabelText("Celular de Yape"), phone);
-  await user.type(screen.getByLabelText("Código de aprobación"), otp);
+  await user.type(screen.getByLabelText(/^Código de aprobación/), otp);
   await user.click(screen.getByRole("button", { name: /con Yape/ }));
 }
 
@@ -46,10 +47,23 @@ describe("PaymentPanel", () => {
     const user = userEvent.setup();
     renderPanel(SEMESTER_PLAN);
     expect(await screen.findByText("S/ 77.40")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Paga con Yape" })).toHaveAttribute("src", "/image/yape-logo.svg");
     await pay(user, "+51 111 111 111");
     expect(mocks.createYapeToken).toHaveBeenCalledWith("TEST-public-key", "111111111", "123456");
     expect(createPayment).toHaveBeenCalledWith("semestral", { token: "yape-token-1", phone: "111111111" });
     await waitFor(() => expect(onPaid).toHaveBeenCalledTimes(1));
+  });
+
+  it("explains where to find the approval code in a modal", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "¿Dónde está el código de aprobación?" }));
+    const dialog = screen.getByRole("dialog", { name: "¿Dónde encuentro mi código?" });
+    expect(dialog).toHaveTextContent("Aprobar compras");
+    expect(screen.getByRole("img", { name: /código de aprobación/ })).toHaveAttribute("src", "/image/codigo-yape.webp");
+    expect(screen.queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Entendido" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("validates the phone and the 6-digit approval code before charging", async () => {
@@ -67,7 +81,7 @@ describe("PaymentPanel", () => {
     renderPanel();
     await pay(user);
     expect(await screen.findByText(/El código de aprobación ya se usó o venció/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Código de aprobación")).toHaveValue("");
+    expect(screen.getByLabelText(/^Código de aprobación/)).toHaveValue("");
     await pay(user, "", "654321");
     await waitFor(() => expect(createPayment).toHaveBeenCalledTimes(2));
   });

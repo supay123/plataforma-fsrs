@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ModalProvider } from "../../components/ui/modal";
 import { ToastProvider } from "../../components/ui/toast";
 import { AppError } from "../../lib/api/errors";
 import { SignUpPage } from "./SignUpPage";
@@ -35,10 +36,10 @@ function CurrentLocation() {
 
 function renderPage(path = "/estudiante/sign-up") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}><ToastProvider><MemoryRouter initialEntries={[path]}><Routes>
+  return render(<QueryClientProvider client={queryClient}><ToastProvider><ModalProvider><MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/estudiante/sign-up" element={<SignUpPage />} />
     <Route path="*" element={<CurrentLocation />} />
-  </Routes></MemoryRouter></ToastProvider></QueryClientProvider>);
+  </Routes></MemoryRouter></ModalProvider></ToastProvider></QueryClientProvider>);
 }
 
 /** Llena los datos, verifica el correo y paga con Yape. */
@@ -49,7 +50,7 @@ async function signUpAndPay(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText("Código de verificación"), "123456");
   await user.click(screen.getByRole("button", { name: "Verificar correo" }));
   await user.type(await screen.findByLabelText("Celular de Yape"), "111111111");
-  await user.type(screen.getByLabelText("Código de aprobación"), "123456");
+  await user.type(screen.getByLabelText(/^Código de aprobación/), "123456");
   await user.click(screen.getByRole("button", { name: /Pagar S\/ 14.90 con Yape/ }));
 }
 
@@ -143,7 +144,7 @@ describe("SignUpPage", () => {
     await waitFor(() => expect(mocks.validateRegistrationCode).toHaveBeenCalledWith("registration-1", "123456"));
     expect(await screen.findByText("S/ 14.90")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Celular de Yape"), "111111111");
-    await user.type(screen.getByLabelText("Código de aprobación"), "123456");
+    await user.type(screen.getByLabelText(/^Código de aprobación/), "123456");
     await user.click(screen.getByRole("button", { name: /Pagar S\/ 14.90 con Yape/ }));
     await waitFor(() => expect(mocks.createRegistrationPayment).toHaveBeenCalledWith("registration-1", "mensual", { token: "yape-token-1", phone: "111111111" }));
     expect(mocks.createYapeToken).toHaveBeenCalledWith("TEST-public-key", "111111111", "123456");

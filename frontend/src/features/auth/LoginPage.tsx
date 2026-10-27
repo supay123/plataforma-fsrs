@@ -64,9 +64,7 @@ export function LoginPage({ role }: { role: AppRole }) {
             <Field label="Contraseña" error={errors.password?.message}><PasswordInput autoComplete="current-password" icon={<LockKeyhole size={20} />} placeholder="Contraseña" {...register("password")} /></Field>
             <Button disabled={isSubmitting}>{isSubmitting ? "Ingresando…" : "Ingresar"}</Button>
             <button type="button" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800" onClick={() => { setError(""); setRecovering(true); }}>¿Olvidaste tu contraseña?</button>
-            {role === "student" && <p className="text-center text-sm text-slate-600">¿No tienes una cuenta? <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante/sign-up">Regístrate</Link></p>}
-            {auth.session && <Button type="button" variant="secondary" onClick={() => void auth.logout()}>Cerrar sesión guardada</Button>}
-          </form>
+            {role === "student" && <p className="text-center text-sm text-slate-600">¿No tienes una cuenta? <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante/sign-up">Regístrate</Link></p>}          </form>
         </>}
   </AuthLayout>;
 }
