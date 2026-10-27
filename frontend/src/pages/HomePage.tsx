@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Logo } from "../components/layout/Logo";
 import { PublicFooter } from "../components/layout/PublicLayout";
-import { BUSINESS, PLAN, SEMESTER_PLAN, formatSoles } from "../config/business";
+import { BUSINESS, PLAN, formatSoles } from "../config/business";
 import { useAuth } from "../features/auth/AuthProvider";
 import { PlanCards } from "../features/payments/PlanCards";
 // El video intenta empezar con sonido; si el navegador lo bloquea, sigue en
