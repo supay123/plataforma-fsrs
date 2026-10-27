@@ -214,17 +214,19 @@ Los tipos de documento (`DNI`, `CE`, `PASAPORTE`, `RUC`) están en
 
 ## Pagos de planes (`features/payments/`)
 
-Cobros con Kuti para el registro y la renovación. El monto lo fija el servidor
-según el plan; el navegador solo dice qué plan eligió.
+Pagos con Yape a través de Mercado Pago para el registro y la renovación. El
+monto lo fija el servidor según el plan; el navegador solo dice qué plan eligió
+y envía el token de Yape.
 
 | Archivo | Qué ofrece |
 | --- | --- |
 | `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. El semestral lleva siempre borde dorado, igual que su tarjeta en el home. |
 | `PlanCards.tsx` | Tarjetas grandes de los dos planes con sus beneficios y el botón «Elegir …» (con destello y leve crecimiento al pasar el mouse por el botón) que lleva al registro con ese plan. El semestral tiene borde dorado animado (`animate-orbit`), repite los beneficios del Plan Estudiante y resalta aparte sus extras. Se usan en el home (sección «Elige tu plan»); acepta `className` para el margen. |
-| `PaymentPanel.tsx` | Cobro de un plan: QR, código de pago de servicios (si el monto lo permite), cuenta regresiva y espera de la confirmación. Recibe `createPayment`, `fetchStatus`, `simulatePayment` y `onPaid`, así sirve para el registro y la renovación. En modo prueba muestra el botón «Simular pago». Sin Kuti configurado muestra el contacto por WhatsApp. |
+| `PaymentPanel.tsx` | Pago de un plan con Yape: pide el celular y el código de aprobación de la app de Yape, genera el token, cobra y espera a que se aplique. Explica los rechazos de Mercado Pago y deja reintentar con un código nuevo. Recibe `createPayment(plan, { token, phone })`, `fetchStatus` y `onPaid`, así sirve para el registro y la renovación. Sin Mercado Pago configurado muestra el contacto por WhatsApp. |
 | `PlanExpiryBanner.tsx` | Aviso en el portal del estudiante cuando a su plan le quedan `RENEWAL_NOTICE_DAYS` días o menos. |
-| `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos que Kuti confirmó pero no se pudieron aplicar. Solo aparece si hay alguno. |
-| `api.ts` | `createRenewalPayment`, `getRenewalPaymentStatus`, `listPaymentsToReview`, `resolvePayment` y los tipos `PlanPayment` y `PlanPaymentStatus`. Los cobros del registro están en `features/registration/api.ts`. |
+| `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos confirmados que no se pudieron aplicar (de Mercado Pago o, los antiguos, de Kuti). Solo aparece si hay alguno. |
+| `yape.ts` | `createYapeToken(publicKey, celular, otp)`: carga el SDK de Mercado Pago y devuelve el token de un solo uso. |
+| `api.ts` | `getPaymentConfig` (Public Key), `createRenewalPayment`, `getRenewalPaymentStatus`, `listPaymentsToReview`, `resolvePayment` y los tipos `PlanPaymentState` y `PlanPaymentStatus`. Los cobros del registro están en `features/registration/api.ts`. |
 
 Los planes y precios están en `config/business.ts` (`PLANS`, `findPlan`,
 `planPriceLabel`) y deben coincidir con `supabase/functions/_shared/plans.ts`.

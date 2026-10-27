@@ -1,9 +1,10 @@
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
-import { peruvianPhone } from "../_shared/kuti.ts";
 import {
   createPlanPayment,
   paymentResponse,
+  yapePhone,
+  yapeToken,
 } from "../_shared/plan-payments.ts";
 import { planId } from "../_shared/plans.ts";
 import type { EdgeContext } from "../_shared/types.ts";
@@ -12,9 +13,9 @@ import type { CreatePaymentBody } from "./interfaces.ts";
 
 /**
  * POST /registration/payment
- * Crea el cobro del plan elegido para un registro con el correo verificado.
- * El monto sale del plan, nunca del navegador. Si ya hay un cobro vigente del
- * mismo plan lo devuelve; si cambió de plan, anula el anterior.
+ * Cobra con Yape el plan elegido para un registro con el correo verificado.
+ * El monto sale del plan, nunca del navegador. Si el pago se aprueba, la
+ * cuenta se activa en el acto.
  */
 export async function createPayment(
   request: Request,
@@ -23,12 +24,12 @@ export async function createPayment(
   const body = await readJson<CreatePaymentBody>(request);
   const registrationId = uuid(body.registration_id, "registration_id");
   const plan = planId(body.plan);
+  const token = yapeToken(body.token);
+  const phone = yapePhone(body.phone);
 
   const { data: registration, error } = await context.supabaseAdmin
     .from(TABLES.studentRegistrations)
-    .select(
-      "id,given_names,family_names,email,phone,email_verified_at,expires_at",
-    )
+    .select("id,email,email_verified_at,expires_at")
     .eq("id", registrationId)
     .maybeSingle();
   if (error) {
@@ -53,12 +54,8 @@ export async function createPayment(
     owner: { column: "registration_id", id: registrationId },
     plan,
     email: registration.email,
-    customer: {
-      first_name: registration.given_names,
-      last_name: registration.family_names,
-      email: registration.email,
-      phone: peruvianPhone(registration.phone),
-    },
+    token,
+    phone,
   });
   return json(paymentResponse(payment), 201);
 }

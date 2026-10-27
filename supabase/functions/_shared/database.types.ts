@@ -786,65 +786,59 @@ export type Database = {
         Row: {
           amount: number;
           applied_at: string | null;
-          bank_code: string | null;
-          checkout_url: string | null;
           created_at: string;
           email: string | null;
-          expires_at: string;
           id: string;
-          kuti_payment_intent_id: string;
           livemode: boolean;
           paid_at: string | null;
           period_end: string | null;
           period_start: string | null;
           plan: string;
           profile_id: string | null;
-          qr_payload: string;
+          provider: string;
+          provider_payment_id: string | null;
           registration_id: string | null;
           resolved_at: string | null;
           status: string;
+          status_detail: string | null;
         };
         Insert: {
           amount: number;
           applied_at?: string | null;
-          bank_code?: string | null;
-          checkout_url?: string | null;
           created_at?: string;
           email?: string | null;
-          expires_at: string;
           id: string;
-          kuti_payment_intent_id: string;
           livemode: boolean;
           paid_at?: string | null;
           period_end?: string | null;
           period_start?: string | null;
           plan: string;
           profile_id?: string | null;
-          qr_payload: string;
+          provider?: string;
+          provider_payment_id?: string | null;
           registration_id?: string | null;
           resolved_at?: string | null;
           status?: string;
+          status_detail?: string | null;
         };
         Update: {
           amount?: number;
           applied_at?: string | null;
-          bank_code?: string | null;
-          checkout_url?: string | null;
           created_at?: string;
           email?: string | null;
-          expires_at?: string;
           id?: string;
-          kuti_payment_intent_id?: string;
           livemode?: boolean;
           paid_at?: string | null;
           period_end?: string | null;
           period_start?: string | null;
           plan?: string;
           profile_id?: string | null;
-          qr_payload?: string;
+          provider?: string;
+          provider_payment_id?: string | null;
           registration_id?: string | null;
           resolved_at?: string | null;
           status?: string;
+          status_detail?: string | null;
         };
         Relationships: [
           {
@@ -1284,6 +1278,84 @@ export type Database = {
           {
             foreignKeyName: "student_invitations_teacher_id_fkey";
             columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["student_id"];
+          },
+          {
+            foreignKeyName: "student_invitations_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["teacher_id"];
+          },
+        ];
+      };
+      student_progress_purges: {
+        Row: {
+          course_id: string;
+          created_at: string;
+          purge_after: string;
+          student_id: string;
+        };
+        Insert: {
+          course_id: string;
+          created_at?: string;
+          purge_after: string;
+          student_id: string;
+        };
+        Update: {
+          course_id?: string;
+          created_at?: string;
+          purge_after?: string;
+          student_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "student_progress_purges_course_id_fkey";
+            columns: ["course_id"];
+            isOneToOne: false;
+            referencedRelation: "courses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_progress_purges_course_id_fkey";
+            columns: ["course_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["course_id"];
+          },
+          {
+            foreignKeyName: "student_progress_purges_course_id_fkey";
+            columns: ["course_id"];
+            isOneToOne: false;
+            referencedRelation: "v_student_topic_access_status";
+            referencedColumns: ["course_id"];
+          },
+          {
+            foreignKeyName: "student_progress_purges_course_id_fkey";
+            columns: ["course_id"];
+            isOneToOne: false;
+            referencedRelation: "v_teacher_students";
+            referencedColumns: ["course_id"];
+          },
+          {
+            foreignKeyName: "student_progress_purges_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "student_progress_purges_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "v_export_all_data";
+            referencedColumns: ["student_id"];
+          },
+          {
+            foreignKeyName: "student_progress_purges_student_id_fkey";
+            columns: ["student_id"];
             isOneToOne: false;
             referencedRelation: "v_export_all_data";
             referencedColumns: ["teacher_id"];
@@ -2302,6 +2374,14 @@ export type Database = {
           period_start: string;
         }[];
       };
+      edge_change_student_group: {
+        Args: {
+          p_actor_id: string;
+          p_student_id: string;
+          p_teacher_id: string;
+        };
+        Returns: string;
+      };
       edge_complete_session: {
         Args: { p_session_id: string; p_student_id: string };
         Returns: string;
@@ -2362,11 +2442,11 @@ export type Database = {
         };
         Returns: string;
       };
-      edge_kuti_webhook_secret: { Args: { p_mode: string }; Returns: string };
       edge_mark_complaint_sheet_sent: {
         Args: { p_sheet_number: number };
         Returns: undefined;
       };
+      edge_mercadopago_webhook_secret: { Args: never; Returns: string };
       edge_registration_colleges: {
         Args: never;
         Returns: {
@@ -2393,10 +2473,6 @@ export type Database = {
       };
       edge_revoke_user_sessions: {
         Args: { p_user_id: string };
-        Returns: undefined;
-      };
-      edge_save_kuti_webhook_secret: {
-        Args: { p_mode: string; p_secret: string };
         Returns: undefined;
       };
       edge_start_session: {

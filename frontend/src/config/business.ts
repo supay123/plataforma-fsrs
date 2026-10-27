@@ -12,7 +12,7 @@ export const BUSINESS = {
   social: [] as Array<{ label: string; url: string }>,
 };
 
-// Los precios se cobran en soles a través de Kuti. Deben coincidir con PLANS en
+// Los precios se cobran en soles con Yape, a través de Mercado Pago. Deben coincidir con PLANS en
 // supabase/functions/_shared/plans.ts, que es el que fija el monto cobrado.
 export type PlanId = "mensual" | "semestral";
 

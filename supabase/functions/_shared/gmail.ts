@@ -101,8 +101,12 @@ export function buildMimeMessage(
     ...alternative(`${boundary}-alt`),
     ...message.attachments.flatMap((file) => [
       `--${boundary}`,
-      `Content-Type: ${file.contentType}; name="${attachmentName(file.filename)}"`,
-      `Content-Disposition: attachment; filename="${attachmentName(file.filename)}"`,
+      `Content-Type: ${file.contentType}; name="${
+        attachmentName(file.filename)
+      }"`,
+      `Content-Disposition: attachment; filename="${
+        attachmentName(file.filename)
+      }"`,
       "Content-Transfer-Encoding: base64",
       "",
       wrapLines(encodeBase64(file.content)),

@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Spinner } from "../../components/ui";
 import { useModal } from "../../components/ui/use-modal";
-import { listUsers, renewAccess, resetCredentials, roleLabel, updateUser } from "../../features/users/api";
+import { StudentDataCard, StudentPasswordResetCard } from "../../features/users/StudentAccount";
+import { getStudentProfile, listUsers, renewAccess, resetCredentials, roleLabel, studentProfileQueryKey, updateUser } from "../../features/users/api";
 import type { Credentials } from "../../types/contracts";
 
 export function UserAccountPage() {
@@ -35,6 +36,13 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
       void refresh();
     },
   });
+  // Del estudiante se muestra su perfil completo y, si tiene correo, se le envía un link en vez de generar un PIN.
+  const isStudent = user.role === "student";
+  const studentProfile = useQuery({
+    queryKey: studentProfileQueryKey(user.id),
+    queryFn: () => getStudentProfile(user.id),
+    enabled: isStudent,
+  });
   const renew = useMutation({
     mutationFn: () => renewAccess({
       user_id: user.id,
@@ -45,15 +53,17 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
     onSuccess: refresh,
   });
 
-  const error = update.error ?? reset.error ?? renew.error;
+  const error = update.error ?? reset.error ?? renew.error ?? studentProfile.error;
+  const studentEmail = studentProfile.data?.email;
   return <>
     <PageHeader
       title={user.full_name}
       description={`${roleLabel(user.role)} · ${user.user_code}`}
       actions={<Link className="text-sm font-semibold text-indigo-600" to="/admin/usuarios">Volver a usuarios</Link>}
     />
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
+    {isStudent && studentProfile.isPending ? <Spinner /> : <div className="grid gap-6 lg:grid-cols-2">
+      {/* Estudiante: sus datos ocupan la primera fila; credenciales y vigencia comparten la segunda. */}
+      {isStudent && studentProfile.data ? <StudentDataCard className="lg:col-span-2" user={user} profile={studentProfile.data} /> : <Card>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-bold">Datos del usuario</h2>
           <Badge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "Activo" : "Inactivo"}</Badge>
@@ -75,8 +85,8 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
           <Field label="Código de acceso"><Input required value={code} onChange={(event) => setCode(event.target.value)} /></Field>
           <Button disabled={update.isPending}>Guardar cambios</Button>
         </form>
-      </Card>
-      <Card>
+      </Card>}
+      {isStudent && studentEmail ? <StudentPasswordResetCard user={user} email={studentEmail} /> : <Card>
         <h2 className="font-bold">Credenciales</h2>
         <p className="mt-1 text-sm text-slate-600">
           Se generará {user.role === "student" ? "un PIN numérico de seis dígitos" : "una contraseña segura"} y se mostrará una sola vez.
@@ -96,10 +106,11 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
         })}>
           Restablecer credencial
         </Button>
-      </Card>
-      {user.role === "student" && <Card className="lg:col-span-2">
+      </Card>}
+      {isStudent && <Card>
         <h2 className="font-bold">Vigencia de acceso</h2>
-        <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={(event) => {
+        {/* A media columna en lg las fechas se apilan; vuelven a ir lado a lado desde xl. */}
+        <form className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" onSubmit={(event) => {
           event.preventDefault();
           modal.warning({
             title: "Renovar y reactivar",
@@ -113,9 +124,9 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
         }}>
           <Field label="Desde"><Input required type="date" value={validFrom} onChange={(event) => setValidFrom(event.target.value)} /></Field>
           <Field label="Hasta"><Input required type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></Field>
-          <Button className="sm:col-span-2" disabled={renew.isPending}>Renovar y reactivar</Button>
+          <Button className="sm:col-span-2 lg:col-span-1 xl:col-span-2" disabled={renew.isPending}>Renovar y reactivar</Button>
         </form>
       </Card>}
-    </div>
+    </div>}
   </>;
 }

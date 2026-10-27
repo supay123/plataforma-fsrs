@@ -1,5 +1,9 @@
 import { BUSINESS } from "./business.ts";
-import { escapeHtml, type EmailAttachment, type EmailMessage } from "./email.ts";
+import {
+  type EmailAttachment,
+  type EmailMessage,
+  escapeHtml,
+} from "./email.ts";
 import { AppError } from "./errors.ts";
 import { boolean, requiredString } from "./validation.ts";
 
@@ -123,11 +127,15 @@ export function parseComplaintData(value: unknown): ComplaintData {
     is_minor: isMinor,
     guardian_name: isMinor ? text(input, "guardian_name", 200) : null,
     guardian_document_type: isMinor
-      ? oneOf<GuardianDocumentType>(input.guardian_document_type, "guardian_document_type", [
-        "DNI",
-        "CE",
-        "PASAPORTE",
-      ])
+      ? oneOf<GuardianDocumentType>(
+        input.guardian_document_type,
+        "guardian_document_type",
+        [
+          "DNI",
+          "CE",
+          "PASAPORTE",
+        ],
+      )
       : null,
     guardian_document_number: isMinor
       ? text(input, "guardian_document_number", 20)
@@ -146,7 +154,9 @@ export function formatSheetNumber(sheetNumber: number | null): string {
 }
 
 export function sheetLabel(record: ComplaintRecord): string {
-  return `${BUSINESS.complaintsBookCode}-${formatSheetNumber(record.sheetNumber)}`;
+  return `${BUSINESS.complaintsBookCode}-${
+    formatSheetNumber(record.sheetNumber)
+  }`;
 }
 
 export function isTestSheet(record: ComplaintRecord): boolean {
@@ -193,32 +203,45 @@ function complaintRows(record: ComplaintRecord): Array<[string, Row[]]> {
       ["N.° de hoja", sheetLabel(record)],
       ["Fecha", formatComplaintDate(record.createdAt)],
     ]],
-    ["1. Identificación del consumidor reclamante", present([
-      ["Nombre completo", data.consumer_name],
-      [
-        "Documento",
-        `${documentLabel(data.consumer_document_type)} ${data.consumer_document_number}`,
-      ],
-      ["Domicilio", fullAddress(data)],
-      ["Teléfono", data.consumer_phone],
-      ["Correo electrónico", data.consumer_email],
-      [
-        "Padre, madre o apoderado",
-        data.is_minor
-          ? `${data.guardian_name} (${documentLabel(data.guardian_document_type)} ${data.guardian_document_number})`
-          : null,
-      ],
-    ])],
-    ["2. Identificación del bien contratado", present([
-      ["Tipo de bien", data.item_type === "servicio" ? "Servicio" : "Producto"],
-      ["Descripción", data.item_description],
-      [
-        "Monto reclamado",
-        data.claimed_amount === null
-          ? null
-          : `S/ ${data.claimed_amount.toFixed(2)}`,
-      ],
-    ])],
+    [
+      "1. Identificación del consumidor reclamante",
+      present([
+        ["Nombre completo", data.consumer_name],
+        [
+          "Documento",
+          `${
+            documentLabel(data.consumer_document_type)
+          } ${data.consumer_document_number}`,
+        ],
+        ["Domicilio", fullAddress(data)],
+        ["Teléfono", data.consumer_phone],
+        ["Correo electrónico", data.consumer_email],
+        [
+          "Padre, madre o apoderado",
+          data.is_minor
+            ? `${data.guardian_name} (${
+              documentLabel(data.guardian_document_type)
+            } ${data.guardian_document_number})`
+            : null,
+        ],
+      ]),
+    ],
+    [
+      "2. Identificación del bien contratado",
+      present([
+        [
+          "Tipo de bien",
+          data.item_type === "servicio" ? "Servicio" : "Producto",
+        ],
+        ["Descripción", data.item_description],
+        [
+          "Monto reclamado",
+          data.claimed_amount === null
+            ? null
+            : `S/ ${data.claimed_amount.toFixed(2)}`,
+        ],
+      ]),
+    ],
     ["3. Detalle de la reclamación y pedido del consumidor", [
       ["Tipo", data.kind === "reclamo" ? "Reclamo" : "Queja"],
       ["Detalle", data.detail],
@@ -239,10 +262,15 @@ export function complaintEmail(
 ): EmailMessage {
   const test = isTestSheet(record);
   const kind = record.data.kind === "reclamo" ? "Reclamo" : "Queja";
-  const subject = `${test ? "[PRUEBA] " : ""}Libro de reclamaciones: ${kind} N.° ${sheetLabel(record)}`;
+  const subject = `${
+    test ? "[PRUEBA] " : ""
+  }Libro de reclamaciones: ${kind} N.° ${sheetLabel(record)}`;
   const sections = complaintRows(record);
   if (evidence.length) {
-    sections.push(["Evidencia adjunta", evidence.map((file, index) => [`Archivo ${index + 1}`, file.filename])]);
+    sections.push([
+      "Evidencia adjunta",
+      evidence.map((file, index) => [`Archivo ${index + 1}`, file.filename]),
+    ]);
   }
   const intro = test
     ? "Hoja de prueba: no es un reclamo real y no tiene número correlativo."
@@ -308,14 +336,20 @@ export async function parseEvidence(
   if (files.length !== entries.length || files.length > EVIDENCE_MAX_FILES) {
     throw new AppError(400, "invalid_evidence", "Evidence is not valid.");
   }
-  if (files.some((file) => !file.type.startsWith("image/") && file.type !== "application/pdf")) {
+  if (
+    files.some((file) =>
+      !file.type.startsWith("image/") && file.type !== "application/pdf"
+    )
+  ) {
     throw new AppError(
       400,
       "invalid_evidence",
       "Evidence must be images or PDF files.",
     );
   }
-  if (files.reduce((total, file) => total + file.size, 0) > EVIDENCE_MAX_BYTES) {
+  if (
+    files.reduce((total, file) => total + file.size, 0) > EVIDENCE_MAX_BYTES
+  ) {
     throw evidenceTooLarge();
   }
   return await Promise.all(files.map(async (file, index) => ({

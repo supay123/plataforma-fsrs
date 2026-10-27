@@ -728,6 +728,59 @@ Ambas son `SECURITY DEFINER`, con `search_path = ''`, y solo las ejecuta `servic
 - `public.edge_registration_teachers()`: grupos que puede elegir un estudiante, tanto en el autoservicio como en la invitación. Devuelve `teacher_id`, `teacher_name`, `college_id` y `college_name` de los profesores activos, de un colegio activo, con al menos un curso no archivado.
 - `public.edge_accept_student_invitation(...)`: acepta una invitación en una sola transacción. Valida el grupo (el fijado por el administrador o, si no hay, el elegido por el estudiante entre los de `edge_registration_teachers()`), toma de él la institución, borra la invitación, crea el perfil del estudiante con el periodo de acceso de la invitación, lo matricula en los cursos no archivados del profesor y registra `invitation.accepted` en `audit_logs`. Si algo falla, todo vuelve atrás y la invitación no se pierde. Errores: `invalid_invitation`, `teacher_required`, `invalid_teacher`.
 
+## public.plan_payments
+
+Pagos de los planes de estudiante, para el registro y la renovación. Desde el
+26/10/2026 se cobran con Yape a través de Mercado Pago; las filas anteriores son
+cobros de Kuti y se conservan como historial. El monto lo fija el servidor según
+el plan. Las Edge Functions crean y aplican los pagos con `service_role`.
+
+**RLS:** activo.
+
+| Columna | Tipo | Nulo | Valor por defecto | Descripción |
+|---|---|---:|---|---|
+| `id` | `uuid` | No | — | Identificador; viaja a Mercado Pago como `external_reference` y llave de idempotencia. |
+| `provider` | `text` | No | `'mercadopago'` | `mercadopago` o `kuti` (historial). |
+| `provider_payment_id` | `text` | Sí | — | Id de la orden de Mercado Pago (`ORD…`) o del cobro de Kuti; llega después de crear la fila. |
+| `livemode` | `boolean` | No | — | `false` si es un pago de prueba. |
+| `plan` | `text` | No | — | `mensual` o `semestral`. |
+| `amount` | `numeric(10,2)` | No | — | Monto cobrado, en soles. |
+| `registration_id` | `uuid` | Sí | — | Registro que se activa con el pago. |
+| `profile_id` | `uuid` | Sí | — | Estudiante que renueva o cuya cuenta se creó con el pago. |
+| `email` | `text` | Sí | — | Correo de quien pagó, para ubicar el pago si se borra el dueño. |
+| `status` | `text` | No | `'pending'` | `pending`, `succeeded`, `failed`, `expired` (solo Kuti) o `cancelled`. |
+| `status_detail` | `text` | Sí | — | Motivo que da Mercado Pago, por ejemplo al rechazar. |
+| `paid_at` | `timestamptz` | Sí | — | Cuándo se aprobó. |
+| `applied_at` | `timestamptz` | Sí | — | Cuándo se aplicó (cuenta creada o plan extendido). |
+| `period_start`, `period_end` | `date` | Sí | — | Días de acceso que cubrió el pago. |
+| `resolved_at` | `timestamptz` | Sí | — | El administrador marcó como resuelto un pago que no se pudo aplicar. |
+| `created_at` | `timestamptz` | No | `now()` | Fecha de creación. |
+
+### Constraints
+
+- `plan_payments_provider_payment_id_unique`: `UNIQUE (provider, provider_payment_id)`.
+- `plan_payments_paid_complete`: `status = 'succeeded'` si y solo si hay `paid_at`.
+- `plan_payments_applied_complete` y `plan_payments_applied_paid`: un pago aplicado tiene su periodo y está pagado.
+
+### Políticas RLS
+
+- `plan_payments_admin_select`: solo el administrador consulta los pagos.
+- `plan_payments_admin_resolve`: solo el administrador actualiza `resolved_at`.
+
+### Secreto del webhook
+
+`edge_mercadopago_webhook_secret()` (solo `service_role`) lee de Vault el
+secreto `mercadopago_webhook_secret`, con el que Mercado Pago firma sus avisos.
+Se guarda desde el editor SQL:
+
+```sql
+select vault.create_secret('<clave secreta del panel>', 'mercadopago_webhook_secret');
+-- Para cambiarla (por ejemplo, al pasar a producción):
+select vault.update_secret(id, '<nueva clave>') from vault.secrets where name = 'mercadopago_webhook_secret';
+```
+
+---
+
 # Funciones
 
 Las funciones de `private` son guards de autorización. Todas son `SECURITY DEFINER`, tienen `search_path = ''`, no son ejecutables por `PUBLIC` y están autorizadas para el rol PostgreSQL `authenticated`.
@@ -1034,3 +1087,38 @@ También aparecen varios índices como no utilizados porque la base de datos tod
 3. `private.teacher_owns_course()` excluye cursos archivados. Esto significa que el profesor no podrá consultarlos mediante esta función; debe confirmarse si el archivo debe seguir siendo visible en modo lectura.
 4. No existen todavía Edge Functions desplegadas. Las operaciones administrativas y académicas sensibles siguen pendientes de implementación.
 5. Las vistas sensibles están correctamente revocadas para acceso directo del rol `authenticated`.
+
+## public.student_progress_purges
+
+Progreso de un estudiante en un curso que dejó cuando el administrador le cambió
+el grupo. Se conserva 7 días y luego se borra, salvo que el estudiante vuelva a
+estar activo en ese curso (por ejemplo, si lo regresan a su grupo o lo inscriben
+desde Asignaciones).
+
+**RLS:** activo, sin políticas. Solo se accede desde Edge Functions con `service_role` (`admin-student-account`) y desde el job de limpieza.
+
+| Columna | Tipo | Nulo | Valor por defecto | Descripción |
+|---|---|---:|---|---|
+| `student_id` | `uuid` | No | — | Estudiante que dejó el curso. |
+| `course_id` | `uuid` | No | — | Curso del grupo anterior. |
+| `purge_after` | `timestamptz` | No | — | Desde cuándo se borra su progreso (7 días después del cambio de grupo). |
+| `created_at` | `timestamptz` | No | `now()` | Fecha de creación. |
+
+### Relaciones
+
+- `student_id → public.profiles.id` con `ON DELETE CASCADE`.
+- `course_id → public.courses.id` con `ON DELETE CASCADE`.
+
+### Constraints
+
+- `student_progress_purges_pkey`: `PRIMARY KEY (student_id, course_id)`; cambiar de grupo otra vez reinicia el plazo.
+
+### Tareas programadas
+
+- `purge-student-progress-after-group-change` (pg_cron, cada hora): ejecuta `private.purge_student_progress()`. Descarta las filas de cursos en los que el estudiante vuelve a estar activo y, para las vencidas, borra sus `assessment_sessions` del curso y sus `student_question_cards` de las preguntas del curso; `assessment_session_questions` y `fsrs_review_logs` se borran en cascada.
+
+### Funciones relacionadas
+
+`SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
+
+- `public.edge_change_student_group(p_student_id, p_teacher_id, p_actor_id)`: cambia el grupo en una sola transacción. Valida el profesor entre los de `edge_registration_teachers()`, desactiva las matrículas activas del estudiante en cursos de otros profesores y programa el borrado de su progreso, lo matricula en los cursos no archivados del nuevo profesor (si vuelve a uno que dejó, se cancela su borrado) y le asigna la institución del profesor, que devuelve. Errores: `user_not_found`, `invalid_teacher`.

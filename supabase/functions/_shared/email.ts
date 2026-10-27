@@ -198,7 +198,7 @@ export function invitationEmail(
   ].join("\n");
   const introHtml = inviterName
     ? `<p> Te invitaron al grupo de 
-    <strong>${ escapeHtml(inviterName)}</strong> 
+    <strong>${escapeHtml(inviterName)}</strong> 
     a usar Chancón para practicar y repasar.</p>`
     : "<p>Te invitaron a usar Chancón para practicar y repasar.</p>";
   const html = `<p>Hola:</p>

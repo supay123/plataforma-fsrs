@@ -48,6 +48,7 @@ pnpm exec supabase gen types --local --schema public \
 | `admin-create-user` | Admin | Creates a teacher or student in Auth and `profiles`, optionally generates a temporary password, and records an audit event. |
 | `admin-update-user` | Admin | Changes a teacher/student code, name, college, or active status and records the changed fields. |
 | `admin-reset-user-credentials` | Admin | Changes a teacher/student code and password, optionally generating the password, with rollback of the code if the Auth update fails. |
+| `admin-student-account` | Admin | A student's account as seen by the admin: `GET /admin-student-account/profile?user_id=` returns the same profile the student sees in `GET /account/profile`; `PUT /admin-student-account/profile` replaces the editable fields with the same rules; `PUT /admin-student-account/email` (`user_id`, `email`) changes the email without verification, also for sign-in, and voids pending email-change codes and reset links (`409 email_taken`); `PUT /admin-student-account/group` (`user_id`, `teacher_id`) moves the student to another teacher's group through `edge_change_student_group`: ends the enrollments in other teachers' courses (their progress is deleted after 7 days unless the student returns), enrolls the student in the new teacher's courses and takes the teacher's college (`400 invalid_teacher`); the `GET` response also includes `group_teacher_ids`; `POST /admin-student-account/password-reset` (`user_id`) emails the student the same reset link as `POST /account/password-reset` (`409 student_email_required` if the student has no email); `DELETE /admin-student-account/password-reset?user_id=` voids it. `404 user_not_found` if `user_id` is not a student. |
 | `admin-renew-access` | Admin | Replaces a student's inclusive access-date range and optionally reactivates the profile. |
 | `import-questions` | Admin, teacher | Validates or confirms an official-template XLSX/JSON question import. A teacher is restricted to their own courses. |
 | `start-session` | Student | Atomically resumes the student's existing in-progress session for a topic or creates one with up to 20 due-first/new questions. |
@@ -57,9 +58,9 @@ pnpm exec supabase gen types --local --schema public \
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
-| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to. |
-| `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` creates the Kuti charge (QR, plus a bank code from S/ 50) of the chosen plan; `GET /registration/payment` reports its status and activates the account once Kuti confirms it. No account exists until the first payment is confirmed. |
-| `kuti` | Kuti signature | `POST /kuti/webhook` receives Kuti payment events (`payment.succeeded`, `failed`, `expired`, `cancelled`), verifies `X-Kuti-Signature` with the signing secret stored in Vault, and applies the payment. Called by Kuti, never by the app. |
+| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to; `GET /public/payment-config` returns the Mercado Pago `public_key` the browser needs to turn the Yape phone and approval code into a token (`503 payments_unavailable` while `MERCADOPAGO_PUBLIC_KEY` is not set). |
+| `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` charges the chosen plan with Yape through Mercado Pago; `GET /registration/payment` reports its status and activates the account once Mercado Pago approves it. No account exists until the first payment is confirmed. |
+| `mercadopago` | Mercado Pago signature | `POST /mercadopago/webhook` receives Mercado Pago **Order** notifications (`type: order`), verifies `x-signature` (HMAC-SHA256 of `id:<data.id in lowercase>;request-id:<x-request-id>;ts:<ts>;`) with the secret stored in Vault as `mercadopago_webhook_secret`, fetches the order (`GET /v1/orders/{id}`) and applies it. Called by Mercado Pago, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
 | `password-reset` | Public | `POST /password-reset/request-link` emails the link from the student login ("¿Olvidaste tu contraseña?"); `GET /password-reset?code=...` says whether it is still valid without using it; `POST /password-reset` uses it once, saves the new password, and closes every session of that user only. |
 | `invitations` | Admin | Student invitations: `GET /invitations` lists the ones not accepted yet (pending or expired), `POST /invitations` invites a student by email with an optional group (teacher), `POST /invitations/resend` sends a new link, and `DELETE /invitations?id=...` cancels one. Students are no longer created directly from the admin screen. |
@@ -128,37 +129,46 @@ pnpm exec supabase gen types --local --schema public \
 - `POST registration/validateCode`: `registration_id`, `code`. Codes last 10
   minutes and allow 5 wrong attempts. Responds with `status: "verified"`.
 - `POST registration/payment`: `registration_id`, `plan` (`mensual` or
-  `semestral`). Requires a verified email. The amount comes from
-  `_shared/plans.ts`, never from the request. Creates a Kuti charge that
-  expires in 30 minutes and stores it in `plan_payments`; responds with
-  `payment_id`, `plan`, `amount`, `qr_payload` (EMVCo text the page draws as a
-  QR), `bank_code` (service-payment code at KUTI; only for amounts of S/ 50 or
-  more, null otherwise), `checkout_url`, `expires_at` and `livemode` (`false`
-  with a `kuti_test_` key). A still-valid QR of the same plan is returned again; a QR
-  of another plan is cancelled in Kuti. Without `KUTI_SECRET_KEY` it returns
-  `503 payments_unavailable` and the page falls back to WhatsApp. The first
-  charge on a deployed project (HTTPS) also registers the Kuti webhook and
-  saves its signing secret in Vault.
-- `GET registration/payment?payment_id=…`: responds with `status`:
-  `pending`, `processing` (paid, account being created), `paid` (account
-  created; access runs from the payment day for the plan's months),
-  `failed`, `expired`, `cancelled`, or `needs_support` (paid after the
-  registration was deleted; listed to the administrator). While pending it
-  asks Kuti directly, so payments are confirmed even without the webhook
-  (local development). A registration with a charge from the last 24 hours is
-  not purged.
-- `POST registration/payment/simulate` and `POST account/payment/simulate`:
-  `payment_id`, `method` (`qr` or `code`). Test mode only: Kuti marks the
-  charge as paid without real money and it is applied at once, like a real
-  payment. Responds like the `GET` status endpoints; a live charge returns
-  `403 test_mode_only` (Kuti also refuses to simulate with a live key).
-- `POST account/payment`: `plan`. Signed-in student, with the plan active or
-  expired (expired students can sign in, but the app only shows the renewal
-  page). Same response as `registration/payment`. Once paid, the months are
-  added after the current end date or, if the plan already expired, start on
-  the payment day (`edge_apply_renewal_payment`).
+  `semestral`), `token` (single-use Yape token the browser creates with the
+  Mercado Pago SDK from the phone and the approval code (OTP) of the Yape app)
+  and `phone` (that Yape phone, 9 digits). Requires a verified email, which is
+  sent to Mercado Pago as the payer. The amount comes from `_shared/plans.ts`,
+  never from the request. The row is stored in `plan_payments` before calling
+  Mercado Pago (its `id` travels as `external_reference` and
+  `X-Idempotency-Key`), then an order is created with the Orders API
+  (`POST /v1/orders`, `processing_mode: "automatic"`, payment method `yape` /
+  `debit_card`), which answers at once (`processed` or `failed`; a rejection
+  may also come as HTTP 402). Responds with `payment_id`,
+  `plan`, `amount`, `status` (same values as the `GET`), `status_detail`
+  (Mercado Pago's reason, e.g. `bad_filled_card_data`) and
+  `livemode`. An approved payment is applied in the same request. If an
+  earlier payment of the same owner is still in process it returns
+  `409 payment_in_process`. Without `MERCADOPAGO_ACCESS_TOKEN` it returns
+  `503 payments_unavailable` and the page falls back to WhatsApp.
+- `GET registration/payment?payment_id=…`: responds like the `POST`, with
+  `status`: `pending` (Mercado Pago still processing), `processing` (paid,
+  account being created), `paid` (account created; access runs from the
+  payment day for the plan's months), `failed` (rejected), `cancelled`, or
+  `needs_support` (paid after the registration was deleted; listed to the
+  administrator). While in process it asks Mercado Pago directly, so payments
+  are confirmed even without the webhook (local development). A registration
+  with a payment from the last 24 hours is not purged.
+- `POST account/payment`: `plan`, `token`, `phone`. Signed-in student, with the plan
+  active or expired (expired students can sign in, but the app only shows the
+  renewal page). Same response as `registration/payment`; a student without
+  email gets `409 payment_email_required`. Once paid, the months are added
+  after the current end date or, if the plan already expired, start on the
+  payment day (`edge_apply_renewal_payment`).
 - `GET account/payment?payment_id=…`: same statuses as
   `registration/payment`, only for the student's own payments.
+- Testing: use the **test** credentials of the application (Tus integraciones →
+  your app → Test environment → Credentials; both start with `APP_USR-`). With
+  OTP `123456`, phone `111111111` is approved (`processed` / `accredited`);
+  `111111112` `required_call_for_authorize`, `111111113` `insufficient_amount`,
+  `111111114` `processing_error`, `111111115` `invalid_card_token`,
+  `111111116` `max_attempts_exceeded`, `111111117`/`111111118`
+  `bad_filled_card_data`. Test orders appear in the app's "Test payments" tab;
+  webhooks are tried with "Simulate notification" in the Webhooks panel.
 - `GET account/profile`: no body. Responds with `profile` (`given_names`,
   `family_names`, `email`, `phone`, `identity_document_type`,
   `identity_document_number`, `college_id`, `college_name`, `group_name`: name of the teacher of their active courses, comma-separated if several, or `null`). Fields the

@@ -436,5 +436,5 @@ verify_jwt = false
 [functions.student-invitation]
 verify_jwt = false
 
-[functions.kuti]
+[functions.mercadopago]
 verify_jwt = false

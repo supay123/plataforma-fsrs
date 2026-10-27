@@ -62,8 +62,16 @@ Deno.test("adds copy, reply-to and attachments in a multipart/mixed message", ()
   assert.ok(raw.includes("\r\nCc: ana@example.com\r\n"));
   assert.ok(raw.includes("\r\nReply-To: ana@example.com\r\n"));
   assert.ok(raw.includes('Content-Type: multipart/mixed; boundary="b"'));
-  assert.ok(raw.includes('Content-Type: multipart/alternative; boundary="b-alt"'));
-  assert.match(raw, /Content-Disposition: attachment; filename="=\?UTF-8\?B\?.+\?="/);
+  assert.ok(
+    raw.includes('Content-Type: multipart/alternative; boundary="b-alt"'),
+  );
+  assert.match(
+    raw,
+    /Content-Disposition: attachment; filename="=\?UTF-8\?B\?.+\?="/,
+  );
   const attachment = raw.split("--b\r\n")[2]!.split("\r\n\r\n")[1]!;
-  assert.equal(decodeBase64(attachment.replace("\r\n--b--", "").trim()), "%PDF-1.3");
+  assert.equal(
+    decodeBase64(attachment.replace("\r\n--b--", "").trim()),
+    "%PDF-1.3",
+  );
 });

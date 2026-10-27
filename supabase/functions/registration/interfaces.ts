@@ -23,9 +23,8 @@ export interface ValidateCodeBody {
 export interface CreatePaymentBody {
   registration_id?: unknown;
   plan?: unknown;
-}
-
-export interface SimulatePaymentBody {
-  payment_id?: unknown;
-  method?: unknown;
+  /** Token de un solo uso que genera el SDK de Mercado Pago con el OTP de Yape. */
+  token?: unknown;
+  /** Celular de Yape con el que se generó el token. */
+  phone?: unknown;
 }

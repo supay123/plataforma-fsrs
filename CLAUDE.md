@@ -11,7 +11,7 @@ PostgreSQL. Detalle funcional en [README.md](README.md) y `docs/`.
   React Router, React Hook Form + Zod, KaTeX. Despliegue en Netlify
   (`netlify.toml`).
 - `supabase/functions/` — Edge Functions en Deno. Lógica compartida en
-  `_shared/` (auth, errores, router, FSRS, validación, Gmail, Kuti, planes).
+  `_shared/` (auth, errores, router, FSRS, validación, Gmail, Mercado Pago, planes).
 - `supabase/migrations/` — esquema SQL (RLS, RPCs). Nombres de tablas/vistas/RPCs
   centralizados en `_shared/database.constants.ts`.
 - Monorepo pnpm (workspace solo incluye `frontend`). Siempre ejecutar desde la raíz.

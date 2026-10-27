@@ -3,10 +3,7 @@ import { withAppSupabase } from "../_shared/server.ts";
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
-import {
-  assertCredential,
-  generateCredential,
-} from "../_shared/password.ts";
+import { assertCredential, generateCredential } from "../_shared/password.ts";
 import {
   assertDateOrder,
   date,

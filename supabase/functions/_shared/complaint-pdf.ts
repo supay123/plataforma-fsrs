@@ -26,7 +26,9 @@ function watermark(doc: jsPDF) {
     doc.setGState(new GState({ opacity: 0.15 }));
     doc.setFont("helvetica", "bold").setFontSize(110).setTextColor(220, 38, 38);
     doc.text("PRUEBA", 38, 215, { angle: 40 });
-    doc.setFontSize(14).text("HOJA DE PRUEBA - SIN VALOR LEGAL", 105, 292, { align: "center" });
+    doc.setFontSize(14).text("HOJA DE PRUEBA - SIN VALOR LEGAL", 105, 292, {
+      align: "center",
+    });
     doc.restoreGraphicsState();
   }
 }
@@ -37,15 +39,41 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   doc.setLineWidth(0.25).setDrawColor(90).setTextColor(20);
   let y = TOP;
 
-  const ensure = (height: number) => { if (y + height > BOTTOM) { doc.addPage(); y = TOP; } };
+  const ensure = (height: number) => {
+    if (y + height > BOTTOM) {
+      doc.addPage();
+      y = TOP;
+    }
+  };
   const box = (x: number, top: number, w: number, h: number, fill = false) => {
     if (fill) doc.setFillColor(217, 217, 217);
     doc.rect(x, top, w, h, fill ? "FD" : "S");
   };
-  const label = (text: string, x: number, top: number, size = 8, align: "left" | "center" | "right" = "left") =>
-    doc.setFont("helvetica", "bold").setFontSize(size).text(text, x, top + 4.6, { align });
-  const wrap = (text: string, width: number, size = 9): string[] => doc.setFont("helvetica", "normal").setFontSize(size).splitTextToSize(text, width);
-  const lines = (text: string[], x: number, top: number, size = 9) => doc.setFont("helvetica", "normal").setFontSize(size).text(text, x, top + 4.6, { lineHeightFactor: 1.15 });
+  const label = (
+    text: string,
+    x: number,
+    top: number,
+    size = 8,
+    align: "left" | "center" | "right" = "left",
+  ) =>
+    doc.setFont("helvetica", "bold").setFontSize(size).text(
+      text,
+      x,
+      top + 4.6,
+      { align },
+    );
+  const wrap = (text: string, width: number, size = 9): string[] =>
+    doc.setFont("helvetica", "normal").setFontSize(size).splitTextToSize(
+      text,
+      width,
+    );
+  const lines = (text: string[], x: number, top: number, size = 9) =>
+    doc.setFont("helvetica", "normal").setFontSize(size).text(
+      text,
+      x,
+      top + 4.6,
+      { lineHeightFactor: 1.15 },
+    );
   const textHeight = (count: number) => Math.max(7, count * LINE + 3);
 
   /** Fila con etiqueta a la izquierda y valor (que puede ocupar varias líneas) a la derecha. */
@@ -63,10 +91,20 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   const sectionHeader = (title: string, keep = 7) => {
     ensure(6.5 + keep);
     box(X, y, W, 6.5, true);
-    doc.setFont("helvetica", "bold").setFontSize(8.5).text(title, X + PAD, y + 4.5);
+    doc.setFont("helvetica", "bold").setFontSize(8.5).text(
+      title,
+      X + PAD,
+      y + 4.5,
+    );
     y += 6.5;
   };
-  const mark = (checked: boolean, x: number, top: number, w: number, h: number) => {
+  const mark = (
+    checked: boolean,
+    x: number,
+    top: number,
+    w: number,
+    h: number,
+  ) => {
     box(x, top, w, h);
     if (checked) label("X", x + w / 2, top + (h - 7) / 2, 10, "center");
   };
@@ -84,7 +122,13 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   lines([formatComplaintDate(record.createdAt)], X + 16, y + 0.6);
   box(X + left, y, right, 8);
   label("N°", X + left + PAD, y + 0.6, 9);
-  doc.setFont("helvetica", "normal").setFontSize(9).text(`${BUSINESS.complaintsBookCode}  -  ${formatSheetNumber(record.sheetNumber)}`, X + left + 10, y + 5.2);
+  doc.setFont("helvetica", "normal").setFontSize(9).text(
+    `${BUSINESS.complaintsBookCode}  -  ${
+      formatSheetNumber(record.sheetNumber)
+    }`,
+    X + left + 10,
+    y + 5.2,
+  );
   y += 8;
 
   // Datos del proveedor.
@@ -94,13 +138,25 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
     ["RUC:", BUSINESS.ruc],
     ["DOMICILIO:", BUSINESS.address],
   ];
-  const providerLines = providerRows.map(([name, value]) => [name, wrap(value, W - 40)] as const);
-  const providerHeight = providerLines.reduce((sum, [, value]) => sum + value.length * LINE, 0) + 3;
+  const providerLines = providerRows.map(([name, value]) =>
+    [name, wrap(value, W - 40)] as const
+  );
+  const providerHeight =
+    providerLines.reduce((sum, [, value]) => sum + value.length * LINE, 0) + 3;
   box(X, y, W, providerHeight);
   let rowTop = y + 0.5;
   for (const [name, value] of providerLines) {
-    doc.setFont("helvetica", "bold").setFontSize(8).text(name, X + PAD, rowTop + 3.2);
-    doc.setFont("helvetica", "normal").setFontSize(9).text(value, X + 38, rowTop + 3.2, { lineHeightFactor: 1.15 });
+    doc.setFont("helvetica", "bold").setFontSize(8).text(
+      name,
+      X + PAD,
+      rowTop + 3.2,
+    );
+    doc.setFont("helvetica", "normal").setFontSize(9).text(
+      value,
+      X + 38,
+      rowTop + 3.2,
+      { lineHeightFactor: 1.15 },
+    );
     rowTop += value.length * LINE;
   }
   y += providerHeight;
@@ -109,7 +165,10 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   const { data } = record;
   sectionHeader("1. IDENTIFICACIÓN DEL CONSUMIDOR RECLAMANTE");
   field("NOMBRE:", data.consumer_name);
-  field("DNI / CE:", `${data.consumer_document_type} ${data.consumer_document_number}`);
+  field(
+    "DNI / CE:",
+    `${data.consumer_document_type} ${data.consumer_document_number}`,
+  );
   field("DOMICILIO:", fullAddress(data));
   const emailLines = wrap(data.consumer_email, 64);
   const contactHeight = textHeight(emailLines.length);
@@ -125,15 +184,27 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   y += contactHeight;
   ensure(14);
   box(X, y, W, 7);
-  label("SI ES MENOR DE EDAD, NOMBRE DEL PADRE, MADRE O APODERADO:", X + PAD, y);
+  label(
+    "SI ES MENOR DE EDAD, NOMBRE DEL PADRE, MADRE O APODERADO:",
+    X + PAD,
+    y,
+  );
   y += 7;
   box(X, y, W, 7);
-  if (data.is_minor) lines([`${data.guardian_name} (${data.guardian_document_type} ${data.guardian_document_number})`], X + PAD, y);
+  if (data.is_minor) {
+    lines(
+      [`${data.guardian_name} (${data.guardian_document_type} ${data.guardian_document_number})`],
+      X + PAD,
+      y,
+    );
+  }
   y += 7;
 
   // 2. Bien contratado.
   sectionHeader("2. IDENTIFICACIÓN DEL BIEN CONTRATADO");
-  const amount = data.claimed_amount === null ? "" : `S/ ${data.claimed_amount.toFixed(2)}`;
+  const amount = data.claimed_amount === null
+    ? ""
+    : `S/ ${data.claimed_amount.toFixed(2)}`;
   const description = wrap(data.item_description, W - 96 - PAD * 2);
   const itemRows: Array<[string, boolean, string, string[]]> = [
     ["PRODUCTO", data.item_type === "producto", "MONTO RECLAMADO:", [amount]],
@@ -155,7 +226,11 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   // 3. Detalle y pedido.
   ensure(14);
   box(X, y, 120, 7, true);
-  doc.setFont("helvetica", "bold").setFontSize(8.5).text("3. DETALLE DE LA RECLAMACIÓN", X + PAD, y + 4.7);
+  doc.setFont("helvetica", "bold").setFontSize(8.5).text(
+    "3. DETALLE DE LA RECLAMACIÓN",
+    X + PAD,
+    y + 4.7,
+  );
   box(X + 120, y, 24, 7);
   label("RECLAMO¹", X + 132, y, 8, "center");
   mark(data.kind === "reclamo", X + 144, y, 9, 7);
@@ -179,9 +254,24 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   label("PEDIDO:", X + PAD, y);
   lines(request, X + PAD, y + 5);
   box(X + 120, y, W - 120, requestHeight - 7);
-  lines(wrap(`Hoja presentada virtualmente por ${data.consumer_name}, quien declaró que la información consignada es veraz.`, W - 124, 7.5), X + 122, y, 7.5);
+  lines(
+    wrap(
+      `Hoja presentada virtualmente por ${data.consumer_name}, quien declaró que la información consignada es veraz.`,
+      W - 124,
+      7.5,
+    ),
+    X + 122,
+    y,
+    7.5,
+  );
   box(X + 120, y + requestHeight - 7, W - 120, 7);
-  label("FIRMA DEL CONSUMIDOR", X + 120 + (W - 120) / 2, y + requestHeight - 7, 8, "center");
+  label(
+    "FIRMA DEL CONSUMIDOR",
+    X + 120 + (W - 120) / 2,
+    y + requestHeight - 7,
+    8,
+    "center",
+  );
   y += requestHeight;
 
   // 4. Respuesta del proveedor (se completa al responder).
@@ -198,11 +288,17 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   // Definiciones y notas legales.
   const claimNote = wrap(`¹ ${COMPLAINT_NOTES[0]}`, W / 2 - PAD * 2, 7);
   const complaintNote = wrap(`² ${COMPLAINT_NOTES[1]}`, W / 2 - PAD * 2, 7);
-  const notesHeight = Math.max(claimNote.length, complaintNote.length) * 3.2 + 3;
+  const notesHeight = Math.max(claimNote.length, complaintNote.length) * 3.2 +
+    3;
   ensure(notesHeight + 20);
   box(X, y, W / 2, notesHeight);
   box(X + W / 2, y, W / 2, notesHeight);
-  doc.setFont("helvetica", "normal").setFontSize(7).text(claimNote, X + PAD, y + 3.6, { lineHeightFactor: 1.15 });
+  doc.setFont("helvetica", "normal").setFontSize(7).text(
+    claimNote,
+    X + PAD,
+    y + 3.6,
+    { lineHeightFactor: 1.15 },
+  );
   doc.text(complaintNote, X + W / 2 + PAD, y + 3.6, { lineHeightFactor: 1.15 });
   y += notesHeight;
   box(X + 86, y, W - 86, 7, true);
@@ -210,7 +306,12 @@ export function renderComplaintPdf(record: ComplaintRecord): Uint8Array {
   y += 9;
   for (const note of COMPLAINT_NOTES.slice(2)) {
     const noteLines = wrap(`* ${note}`, W, 7);
-    doc.setFont("helvetica", "normal").setFontSize(7).text(noteLines, X, y + 2.5, { lineHeightFactor: 1.15 });
+    doc.setFont("helvetica", "normal").setFontSize(7).text(
+      noteLines,
+      X,
+      y + 2.5,
+      { lineHeightFactor: 1.15 },
+    );
     y += noteLines.length * 3.2;
   }
   if (isTestSheet(record)) watermark(doc);

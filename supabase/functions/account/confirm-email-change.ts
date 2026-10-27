@@ -1,14 +1,14 @@
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
-import { RPCS, TABLES } from "../_shared/database.constants.ts";
+import { TABLES } from "../_shared/database.constants.ts";
 import {
   EMAIL_CODE_MAX_ATTEMPTS,
   verifyEmailCode,
 } from "../_shared/email-code.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
+import { applyStudentEmail } from "../_shared/student-email.ts";
 import type { EdgeContext } from "../_shared/types.ts";
 import { requiredString } from "../_shared/validation.ts";
 import type { ConfirmEmailChangeBody } from "./interfaces.ts";
-import { loadStudentProfile } from "./profile.ts";
 
 /**
  * POST /account/email-change/confirm
@@ -88,63 +88,7 @@ export async function confirmEmailChange(
   }
   const newEmail = consumed.new_email;
 
-  const { data: inUse, error: inUseError } = await context.supabaseAdmin.rpc(
-    RPCS.emailInUse,
-    { p_email: newEmail, p_except_user_id: userId },
-  );
-  if (inUseError) {
-    throw new AppError(500, "email_lookup_failed", inUseError.message);
-  }
-  if (inUse) {
-    throw new AppError(
-      409,
-      "email_taken",
-      "The email already has an account.",
-      {
-        field: "email",
-      },
-    );
-  }
-
-  // profiles.email (búsqueda del login) y auth.users.email deben coincidir:
-  // si falla el segundo, se revierte el primero.
-  const { email: previousEmail } = await loadStudentProfile(context, userId);
-  const { error: profileError } = await context.supabaseAdmin
-    .from(TABLES.profiles)
-    .update({ email: newEmail })
-    .eq("id", userId);
-  if (profileError) {
-    if (profileError.code === "23505") {
-      throw new AppError(
-        409,
-        "email_taken",
-        "The email already has an account.",
-        {
-          field: "email",
-        },
-      );
-    }
-    throw new AppError(500, "email_change_failed", profileError.message);
-  }
-  const { error: authError } = await context.supabaseAdmin.auth.admin
-    .updateUserById(userId, { email: newEmail, email_confirm: true });
-  if (authError) {
-    await context.supabaseAdmin
-      .from(TABLES.profiles)
-      .update({ email: previousEmail })
-      .eq("id", userId);
-    if (authError.code === "email_exists") {
-      throw new AppError(
-        409,
-        "email_taken",
-        "The email already has an account.",
-        {
-          field: "email",
-        },
-      );
-    }
-    throw new AppError(500, "email_change_failed", authError.message);
-  }
+  await applyStudentEmail(context, userId, newEmail);
 
   await writeAudit(
     context,

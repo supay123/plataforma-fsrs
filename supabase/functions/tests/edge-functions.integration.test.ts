@@ -963,21 +963,19 @@ Deno.test({
     });
     assert.equal(verified.status, "verified");
 
-    // Kuti confirmó el pago del plan semestral (no se llama a Kuti en el test).
+    // Mercado Pago aprobó el pago del plan semestral (no se le llama en el test).
     const paymentId = crypto.randomUUID();
     const { error: paymentError } = await adminClient
       .from(TABLES.planPayments)
       .insert({
         id: paymentId,
-        kuti_payment_intent_id: `pi_test_${suffix}`,
+        provider_payment_id: `mp_test_${suffix}`,
         livemode: false,
         plan: "semestral",
         amount: 77.4,
         registration_id: registrationId,
         email: correctedEmail,
         status: "succeeded",
-        qr_payload: "000201",
-        expires_at: new Date(Date.now() + 1_800_000).toISOString(),
         paid_at: new Date().toISOString(),
       });
     assert.ifError(paymentError);

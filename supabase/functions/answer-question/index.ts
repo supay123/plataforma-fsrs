@@ -4,10 +4,17 @@ import { requireProfile } from "../_shared/auth.ts";
 import { RPCS, TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
 import { scheduleAnswer } from "../_shared/fsrs.ts";
-import type { FsrsConfig, StoredCard } from "../_shared/interfaces/fsrs.interfaces.ts";
+import type {
+  FsrsConfig,
+  StoredCard,
+} from "../_shared/interfaces/fsrs.interfaces.ts";
 import type { AnswerFeedback } from "../_shared/interfaces/session.interfaces.ts";
 import { nonNegativeInteger, option, uuid } from "../_shared/validation.ts";
-import type { AnswerQuestionBody, AnswerTarget, QuestionKey } from "./interfaces.ts";
+import type {
+  AnswerQuestionBody,
+  AnswerTarget,
+  QuestionKey,
+} from "./interfaces.ts";
 
 function feedbackFor(
   selectedOption: string,
@@ -94,7 +101,11 @@ export default {
           );
         }
         if (!session.fsrs_config) {
-          throw new AppError(500, "fsrs_config_failed", "FSRS config not found.");
+          throw new AppError(
+            500,
+            "fsrs_config_failed",
+            "FSRS config not found.",
+          );
         }
 
         const reviewedAt = new Date();
@@ -109,16 +120,19 @@ export default {
         // ignores a second answer, so a concurrent request cannot overwrite it.
         const save = async () => {
           for (let attempt = 1; attempt <= SAVE_ATTEMPTS; attempt++) {
-            const { error } = await context.supabaseAdmin.rpc(RPCS.applyAnswer, {
-              p_student_id: student.id,
-              p_session_question_id: sessionQuestionId,
-              p_selected_option: selectedOption,
-              // PostgreSQL permits NULL here, but generated RPC argument types
-              // do not expose parameter nullability from the system catalog.
-              p_response_time_ms: responseTime as number,
-              p_reviewed_at: reviewedAt.toISOString(),
-              p_card: nextCard,
-            });
+            const { error } = await context.supabaseAdmin.rpc(
+              RPCS.applyAnswer,
+              {
+                p_student_id: student.id,
+                p_session_question_id: sessionQuestionId,
+                p_selected_option: selectedOption,
+                // PostgreSQL permits NULL here, but generated RPC argument types
+                // do not expose parameter nullability from the system catalog.
+                p_response_time_ms: responseTime as number,
+                p_reviewed_at: reviewedAt.toISOString(),
+                p_card: nextCard,
+              },
+            );
             if (!error) return;
             if (attempt === SAVE_ATTEMPTS) {
               console.error("Answer save failed", sessionQuestionId, error);
