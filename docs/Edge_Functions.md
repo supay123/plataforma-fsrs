@@ -51,6 +51,7 @@ pnpm exec supabase gen types --local --schema public \
 | `admin-student-account` | Admin | A student's account as seen by the admin: `GET /admin-student-account/profile?user_id=` returns the same profile the student sees in `GET /account/profile`; `PUT /admin-student-account/profile` replaces the editable fields with the same rules; `PUT /admin-student-account/email` (`user_id`, `email`) changes the email without verification, also for sign-in, and voids pending email-change codes and reset links (`409 email_taken`); `PUT /admin-student-account/group` (`user_id`, `teacher_id`) moves the student to another teacher's group through `edge_change_student_group`: ends the enrollments in other teachers' courses (their progress is deleted after 7 days unless the student returns), enrolls the student in the new teacher's courses and takes the teacher's college (`400 invalid_teacher`); the `GET` response also includes `group_teacher_ids`; `POST /admin-student-account/password-reset` (`user_id`) emails the student the same reset link as `POST /account/password-reset` (`409 student_email_required` if the student has no email); `DELETE /admin-student-account/password-reset?user_id=` voids it. `404 user_not_found` if `user_id` is not a student. |
 | `admin-renew-access` | Admin | Replaces a student's inclusive access-date range and optionally reactivates the profile. |
 | `import-questions` | Admin, teacher | Validates or confirms an official-template XLSX/JSON question import. A teacher is restricted to their own courses. |
+| `questions` | Admin, teacher | Lists a topic's current questions (`GET /questions?topic_id=...`), archives one (`DELETE /questions?id=...`) or all of them (`DELETE /questions/topic?topic_id=...`). Archived questions no longer appear in new sessions but their historical results are kept. A teacher is restricted to their own courses. |
 | `start-session` | Student | Atomically resumes the student's existing in-progress session for a topic or creates one with up to 20 due-first/new questions. |
 | `get-session` | Student | Reloads an owned session. Answered questions include their `feedback`; pending questions never expose the correct answer or explanation. |
 | `answer-question` | Student | Corrects an answer server-side, maps it to FSRS `Again` or `Good`, atomically persists the answer/card/review log, and returns immediate `feedback` for the stored answer. Safe to retry. |
@@ -82,6 +83,9 @@ pnpm exec supabase gen types --local --schema public \
   `access_valid_until`, optional `reactivate`.
 - `import-questions`: `action` (`validate` or `confirm`), `topic_id`,
   `filename`, and either `rows` or `file_base64`.
+- `questions`: `GET /questions?topic_id=...` to list the topic's questions,
+  `DELETE /questions?id=...` to archive one, and
+  `DELETE /questions/topic?topic_id=...` to archive all of them.
 - `start-session`: `topic_id`.
 - `get-session`, `complete-session`, `get-session-review`: `session_id`.
 - `answer-question`: `session_question_id`, `selected_option` (`A`–`D`),

@@ -254,27 +254,34 @@ export function HomePage() {
 
     {/* Encima del pie fijo (z-0), que queda descubierto al terminar la página. */}
     <main className="relative z-10 bg-slate-950 shadow-xl shadow-black/40">
-    <section className="relative flex min-h-[calc(100svh-4rem)] flex-col items-center px-4 pb-10">
+    <section className="relative flex min-h-[calc(100svh-4rem)] flex-col items-center px-4 pb-4 sm:pb-10">
       <div aria-hidden className="bg-grid absolute inset-0" />
       <Glow className="-left-32 top-10 h-96 w-96 bg-indigo-600/30" />
       <Glow className="-right-24 bottom-0 h-80 w-80 bg-emerald-500/20 [animation-delay:-4s]" />
-      <Reveal className="relative flex flex-col items-center pt-8 text-center">
-        <Logo className="h-10 sm:h-15" />
-        <h1 className="mt-4 text-4xl font-extrabold tracking-tight sm:text-5xl">
-          Estudia lo que no sabes e <span className="bg-gradient-to-r from-indigo-300 to-emerald-300 bg-clip-text text-transparent">ingresa a la UNSAAC</span>
+      <Reveal className="relative flex flex-col items-center text-center sm:pt-8">
+        <Logo className="h-8 sm:h-20" />
+        {/* En celular el título es más pequeño y no fuerza el salto de línea. */}
+        <h1 className="mt-3 max-w-7xl text-2xl font-extrabold tracking-tight sm:mt-4 sm:text-5xl">
+          No estudies TODO. <span className="bg-gradient-to-r from-indigo-300 to-emerald-300 bg-clip-text text-transparent">Estudia lo que no sabes</span>
+          <br className="hidden sm:inline" /> e INGRESA a la UNSAAC
         </h1>
       </Reveal>
-      <div className="relative mx-auto my-auto grid pt-8 w-full max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
-        <Reveal><IntroVideo onEnded={() => setPopStart(true)} /></Reveal>
+      <div className="relative mx-auto my-auto grid w-full max-w-6xl items-center gap-4 pt-4 px-0 sm:gap-10 sm:pt-8 sm:px-8 lg:grid-cols-2 lg:gap-14">
+        {/* En celular el video se achica para que toda la sección entre en pantalla. */}
+        <Reveal className="mx-auto w-full max-w-[340px] sm:max-w-none"><IntroVideo onEnded={() => setPopStart(true)} /></Reveal>
         {/* Mismo ancho para el texto y la lista, así quedan alineados en celular. */}
         <Reveal delay={150} className="mx-auto max-w-md text-center lg:mx-0 lg:text-left">
-          <p className="text-lg text-slate-300">Deja de estudiar sin rumbo. {BUSINESS.brand} te muestra en qué fallas y te entrena justo en lo que te falta para ingresar.</p>
-          <ul className="mt-6 grid gap-3 text-left">
-            {benefits.map(({ icon: Icon, text }) => <li key={text} className="flex items-center gap-3 text-slate-200">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300"><Icon size={17} aria-hidden /></span>{text}
+          <p className="text-base text-slate-300 sm:text-lg">Deja de estudiar sin rumbo. {BUSINESS.brand} te muestra en qué fallas y te entrena justo en lo que te falta para ingresar.</p>
+          {/* En celulares bajos se oculta la lista para que el resto entre sin scroll. */}
+          <ul className="mt-4 grid gap-2 text-left [@media(max-width:639px)_and_(max-height:700px)]:hidden sm:mt-6 sm:gap-3">
+            {benefits.map(({ icon: Icon, text }) => <li key={text} className="flex items-center gap-2.5 text-sm text-slate-200 sm:gap-3 sm:text-base">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300 sm:h-8 sm:w-8"><Icon size={16} aria-hidden /></span>{text}
             </li>)}
           </ul>
-          <div className={clsx("mt-8 flex justify-center", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
+          <p className="mt-4 text-sm text-slate-400 sm:mt-8">
+            Empieza con <strong className="text-base font-bold text-emerald-300">{formatSoles(PLAN.priceSoles)} al mes</strong> · menos de {formatSoles(dailyCap)} al día
+          </p>
+          <div className={clsx("mt-3 flex justify-center sm:mt-4", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
             <StartButton compact />
           </div>
         </Reveal>
@@ -283,7 +290,7 @@ export function HomePage() {
 
     {/* Las secciones alternan fondo oscuro, blanco, índigo y claro para que se distinga dónde empieza cada una. */}
     <section id="pasos" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-white px-4 py-16 text-center text-slate-900">
-      <Glow className="left-1/2 top-1/3 h-96 w-[36rem] -translate-x-1/2 bg-indigo-100/70" />
+      <Glow className="left-1/2 top-1/3 h-64 w-[36rem] -translate-x-1/2 bg-indigo-100/70" />
       <div className="relative mx-auto max-w-5xl">
         <Reveal>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-indigo-600">Cómo funciona</p>
@@ -300,6 +307,9 @@ export function HomePage() {
             </div>
           </Reveal>)}
         </ol>
+      </div>
+      <div className={clsx("mt-8 flex justify-center", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
+        <StartButton compact />
       </div>
     </section>
 

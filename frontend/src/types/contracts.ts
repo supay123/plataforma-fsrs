@@ -25,6 +25,17 @@ export interface ImportRow {
 export interface ImportIssue { row: number; code: string; message: string }
 export interface ImportReport { total: number; accepted: number; rejected: number; duplicates: number; issues: ImportIssue[] }
 export interface ImportResponse { batch_id?: string; report: ImportReport; accepted_rows?: ImportRow[] }
+export interface TopicQuestion {
+  id: string;
+  statement: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_option: AnswerOption;
+  explanation: string | null;
+  created_at: string;
+}
 
 export interface AnswerFeedback { is_correct: boolean; correct_option: AnswerOption; explanation: string | null }
 export interface AnswerResult {

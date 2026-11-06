@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ModalProvider } from "../../components/ui/modal";
 import { CoursesPage } from "./CoursesPage";
 
 const mocks = vi.hoisted(() => ({
@@ -33,10 +34,12 @@ describe("CoursesPage", () => {
 
   it("archives a course only after confirmation", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><MemoryRouter><CoursesPage /></MemoryRouter></QueryClientProvider>);
+    render(<QueryClientProvider client={client}><ModalProvider><MemoryRouter><CoursesPage /></MemoryRouter></ModalProvider></QueryClientProvider>);
     await user.click(await screen.findByRole("button", { name: "Eliminar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Eliminar curso" });
+    expect(mocks.archiveCourse).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Eliminar curso" }));
     await waitFor(() => expect(mocks.archiveCourse.mock.calls[0]?.[0]).toBe("course-1"));
   });
 });

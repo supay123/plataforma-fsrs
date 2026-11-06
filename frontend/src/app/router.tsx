@@ -12,6 +12,7 @@ const TermsPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({
 const PrivacyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const RefundPolicyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.RefundPolicyPage })));
 const ComplaintsBookPage = lazy(() => import("../pages/public/ComplaintsBookPage").then((m) => ({ default: m.ComplaintsBookPage })));
+const AdminCoursesPage = lazy(() => import("../pages/admin/CoursesPage").then((m) => ({ default: m.CoursesPage })));
 const CollegesPage = lazy(() => import("../pages/admin/CollegesPage").then((m) => ({ default: m.CollegesPage })));
 const AssignmentsPage = lazy(() => import("../pages/admin/AssignmentsPage").then((m) => ({ default: m.AssignmentsPage })));
 const TeacherDetailPage = lazy(() => import("../pages/admin/UserDetailPage").then((m) => ({ default: m.TeacherDetailPage })));
@@ -44,7 +45,7 @@ export function AppRouter() {
     <Route path="/estudiante/invitacion" element={<InvitationPage />} />
     <Route path="/estudiante/renovar" element={<RoleGuard role="student" allowExpired><RenewPage /></RoleGuard>} />
     <Route path="/admin" element={<RoleGuard role="admin"><PortalLayout role="admin" /></RoleGuard>}>
-      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
+      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="cursos" element={<AdminCoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="/profesor" element={<RoleGuard role="teacher"><PortalLayout role="teacher" /></RoleGuard>}>
       <Route index element={<Navigate to="cursos" replace />} /><Route path="cursos" element={<CoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="estudiantes" element={<StudentsPage />} /><Route path="estudiantes/:studentId/resultados" element={<StudentResultsPage />} /><Route path="sesiones/:sessionId" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />

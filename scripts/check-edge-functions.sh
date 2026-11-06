@@ -17,6 +17,7 @@ function_dirs=(
   get-session-review
   get-session
   import-questions
+  questions
   login-with-code
   recover-password
   start-session

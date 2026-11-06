@@ -1,4 +1,4 @@
-import { TriangleAlert } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "./index";
 import { ModalContext, type ModalApi, type ModalOptions, type ModalVariant } from "./use-modal";
@@ -39,7 +39,16 @@ function ModalDialog({ modal, onClose }: { modal: OpenModal; onClose: () => void
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
     <button aria-label="Cerrar diálogo" className="absolute inset-0 bg-slate-950/55" disabled={pending} onClick={onClose} />
     <section aria-modal="true" aria-labelledby="modal-title" className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" role="dialog">
-      <h2 id="modal-title" className="flex items-center gap-2 text-lg font-bold text-slate-950">
+      <button
+        aria-label="Cerrar"
+        className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={pending}
+        onClick={onClose}
+        type="button"
+      >
+        <X aria-hidden="true" className="h-5 w-5" />
+      </button>
+      <h2 id="modal-title" className="flex items-center gap-2 pr-10 text-lg font-bold text-slate-950">
         {modal.variant === "warning" && <TriangleAlert aria-hidden="true" className="h-5 w-5 shrink-0 text-amber-600" />}
         {modal.title}
       </h2>
