@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Spinner } from "../../components/ui";
 import { createTopic, listCourses, listTopics, updateTopic } from "../../features/courses/api";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { importQuestionsPath } from "../../lib/portal-paths";
 
 const empty = { name: "", material_url: "" };
 
@@ -48,7 +49,7 @@ export function TopicsPage() {
           <Button variant="ghost" aria-label={`Bajar ${topic.name}`} disabled={index === (query.data?.length ?? 0) - 1} onClick={() => void move(index, 1)}>↓</Button>
           <Button variant="ghost" onClick={() => { setEditingId(topic.id); setForm({ name: topic.name, material_url: topic.material_url ?? "" }); }}>Editar</Button>
           <Button variant="ghost" onClick={() => void updateTopic(topic.id, { status: topic.status === "active" ? "inactive" : "active" }).then(invalidate)}>{topic.status === "active" ? "Desactivar" : "Activar"}</Button>
-          <Link to={`/profesor/temas/${topic.id}/importar`}><Button>Importar</Button></Link>
+          <Link to={importQuestionsPath(profile?.role, topic.id)}><Button>Importar</Button></Link>
         </div>
       </div>)}</div> : <EmptyState>No hay temas registrados.</EmptyState>}</Card>
       <Card>

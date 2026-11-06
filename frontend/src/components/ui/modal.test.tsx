@@ -89,6 +89,16 @@ describe("Modal", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("closes with the X button without running the action", async () => {
+    const user = userEvent.setup();
+    const { onConfirm } = renderOpener("delete");
+    await user.click(screen.getByRole("button", { name: "Abrir" }));
+    await user.click(screen.getByRole("button", { name: "Cerrar" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("closes with Cancelar, Escape or the backdrop without running the action", async () => {
     const user = userEvent.setup();
     const { onConfirm } = renderOpener("delete");

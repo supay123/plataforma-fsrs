@@ -84,7 +84,8 @@ Comportamiento:
 - Si la promesa se resuelve, el modal se cierra solo. Si falla, sigue abierto
   para reintentar o cancelar; quien lo llama muestra el error (por ejemplo, con
   un toast).
-- Se cierra sin ejecutar nada con "Cancelar", Escape o un clic fuera.
+- Se cierra sin ejecutar nada con "Cancelar", Escape, la "X" de la esquina
+  superior derecha o un clic fuera.
 
 ```tsx
 import { useModal } from "../../components/ui/use-modal";
@@ -101,6 +102,33 @@ modal.delete({
 Ejemplos reales: `pages/admin/CollegesPage.tsx`, `UsersPage.tsx`,
 `AssignmentsPage.tsx`, `UserAccountPage.tsx` (variante `warning`) y
 `features/payments/PaymentPanel.tsx` (variante `info`). En tests, envuelve el componente con `<ModalProvider>`.
+
+### ModalForm (modales con formulario)
+
+Cuando la acción necesita datos, usa `ModalForm` en lugar de `useModal()`.
+Renderiza el formulario, un botón "Cancelar", una "X" de cierre en la esquina
+superior derecha y un botón principal con el texto que indiques; el botón
+principal es `type="submit"`, así que también se envía con Enter.
+
+- Archivo: `components/ui/modal-form.tsx` (`ModalForm`).
+- Se controla desde el componente padre: se muestra solo cuando su estado está
+  abierto (`{open && <ModalForm …>}`), no necesita provider.
+
+| Prop | Tipo | Descripción |
+| --- | --- | --- |
+| `title` | `string` | Título del modal. |
+| `confirmLabel` | `string` | Texto del botón principal. |
+| `pendingLabel` | `string` (opcional) | Texto mientras se ejecuta la acción ("Guardando…" por defecto). |
+| `pending` | `boolean` (opcional) | Desactiva los botones y el cierre mientras la acción corre. |
+| `onCancel` | `() => void` | Cerrar sin ejecutar (botón, "X", Escape o clic fuera). |
+| `onSubmit` | `() => void` | Acción del botón principal y del submit del formulario. |
+| `error` | `ReactNode` (opcional) | Error de la acción; se muestra dentro del modal. |
+| `children` | `ReactNode` | Campos del formulario. |
+
+Ejemplo real: `features/courses/CoursesView.tsx` lo usa para crear y editar
+cursos. Los campos compartidos están en `CourseFormFields` dentro del mismo
+archivo. La eliminación de un curso usa `modal.delete` para advertir que la
+acción es permanente antes de confirmarla.
 
 ---
 
@@ -233,6 +261,27 @@ y envía el token de Yape.
 
 Los planes y precios están en `config/business.ts` (`PLANS`, `findPlan`,
 `planPriceLabel`) y deben coincidir con `supabase/functions/_shared/plans.ts`.
+
+## Cursos (`features/courses/`)
+
+La lista de cursos es un solo componente compartido por el profesor y el
+administrador:
+
+| Archivo | Qué ofrece |
+| --- | --- |
+| `CoursesView.tsx` | Vista única de cursos. Con rol `admin` muestra todos los cursos agrupados por profesor, con buscador y filtro por profesor; con rol `teacher` muestra solo los del profesor y permite crearlos, editarlos, activarlos/desactivarlos y archivarlos. El alcance de los datos lo decide RLS, no la interfaz. |
+| `api.ts` | `listCourses` (todos los campos + colegio + nombre del profesor), `createCourse`, `updateCourse`, `archiveCourse`, `listTopics`, `createTopic`, `updateTopic`, `listStudentCourses` y `enrollStudent`. |
+
+Las páginas `pages/teacher/CoursesPage.tsx` y `pages/admin/CoursesPage.tsx`
+solo reexportan `CoursesView`. Si agregas una funcionalidad de cursos, hazlo en
+`CoursesView.tsx` (o en sus piezas dentro de `features/courses/`) para que se
+refleje en ambos roles; no crees una copia por rol.
+
+El detalle del curso (`TopicsPage`) y la importación de preguntas (`ImportPage`)
+también se reutilizan: las rutas son `/admin/cursos/:courseId` y
+`/admin/temas/:topicId/importar` para el admin, y `/profesor/...` para el
+profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
+(`courseTopicsPath` e `importQuestionsPath`), así no se repiten rutas por rol.
 
 ## Utilidades (`lib/`)
 

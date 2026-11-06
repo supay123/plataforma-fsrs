@@ -61,6 +61,7 @@ function_names=(
   admin-reset-user-credentials
   admin-renew-access
   import-questions
+  questions
   start-session
   get-session
   answer-question
