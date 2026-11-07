@@ -15,6 +15,8 @@ vi.mock("../../features/courses/api", () => ({
   archiveCourse: mocks.archiveCourse,
   listCourses: mocks.listCourses,
   createCourse: vi.fn(),
+  duplicateCourse: vi.fn(),
+  moveCourse: vi.fn(),
   updateCourse: vi.fn(),
 }));
 vi.mock("../../features/auth/AuthProvider", () => ({

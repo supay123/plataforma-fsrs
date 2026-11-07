@@ -2326,6 +2326,14 @@ export type Database = {
       };
     };
     Functions: {
+      admin_duplicate_course: {
+        Args: { p_course_id: string };
+        Returns: string;
+      };
+      admin_move_course: {
+        Args: { p_course_id: string; p_teacher_id: string };
+        Returns: undefined;
+      };
       admin_sync_teacher_students: {
         Args: { p_student_ids?: string[]; p_teacher_id: string };
         Returns: undefined;

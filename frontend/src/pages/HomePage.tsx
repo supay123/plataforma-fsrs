@@ -266,7 +266,7 @@ export function HomePage() {
           <br className="hidden sm:inline" /> e INGRESA a la UNSAAC
         </h1>
       </Reveal>
-      <div className="relative mx-auto my-auto grid w-full max-w-6xl items-center gap-4 pt-4 px-0 sm:gap-10 sm:pt-8 sm:px-8 lg:grid-cols-2 lg:gap-14">
+      <div className="relative mx-auto grid w-full max-w-6xl flex-1 content-evenly items-center gap-4 px-0 pt-10 sm:gap-10 sm:px-8 sm:pt-8 lg:grid-cols-2 lg:gap-14">
         {/* En celular el video se achica para que toda la sección entre en pantalla. */}
         <Reveal className="mx-auto w-full max-w-[340px] sm:max-w-none"><IntroVideo onEnded={() => setPopStart(true)} /></Reveal>
         {/* Mismo ancho para el texto y la lista, así quedan alineados en celular. */}
@@ -278,10 +278,10 @@ export function HomePage() {
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300 sm:h-8 sm:w-8"><Icon size={16} aria-hidden /></span>{text}
             </li>)}
           </ul>
-          <p className="mt-4 text-sm text-slate-400 sm:mt-8">
+          <p className="mt-4 text-sm text-slate-400 sm:mt-7">
             Empieza con <strong className="text-base font-bold text-emerald-300">{formatSoles(PLAN.priceSoles)} al mes</strong> · menos de {formatSoles(dailyCap)} al día
           </p>
-          <div className={clsx("mt-3 flex justify-center sm:mt-4", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
+          <div className={clsx("mt-4 flex justify-center sm:mt-3", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
             <StartButton compact />
           </div>
         </Reveal>

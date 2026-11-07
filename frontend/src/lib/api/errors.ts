@@ -80,3 +80,24 @@ export async function normalizeError(error: unknown): Promise<AppError> {
   if (error && typeof error === "object" && "message" in error) return new AppError("request_error", String(error.message));
   return new AppError("unknown_error", "Ocurrió un error inesperado.");
 }
+
+/**
+ * Mensajes en español para reglas de la base de datos que llegan crudas desde
+ * PostgREST (índices únicos y triggers). Se busca por el nombre de la
+ * restricción o por el texto del trigger.
+ */
+const databaseMessages: Array<{ match: string; message: string }> = [
+  { match: "courses_teacher_name_unique_active_ci", message: "Este profesor ya tiene un curso con ese nombre. Usa otro nombre o cambia el nombre del curso existente." },
+  { match: "at most 8 non-archived courses", message: "Un profesor puede tener como máximo 8 cursos. Archiva alguno o elige otro profesor." },
+  { match: "teacher and course must belong to the same college", message: "El profesor y el curso deben ser del mismo colegio." },
+  { match: "at most 25 non-archived topics", message: "Un curso puede tener como máximo 25 temas." },
+  { match: "at most 50 non-archived questions", message: "Un tema puede tener como máximo 50 preguntas." },
+];
+
+/** Convierte un error de PostgREST en un `AppError` con texto en español; si no lo reconoce, lo devuelve igual. */
+export function translateDatabaseError(error: unknown): unknown {
+  if (!error || typeof error !== "object" || !("message" in error)) return error;
+  const text = String(error.message);
+  const known = databaseMessages.find(({ match }) => text.includes(match));
+  return known ? new AppError("database_rule", known.message, error) : error;
+}
