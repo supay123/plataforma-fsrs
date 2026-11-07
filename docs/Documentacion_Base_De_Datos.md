@@ -197,6 +197,13 @@ Cursos pertenecientes a un solo profesor y a un solo colegio.
 - `courses_insert`: administrador o profesor activo creando un curso propio en su colegio.
 - `courses_update`: administrador o profesor propietario; no permite reasignar el curso a otro profesor/colegio fuera de sus permisos.
 
+### Funciones relacionadas
+
+`SECURITY INVOKER`, con `search_path = ''`. Las ejecuta un administrador autenticado desde la vista de cursos; si quien llama no es administrador fallan con `42501`. Los triggers y el índice único de arriba se siguen aplicando.
+
+- `public.admin_move_course(p_course_id, p_teacher_id)`: pasa el curso a otro profesor (debe ser del mismo colegio y tener menos de 8 cursos). Como los estudiantes se asignan por profesor, reemplaza las matrículas del curso por las de los estudiantes del nuevo profesor. Si el curso ya es de ese profesor, no hace nada.
+- `public.admin_duplicate_course(p_course_id)`: crea un curso para el mismo profesor y colegio con el nombre `<nombre> - duplicado`, y copia los temas y las preguntas no archivados (con su estado, sin `import_batch_id` ni `supersedes_question_id`). No copia sesiones, tarjetas FSRS ni accesos a temas, así que el curso empieza sin progreso. Los estudiantes del profesor se matriculan con el trigger `courses_sync_new_enrollments`. Devuelve el id del curso nuevo. Si el profesor ya tiene un curso con ese nombre, falla por `courses_teacher_name_unique_active_ci`.
+
 ---
 
 ## public.course_enrollments

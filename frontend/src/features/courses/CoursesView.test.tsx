@@ -9,6 +9,8 @@ import { CoursesView } from "./CoursesView";
 const mocks = vi.hoisted(() => ({
   archiveCourse: vi.fn(),
   createCourse: vi.fn(),
+  duplicateCourse: vi.fn(),
+  moveCourse: vi.fn(),
   listCourses: vi.fn(),
   listUsers: vi.fn(),
   listColleges: vi.fn(),
@@ -18,6 +20,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./api", () => ({
   archiveCourse: mocks.archiveCourse,
   createCourse: mocks.createCourse,
+  duplicateCourse: mocks.duplicateCourse,
+  moveCourse: mocks.moveCourse,
   listCourses: mocks.listCourses,
   updateCourse: mocks.updateCourse,
 }));
@@ -70,6 +74,8 @@ describe("CoursesView como administrador", () => {
     mocks.createCourse.mockReset().mockResolvedValue({});
     mocks.updateCourse.mockReset().mockResolvedValue({});
     mocks.archiveCourse.mockReset().mockResolvedValue("course-1");
+    mocks.duplicateCourse.mockReset().mockResolvedValue("course-9");
+    mocks.moveCourse.mockReset().mockResolvedValue(undefined);
   });
 
   it("agrupa los cursos por profesor", async () => {
@@ -191,5 +197,37 @@ describe("CoursesView como administrador", () => {
     await user.click(within(dialog).getByRole("button", { name: "Eliminar curso" }));
 
     await waitFor(() => expect(mocks.archiveCourse.mock.calls[0]?.[0]).toBe("course-1"));
+  });
+
+  it("duplica un curso solo después de confirmar", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("heading", { name: "Ana Profesora" });
+
+    await user.click(screen.getAllByRole("button", { name: "Duplicar" })[0]);
+
+    const dialog = await screen.findByRole("dialog", { name: "Duplicar curso" });
+    expect(mocks.duplicateCourse).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Duplicar curso" }));
+
+    await waitFor(() => expect(mocks.duplicateCourse.mock.calls[0]?.[0]).toBe("course-1"));
+  });
+
+  it("mueve un curso a otro profesor del mismo colegio", async () => {
+    mocks.listUsers.mockResolvedValue([...users, { id: "teacher-3", full_name: "Carla Profesora", role: "teacher", college_id: "college-1" }]);
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("heading", { name: "Ana Profesora" });
+
+    await user.click(screen.getAllByRole("button", { name: "Mover" })[0]);
+
+    const dialog = await screen.findByRole("dialog", { name: "Mover curso" });
+    const select = within(dialog).getByLabelText("Nuevo profesor");
+    expect(within(select).queryByRole("option", { name: "Beto Profesor" })).toBeNull();
+    expect(within(select).queryByRole("option", { name: "Ana Profesora" })).toBeNull();
+    await user.selectOptions(select, "teacher-3");
+    await user.click(within(dialog).getByRole("button", { name: "Mover curso" }));
+
+    await waitFor(() => expect(mocks.moveCourse.mock.calls[0]?.[0]).toEqual({ courseId: "course-1", teacherId: "teacher-3" }));
   });
 });

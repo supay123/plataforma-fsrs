@@ -9,7 +9,7 @@ import type { Tables } from "../../types/database";
 import { useAuth } from "../auth/AuthProvider";
 import { listColleges } from "../colleges/api";
 import { listUsers } from "../users/api";
-import { archiveCourse, createCourse, listCourses, updateCourse } from "./api";
+import { archiveCourse, createCourse, duplicateCourse, listCourses, moveCourse, updateCourse } from "./api";
 
 type CourseFormState = { name: string; description: string; teacher_id: string; college_id: string };
 type TeacherOption = { id: string; full_name: string; college_id: string | null };
@@ -62,7 +62,7 @@ function CourseFormFields({ form, onChange, teachers, colleges }: {
           {colleges!.map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}
         </Select>
       </Field>
-      <Field label="Profesor del curso" hint={form.college_id ? undefined : "Elige primero un colegio"}>
+      <Field label={`Profesor del curso ${form.college_id ? "" : " - Elige primero un colegio"}`}>
         <Select required value={form.teacher_id} disabled={!form.college_id} onChange={(event) => onChange({ ...form, teacher_id: event.target.value })}>
           <option value="">Selecciona un profesor</option>
           {availableTeachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>)}
@@ -92,6 +92,9 @@ export function CoursesView() {
   const [adminFormOpen, setAdminFormOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("");
+  const [collegeFilter, setCollegeFilter] = useState("");
+  const [moving, setMoving] = useState<CourseRow | null>(null);
+  const [moveTeacherId, setMoveTeacherId] = useState("");
 
   const courses = useMemo(() => (query.data ?? []) as unknown as CourseRow[], [query.data]);
   const teacherDirectory = useMemo<TeacherOption[]>(
@@ -100,38 +103,44 @@ export function CoursesView() {
     [users.data],
   );
 
-  const teacherOptions = useMemo(() => {
-    const byId = new Map<string, string>();
-    for (const course of courses) byId.set(course.teacher_id, teacherName(course));
-    return [...byId.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, "es"));
-  }, [courses]);
+  // Todos los profesores del directorio (tengan o no cursos), más los que aparezcan en cursos.
+  const allTeachers = useMemo(() => {
+    const byId = new Map<string, TeacherOption>();
+    for (const teacher of teacherDirectory) byId.set(teacher.id, teacher);
+    for (const course of courses) {
+      if (!byId.has(course.teacher_id)) byId.set(course.teacher_id, { id: course.teacher_id, full_name: teacherName(course), college_id: course.college_id });
+    }
+    return [...byId.values()].sort((a, b) => a.full_name.localeCompare(b.full_name, "es"));
+  }, [teacherDirectory, courses]);
+
+  const teacherOptions = useMemo(
+    () => allTeachers.filter((teacher) => !collegeFilter || teacher.college_id === collegeFilter)
+      .map((teacher) => ({ id: teacher.id, name: teacher.full_name })),
+    [allTeachers, collegeFilter],
+  );
 
   const adminGroups = useMemo(() => {
     const needle = normalize(search);
-    const filtered = courses.filter((course) => {
-      if (teacherFilter && course.teacher_id !== teacherFilter) return false;
-      if (!needle) return true;
-      return normalize([
-        course.name,
-        course.description ?? "",
-        teacherName(course),
-        course.colleges?.name ?? "",
-      ].join(" ")).includes(needle);
-    });
-    const groups = new Map<string, CourseGroup>();
-    for (const course of filtered) {
-      const group = groups.get(course.teacher_id) ?? {
-        teacherId: course.teacher_id,
-        teacherName: teacherName(course),
-        courses: [],
-      };
-      group.courses.push(course);
-      groups.set(course.teacher_id, group);
+    const result: CourseGroup[] = [];
+    for (const teacher of allTeachers) {
+      if (teacherFilter && teacher.id !== teacherFilter) continue;
+      if (collegeFilter && teacher.college_id !== collegeFilter) continue;
+      const teacherCourses = courses.filter((course) => {
+        if (course.teacher_id !== teacher.id) return false;
+        if (collegeFilter && course.college_id !== collegeFilter) return false;
+        if (!needle) return true;
+        return normalize([
+          course.name,
+          course.description ?? "",
+          teacherName(course),
+          course.colleges?.name ?? "",
+        ].join(" ")).includes(needle);
+      });
+      if (needle && !teacherCourses.length && !normalize(teacher.full_name).includes(needle)) continue;
+      result.push({ teacherId: teacher.id, teacherName: teacher.full_name, courses: teacherCourses });
     }
-    return [...groups.values()].sort((a, b) => a.teacherName.localeCompare(b.teacherName, "es"));
-  }, [courses, search, teacherFilter]);
+    return result;
+  }, [allTeachers, courses, search, teacherFilter, collegeFilter]);
 
   const save = useMutation({
     mutationFn: () => {
@@ -165,6 +174,18 @@ export function CoursesView() {
       void client.invalidateQueries({ queryKey: ["courses"] });
     },
   });
+  const move = useMutation({
+    mutationFn: () => moveCourse({ courseId: moving!.id, teacherId: moveTeacherId }),
+    onSuccess: () => {
+      setMoving(null);
+      setMoveTeacherId("");
+      void client.invalidateQueries({ queryKey: ["courses"] });
+    },
+  });
+  const duplicate = useMutation({
+    mutationFn: duplicateCourse,
+    onSuccess: () => { void client.invalidateQueries({ queryKey: ["courses"] }); },
+  });
   const toggle = useMutation({
     mutationFn: (course: CourseRow) => updateCourse(course.id, { status: course.status === "active" ? "inactive" : "active" }),
     onSuccess: () => { void client.invalidateQueries({ queryKey: ["courses"] }); },
@@ -193,6 +214,27 @@ export function CoursesView() {
     setEditingId(null);
     setForm(empty);
   };
+  const openMove = (course: CourseRow) => {
+    move.reset();
+    setMoveTeacherId("");
+    setMoving(course);
+  };
+  const closeMove = () => {
+    if (move.isPending) return;
+    setMoving(null);
+  };
+  const confirmDuplicate = (course: CourseRow) => {
+    duplicate.reset();
+    modal.create({
+      title: "Duplicar curso",
+      body: <div className="grid gap-2">
+        <p>Se creará una copia de <strong className="text-slate-900">{course.name}</strong> con sus temas y preguntas, para el mismo profesor.</p>
+        <p>La copia se llamará «{course.name} - duplicado» y empezará sin progreso de estudiantes.</p>
+      </div>,
+      confirmLabel: "Duplicar curso",
+      onConfirm: () => duplicate.mutateAsync(course.id),
+    });
+  };
   const confirmDelete = (course: CourseRow) => {
     modal.delete({
       title: "Eliminar curso",
@@ -212,18 +254,20 @@ export function CoursesView() {
   if (isAdmin) return <>
     <PageHeader title="Cursos" description="Todos los cursos de la plataforma, agrupados por profesor." actions={<Button onClick={openCreate}>Nuevo Curso</Button>} />
     <Card>
-      <div className="grid gap-4 md:grid-cols-[1fr_18rem]">
+      <div className="grid gap-4 md:grid-cols-[1fr_16rem_16rem]">
         <Field label="Buscar curso o profesor"><Input placeholder="Nombre del curso o del profesor" value={search} onChange={(event) => setSearch(event.target.value)} /></Field>
+        <Field label="Institución"><Select value={collegeFilter} onChange={(event) => { setCollegeFilter(event.target.value); setTeacherFilter(""); }}><option value="">Todas las instituciones</option>{(colleges.data ?? []).map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}</Select></Field>
         <Field label="Profesor"><Select value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}><option value="">Todos los profesores</option>{teacherOptions.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</Select></Field>
       </div>
     </Card>
     {query.error && <div className="mt-4"><Alert tone="error">{query.error.message}</Alert></div>}
+    {duplicate.error && <div className="mt-4"><Alert tone="error">{duplicate.error.message}</Alert></div>}
     {adminGroups.length ? <div className="mt-6 grid gap-6">{adminGroups.map((group) => <section key={group.teacherId}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-bold text-slate-950">{group.teacherName}</h2>
         <span className="text-sm text-slate-500">{courseCount(group.courses.length)}</span>
       </div>
-      <div className="grid gap-4">{group.courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="grid gap-4">{!group.courses.length && <EmptyState>No hay cursos disponibles. Crea uno.</EmptyState>}{group.courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-bold">{course.name}</h3>
@@ -234,12 +278,14 @@ export function CoursesView() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => openEdit(course)}>Editar</Button>
+          <Button variant="ghost" onClick={() => openMove(course)}>Mover</Button>
+          <Button variant="ghost" disabled={duplicate.isPending && duplicate.variables === course.id} onClick={() => confirmDuplicate(course)}>Duplicar</Button>
           <Button variant="ghost" disabled={toggle.isPending && toggle.variables?.id === course.id} onClick={() => toggle.mutate(course)}>{course.status === "active" ? "Desactivar" : "Activar"}</Button>
           <Button variant="danger" disabled={archive.isPending && archive.variables === course.id} onClick={() => confirmDelete(course)}>Eliminar</Button>
           <Link to={courseTopicsPath(profile?.role, course.id)}><Button>Temas</Button></Link>
         </div>
       </Card>)}</div>
-    </section>)}</div> : <div className="mt-6"><EmptyState>{courses.length ? "No hay cursos que coincidan con los filtros." : "No hay cursos registrados."}</EmptyState></div>}
+    </section>)}</div> : <div className="mt-6"><EmptyState>No hay profesores que coincidan con los filtros.</EmptyState></div>}
     {adminFormOpen && <ModalForm
       title={editingId ? "Editar curso" : "Nuevo curso"}
       confirmLabel={editingId ? "Guardar cambios" : "Crear curso"}
@@ -249,6 +295,23 @@ export function CoursesView() {
       error={save.error?.message}
     >
       <CourseFormFields form={form} onChange={setForm} teachers={teacherDirectory} colleges={colleges.data ?? []} />
+    </ModalForm>}
+    {moving && <ModalForm
+      title="Mover curso"
+      confirmLabel="Mover curso"
+      pending={move.isPending}
+      onCancel={closeMove}
+      onSubmit={() => move.mutate()}
+      error={move.error?.message}
+    >
+      <p className="text-sm text-slate-600">Elige el profesor que se quedará con <strong className="text-slate-900">{moving.name}</strong>. Solo se muestran profesores del mismo colegio. Los estudiantes del curso pasarán a ser los del nuevo profesor.</p>
+      <Field label="Nuevo profesor">
+        <Select required value={moveTeacherId} onChange={(event) => setMoveTeacherId(event.target.value)}>
+          <option value="">Selecciona un profesor</option>
+          {allTeachers.filter((teacher) => teacher.college_id === moving.college_id && teacher.id !== moving.teacher_id)
+            .map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>)}
+        </Select>
+      </Field>
     </ModalForm>}
   </>;
 
