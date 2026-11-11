@@ -42,14 +42,14 @@ export function LoginPage({ role }: { role: AppRole }) {
     try { setError(""); await auth.login(values.code, values.password, role); navigate(portal[role].path, { replace: true }); }
     catch (reason) { setError((await normalizeError(reason)).message); }
   });
-  return <AuthLayout cover={covers[role]}>
+  return <AuthLayout dark cover={covers[role]}>
       {recovering
         ? role === "student"
           ? <EmailRecoveryForm onBack={() => setRecovering(false)} />
           : <RecoveryForm role={role} onBack={() => setRecovering(false)} />
         : <>
-          <h1 className="text-2xl font-bold">Acceso de {portal[role].label}</h1>
-          <p className="mt-2 text-sm text-slate-600">{role === "student" ? "Ingresa con tu correo, o con el código que te dio tu institución." : "Ingresa con el código entregado por la institución."}</p>
+          <h1 className="font-display text-2xl font-semibold tracking-wide text-slate-50">Acceso de {portal[role].label}</h1>
+          <p className="mt-2 text-sm text-slate-400">{role === "student" ? "Ingresa con tu correo, o con el código que te dio tu institución." : "Ingresa con el código entregado por la institución."}</p>
           <form onSubmit={submit} className="mt-6 grid gap-4">
             {(searchParams.get("acceso") === "vencido" || access === "not_started") &&
               <Alert tone="error">Tu periodo de acceso todavía no empieza. Consulta con tu institución.</Alert>}
@@ -63,14 +63,14 @@ export function LoginPage({ role }: { role: AppRole }) {
             <Field label={role === "student" ? "Correo" : "Código"} error={errors.code?.message}><Input autoComplete="username" icon={role === "student" ? <Mail size={20} /> : <User size={20} />} placeholder={role === "student" ? "tu@correo.com" : "Tu código"} {...register("code")} /></Field>
             <Field label="Contraseña" error={errors.password?.message}><PasswordInput autoComplete="current-password" icon={<LockKeyhole size={20} />} placeholder="Contraseña" {...register("password")} /></Field>
             <Button disabled={isSubmitting}>{isSubmitting ? "Ingresando…" : "Ingresar"}</Button>
-            <button type="button" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800" onClick={() => { setError(""); setRecovering(true); }}>¿Olvidaste tu contraseña?</button>
-            {role === "student" && <p className="text-center text-sm text-slate-600">¿No tienes una cuenta? <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante/sign-up">Regístrate</Link></p>}          </form>
+            <button type="button" className="text-sm font-semibold text-emerald-400 hover:text-emerald-300" onClick={() => { setError(""); setRecovering(true); }}>¿Olvidaste tu contraseña?</button>
+            {role === "student" && <p className="text-center text-sm text-slate-400">¿No tienes una cuenta? <Link className="font-semibold text-emerald-400 hover:text-emerald-300" to="/estudiante/sign-up">Regístrate</Link></p>}          </form>
         </>}
   </AuthLayout>;
 }
 
 function BackToLogin({ onBack }: { onBack: () => void }) {
-  return <p className="text-center text-sm text-slate-600">¿Ya recordaste tu contraseña? <button type="button" className="font-semibold text-indigo-600 hover:text-indigo-800" onClick={onBack}>Inicia sesión</button></p>;
+  return <p className="text-center text-sm text-slate-400">¿Ya recordaste tu contraseña? <button type="button" className="font-semibold text-emerald-400 hover:text-emerald-300" onClick={onBack}>Inicia sesión</button></p>;
 }
 
 /** Estudiantes: reciben en su correo un link para crear una nueva contraseña. */
@@ -94,8 +94,8 @@ function EmailRecoveryForm({ onBack }: { onBack: () => void }) {
   };
 
   return <>
-    <h1 className="text-2xl font-bold">Recuperar contraseña</h1>
-    <p className="mt-2 text-sm text-slate-600">Escribe el correo de tu cuenta y te enviaremos un link para crear una nueva contraseña.</p>
+    <h1 className="font-display text-2xl font-semibold tracking-wide text-slate-50">Recuperar contraseña</h1>
+    <p className="mt-2 text-sm text-slate-400">Escribe el correo de tu cuenta y te enviaremos un link para crear una nueva contraseña.</p>
     <form onSubmit={(event) => void send(event)} className="mt-6 grid gap-4" noValidate>
       {sentTo
         ? <Alert tone="success">Te enviamos a <strong>{sentTo}</strong> un link para crear una nueva contraseña. Vence en 1 hora; si no lo ves, revisa la carpeta de spam.</Alert>
@@ -135,8 +135,8 @@ function RecoveryForm({ role, onBack }: { role: AppRole; onBack: () => void }) {
   };
 
   return <>
-    <h1 className="text-2xl font-bold">Restablecer contraseña</h1>
-    <p className="mt-2 text-sm text-slate-600">Confirma tu respuesta de seguridad para generar una nueva credencial.</p>
+    <h1 className="font-display text-2xl font-semibold tracking-wide text-slate-50">Restablecer contraseña</h1>
+    <p className="mt-2 text-sm text-slate-400">Confirma tu respuesta de seguridad para generar una nueva credencial.</p>
     <div className="mt-6 grid gap-4">
       {error && <Alert tone="error">{error}</Alert>}
       {credentials
@@ -144,7 +144,7 @@ function RecoveryForm({ role, onBack }: { role: AppRole; onBack: () => void }) {
         : <>
           <Field label="Código"><Input value={code} disabled={Boolean(question)} onChange={(event) => setCode(event.target.value)} autoComplete="username" /></Field>
           {question
-            ? <><div className="rounded-xl bg-slate-100 p-3 text-sm font-medium text-slate-800">{question}</div><Field label="Respuesta"><Input type="password" value={answer} onChange={(event) => setAnswer(event.target.value)} autoComplete="off" /></Field><Button type="button" disabled={busy || answer.trim().length < 2} onClick={() => void reset()}>{busy ? "Restableciendo…" : "Generar nueva credencial"}</Button></>
+            ? <><div className="rounded-lg bg-white/[0.04] p-3 text-sm font-medium text-slate-200">{question}</div><Field label="Respuesta"><Input type="password" value={answer} onChange={(event) => setAnswer(event.target.value)} autoComplete="off" /></Field><Button type="button" disabled={busy || answer.trim().length < 2} onClick={() => void reset()}>{busy ? "Restableciendo…" : "Generar nueva credencial"}</Button></>
             : <Button type="button" disabled={busy || !code.trim()} onClick={() => void findQuestion()}>{busy ? "Consultando…" : "Continuar"}</Button>}
         </>}
       <BackToLogin onBack={onBack} />

@@ -1,32 +1,79 @@
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Button, Card, PageHeader, Spinner } from "../../components/ui";
-import { answerQuestion, completeSession, startSession, warmAnswerQuestion } from "../../features/sessions/api";
-import { AppError } from "../../lib/api/errors";
+import { usePortalFocus, useLeaveWarning, type LeaveWarning } from "../../components/layout/portal-mode";
+import { Alert, Button, Card, Eyebrow, PageHeader } from "../../components/ui";
+import { decryptAnswerKey } from "../../features/sessions/answer-key";
+import { startPractice, submitPractice } from "../../features/sessions/api";
 import { MathText } from "../../lib/math";
-import type { AnswerOption, SessionPayload, SessionQuestion } from "../../types/contracts";
+import type { AnswerFeedback, AnswerKeyEntry, AnswerOption, SessionAnswer, SessionPayload, SessionQuestion } from "../../types/contracts";
 
-function firstPendingIndex(questions: SessionQuestion[], after = -1): number {
-  const next = questions.findIndex((item, itemIndex) => itemIndex > after && !item.selected_option);
+interface Practice { payload: SessionPayload; key: Record<string, AnswerKeyEntry> }
+type LocalAnswer = Pick<SessionAnswer, "selected_option" | "response_time_ms">;
+
+const LEAVE_WARNING: LeaveWarning = {
+  title: "¿Salir de la práctica?",
+  body: "Perderás todo tu progreso de esta práctica hasta este momento: tus respuestas no se guardan hasta que la finalices.",
+  confirmLabel: "Salir y perder progreso",
+};
+
+/** Trae las preguntas y descifra su clave para corregir sin esperar al servidor. */
+async function loadPractice(topicId: string): Promise<Practice> {
+  const { answer_key, ...payload } = await startPractice(topicId);
+  const key = await decryptAnswerKey(answer_key);
+  if (payload.questions.some((item) => !item.selected_option && !key[item.session_question_id])) {
+    throw new Error("No se pudo preparar la corrección de la práctica. Vuelve a intentarlo.");
+  }
+  return { payload, key };
+}
+
+function isAnswered(question: SessionQuestion, answers: Record<string, LocalAnswer>): boolean {
+  return Boolean(question.selected_option || answers[question.session_question_id]);
+}
+
+function firstPendingIndex(questions: SessionQuestion[], answers: Record<string, LocalAnswer>, after = -1): number {
+  const next = questions.findIndex((item, itemIndex) => itemIndex > after && !isAnswered(item, answers));
   return next < 0 ? questions.length - 1 : next;
 }
 
-function optionClass(answerOption: AnswerOption, question: SessionQuestion, selected: AnswerOption | null): string {
-  const { feedback, selected_option } = question;
+function letterClass(answerOption: AnswerOption, feedback: AnswerFeedback | null, chosen: AnswerOption | null, selected: AnswerOption | null): string {
   if (feedback) {
-    if (answerOption === feedback.correct_option) return "flex border-emerald-500 bg-emerald-50";
-    if (answerOption === selected_option) return "flex border-rose-500 bg-rose-50";
+    if (answerOption === feedback.correct_option) return "border-success text-success-light";
+    if (answerOption === chosen) return "border-danger text-danger-light";
+  // Selección neutra (sin color): el verde queda solo para "correcto" y el rojo para "incorrecto".
+  } else if (selected === answerOption) return "border-fg-muted text-fg-strong";
+  return "border-line-strong text-fg";
+}
+
+function optionClass(answerOption: AnswerOption, feedback: AnswerFeedback | null, chosen: AnswerOption | null, selected: AnswerOption | null): string {
+  if (feedback) {
+    if (answerOption === feedback.correct_option) return "flex border-success bg-success/10";
+    if (answerOption === chosen) return "flex border-danger bg-danger/10";
     // On mobile the feedback only keeps the student's answer and the correct one.
-    return "hidden opacity-60 sm:flex";
+    return "hidden opacity-40 sm:flex";
   }
-  return selected === answerOption ? "flex border-indigo-500 bg-indigo-50" : "flex hover:border-indigo-300";
+  return selected === answerOption ? "flex border-fg-muted bg-white/[0.04]" : "flex hover:border-line-strong hover:bg-white/[0.02]";
+}
+
+/** Pantalla mientras se traen y descifran las preguntas (única carga que no usa skeleton). */
+function PracticeLoading() {
+  return <div role="status" aria-live="polite" className="mx-auto mt-10 grid max-w-md justify-items-center gap-5 text-center sm:mt-20">
+    <div className="relative h-14 w-14">
+      <span className="absolute inset-0 animate-spin rounded-full border-2 border-line border-t-primary-light" />
+      <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-ornament" />
+    </div>
+    <div>
+      <p className="font-display text-xl tracking-wide text-primary-pale">Preparando tu práctica…</p>
+      <p className="mt-1 text-sm text-fg-muted">Estamos cargando tus preguntas. En un momento empiezas y cada respuesta se corregirá al instante.</p>
+    </div>
+  </div>;
 }
 
 export function SessionPage() {
   const { topicId = "" } = useParams();
   const navigate = useNavigate();
-  const [payload, setPayload] = useState<SessionPayload | null>(null);
+  const [practice, setPractice] = useState<Practice | null>(null);
+  const [answers, setAnswers] = useState<Record<string, LocalAnswer>>({});
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<AnswerOption | null>(null);
   const [startedAt, setStartedAt] = useState(0);
@@ -42,14 +89,15 @@ export function SessionPage() {
     return () => observer.disconnect();
   }, []);
 
+  usePortalFocus();
+
   const start = useMutation({
-    mutationFn: () => startSession(topicId),
+    mutationFn: () => loadPractice(topicId),
     onSuccess: (data) => {
-      // Si falla, la primera respuesta solo tarda un poco más.
-      warmAnswerQuestion().catch(() => undefined);
-      setPayload(data);
+      setPractice(data);
+      setAnswers({});
       setStartedAt(Date.now());
-      setIndex(firstPendingIndex(data.questions));
+      setIndex(firstPendingIndex(data.payload.questions, {}));
     },
   });
   const startMutation = start.mutate;
@@ -57,39 +105,17 @@ export function SessionPage() {
     startMutation();
   }, [topicId, startMutation]);
 
-  const answer = useMutation({
-    mutationFn: (body: { session_question_id: string; selected_option: AnswerOption; response_time_ms: number }) =>
-      answerQuestion(body),
-    onSuccess: (result, body) => {
-      setSelected(null);
-      setPayload((current) => current && {
-        ...current,
-        questions: current.questions.map((item) => item.session_question_id === body.session_question_id
-          ? {
-            ...item,
-            selected_option: result.selected_option,
-            answered_at: item.answered_at ?? new Date().toISOString(),
-            feedback: result.feedback,
-          }
-          : item),
-      });
+  const submit = useMutation({
+    mutationFn: (session: { id: string; answers: SessionAnswer[] }) => submitPractice(session.id, session.answers),
+    onSuccess: (_, session) => {
+      navigate(`/estudiante/sesiones/${session.id}/revision`, { replace: true });
     },
   });
 
-  const complete = useMutation({
-    mutationFn: () => completeSession(payload!.session.id, []),
-    // La última respuesta se guarda después de mostrar su corrección; si aún no
-    // termina, el servidor la ve pendiente y basta con volver a intentar.
-    retry: (failureCount, error) => error instanceof AppError && error.code === "incomplete_submission" && failureCount < 4,
-    retryDelay: 500,
-    onSuccess: () => {
-      navigate(`/estudiante/sesiones/${payload!.session.id}/revision`, { replace: true });
-    },
-  });
+  // Hasta que la práctica se guarda, salir desde el menú pide confirmación.
+  useLeaveWarning(practice && !submit.isSuccess ? LEAVE_WARNING : null);
 
-  const question = payload?.questions[index];
-  const answeredCount = payload ? payload.questions.filter((item) => item.selected_option).length : 0;
-  const allAnswered = Boolean(payload && answeredCount === payload.questions.length);
+  const question = practice?.payload.questions[index];
   const options = useMemo(
     () => question
       ? ([
@@ -102,28 +128,42 @@ export function SessionPage() {
     [question],
   );
 
-  if (start.isPending) return <Spinner />;
   if (start.error) {
-    return <Alert tone="error">{start.error.message}</Alert>;
+    return <div className="mx-auto mt-10 grid max-w-md gap-4">
+      <Alert tone="error">{start.error.message}</Alert>
+      <Button onClick={() => start.mutate()}>Reintentar</Button>
+    </div>;
   }
-  if (!payload || !question) return <Spinner />;
-  const activePayload = payload;
+  if (!practice || !question) return <PracticeLoading />;
+
+  const { payload, key } = practice;
   const activeQuestion = question;
-  const feedback = question.feedback;
+  const localAnswer = answers[question.session_question_id];
+  const chosen = question.selected_option ?? localAnswer?.selected_option ?? null;
+  const entry = key[question.session_question_id];
+  const feedback: AnswerFeedback | null = question.feedback ?? (localAnswer && entry
+    ? { is_correct: localAnswer.selected_option === entry.correct_option, correct_option: entry.correct_option, explanation: entry.explanation }
+    : null);
+  const answeredCount = payload.questions.filter((item) => isAnswered(item, answers)).length;
+  const allAnswered = answeredCount === payload.questions.length;
 
   function confirm(): void {
     if (!selected) return;
-    answer.mutate({
-      session_question_id: activeQuestion.session_question_id,
-      selected_option: selected,
-      response_time_ms: Math.min(2_147_483_647, Math.max(0, Date.now() - startedAt)),
-    });
+    const answer = { selected_option: selected, response_time_ms: Math.min(2_147_483_647, Math.max(0, Date.now() - startedAt)) };
+    setAnswers((current) => ({ ...current, [activeQuestion.session_question_id]: answer }));
+    setSelected(null);
   }
 
   function next(): void {
-    answer.reset();
-    setIndex(firstPendingIndex(activePayload.questions, index));
+    setIndex(firstPendingIndex(payload.questions, answers, index));
     setStartedAt(Date.now());
+  }
+
+  function finish(): void {
+    submit.mutate({
+      id: payload.session.id,
+      answers: Object.entries(answers).map(([session_question_id, answer]) => ({ session_question_id, ...answer })),
+    });
   }
 
   return <div className="max-sm:[&>header]:mb-4 max-sm:[&_h1]:text-xl">
@@ -132,23 +172,23 @@ export function SessionPage() {
       description={`${answeredCount} respondidas`}
     />
     {/* En móvil la pregunta va directo sobre el fondo, sin marco, para ganar espacio. */}
-    <Card className="mx-auto max-w-3xl max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:border sm:border-slate-200 sm:bg-white">
-      <h2 className="text-lg font-semibold"><MathText>{question.question.statement}</MathText></h2>
+    <Card glow className="mx-auto max-w-3xl max-sm:border-0 max-sm:bg-none max-sm:p-0 max-sm:shadow-none sm:p-6">
+      <h2 className="text-xl font-semibold text-fg-strong"><MathText>{question.question.statement}</MathText></h2>
       <div className="mt-4 grid gap-3 sm:mt-6">
         {options.map(([answerOption, text]) => <button
           key={answerOption}
-          disabled={Boolean(feedback) || answer.isPending || complete.isPending}
+          disabled={Boolean(feedback) || submit.isPending}
           onClick={() => setSelected(answerOption)}
-          className={`min-h-14 items-center gap-3 rounded-xl border p-3 text-left ${
-            optionClass(answerOption, question, selected)
+          className={`min-h-14 items-center gap-4 border px-4 py-3 text-left transition duration-150 disabled:cursor-default ${
+            optionClass(answerOption, feedback, chosen, selected)
           }`}
         >
-          <strong className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100">{answerOption}</strong>
-          <span className="flex-1"><MathText>{text}</MathText></span>
+          <strong className={`grid h-8 w-8 shrink-0 place-items-center border font-display text-sm font-normal ${letterClass(answerOption, feedback, chosen, selected)}`}>{answerOption}</strong>
+          <span className="flex-1 text-lg text-fg-strong"><MathText>{text}</MathText></span>
           {feedback && answerOption === feedback.correct_option &&
-            <span className="text-xs font-semibold text-emerald-700">Respuesta correcta</span>}
-          {feedback && !feedback.is_correct && answerOption === question.selected_option &&
-            <span className="text-xs font-semibold text-rose-700">Tu respuesta</span>}
+            <span className="text-xs font-semibold text-success-light">Respuesta correcta</span>}
+          {feedback && !feedback.is_correct && answerOption === chosen &&
+            <span className="text-xs font-semibold text-danger-light">Tu respuesta</span>}
         </button>)}
       </div>
       {feedback && <div className="mt-4 grid gap-3 sm:mt-6">
@@ -159,31 +199,26 @@ export function SessionPage() {
               : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`}
           </Alert>
         </div>
-        {feedback.explanation && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <h3 className="text-sm font-semibold text-slate-700">Explicación</h3>
-          <div className="mt-2 text-slate-800"><MathText>{feedback.explanation}</MathText></div>
+        {feedback.explanation && <div className="border border-line bg-surface-deep p-4">
+          <Eyebrow>Explicación</Eyebrow>
+          <div className="mt-2 text-fg"><MathText>{feedback.explanation}</MathText></div>
         </div>}
       </div>}
-      {answer.error && <div className="mt-4"><Alert tone="error">
-        {answer.error.message} Puedes reintentar; tu respuesta no se registrará dos veces.
-      </Alert></div>}
-      {complete.error && <div className="mt-4"><Alert tone="error">
-        {complete.error.message} Tus respuestas siguen guardadas; puedes reintentar sin recargar.
+      {submit.error && <div className="mt-4"><Alert tone="error">
+        {submit.error.message} Tus respuestas siguen aquí; puedes reintentar sin recargar.
       </Alert></div>}
       {/* En móvil la acción queda fija abajo (estilo Duolingo) y muestra el resultado. */}
       <div ref={barRef} className={`fixed inset-x-0 bottom-0 z-20 grid gap-3 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:static sm:mt-6 sm:flex sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 ${
-        !feedback ? "border-slate-200 bg-white" : feedback.is_correct ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"
+        !feedback ? "border-line bg-sidebar" : feedback.is_correct ? "border-success/40 bg-sidebar" : "border-danger/40 bg-sidebar"
       }`}>
-        {feedback && <p className={`font-semibold sm:hidden ${feedback.is_correct ? "text-emerald-700" : "text-rose-700"}`}>
+        {feedback && <p className={`font-semibold sm:hidden ${feedback.is_correct ? "text-success-light" : "text-danger-light"}`}>
           {feedback.is_correct ? "¡Correcto!" : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`}
         </p>}
         {!feedback
-          ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={!selected || answer.isPending} onClick={confirm}>
-            {answer.isPending ? "Corrigiendo…" : answer.error ? "Reintentar" : "Confirmar respuesta"}
-          </Button>
+          ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={!selected} onClick={confirm}>Confirmar respuesta</Button>
           : allAnswered
-            ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={complete.isPending} onClick={() => complete.mutate()}>
-              {complete.isPending ? "Finalizando…" : complete.error ? "Reintentar finalización" : "Finalizar examen"}
+            ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={submit.isPending} onClick={finish}>
+              {submit.isPending ? "Guardando respuestas…" : submit.error ? "Reintentar" : "Finalizar examen"}
             </Button>
             : <Button className="h-12 w-full sm:h-auto sm:w-auto" onClick={next}>Siguiente</Button>}
       </div>

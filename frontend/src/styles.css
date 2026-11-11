@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Modo oscuro por clase: `dark:` aplica dentro de cualquier elemento con la clase `dark`
+   (AuthLayout la pone también en <html> para que toasts y modales la hereden). */
+@custom-variant dark (&:where(.dark, .dark *));
+.dark { color-scheme: dark; }
+/* Portales (estudiante, profesor y admin): estilo 1.5. Siempre va junto a `dark`; las variantes
+   `portal:` solo cambian lo que el 1.5 hace distinto del SaaS. Se declara después de `dark` para
+   que gane cuando ambas tocan la misma propiedad. PortalLayout la pone también en <html>. */
+@custom-variant portal (&:where(.portal, .portal *));
+
 :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #4a69b1; background: #f8fafc; font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
@@ -13,12 +22,61 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
 
 /* Landing: luces que respiran y cuadrícula tenue de fondo. */
 @theme {
+  /* ── Colores del estilo 1.5 (portales) ────────────────────────────────────────────────
+     Un solo lugar para todos. Los tres primeros son los que el admin podrá editar; el resto
+     hoy son valores fijos que luego se derivarán de ellos. Uso: bg-primary, text-primary-light,
+     border-line, from-surface, text-fg-muted… (acepta opacidad: bg-primary/10). */
+  /* Editables */
+  --color-primary: #3fb97c;        /* verde: botones, barras, activo, correcto */
+  --color-ornament: #c9a961;       /* dorado: solo ornamentos (esquinas, rombos, líneas, etiquetas) */
+  --color-canvas: #070b12;         /* fondo de la página (no llamarlo "base": choca con text-base) */
+  /* Derivados del verde */
+  --color-primary-light: #9fe3bf;  /* cifras y enlaces */
+  --color-primary-pale: #d5eee1;   /* títulos y texto de botones */
+  --color-primary-ink: #06140d;    /* texto sobre verde sólido (barra de toast, chips rellenos) */
+  /* Derivados del fondo */
+  --color-sidebar: #050810;        /* menú lateral */
+  --color-surface: #0e1621;        /* tarjeta, parte alta del degradado */
+  --color-surface-deep: #0a1019;   /* tarjeta (parte baja), cajas internas, hundidos */
+  --color-line: #1e2a38;           /* bordes de tarjetas, menú, separadores de tabla */
+  --color-line-strong: #2a3747;    /* bordes de controles (campos, botón secundario, letras de opción) */
+  --color-track: #1a2533;          /* fondo de barras de progreso y skeleton */
+  /* Texto (claro sobre fondo oscuro) */
+  --color-fg-strong: #f1f5f9;      /* texto destacado dentro de tarjetas */
+  --color-fg: #e2e8f0;             /* texto general */
+  --color-fg-muted: #94a3b8;       /* texto secundario */
+  --color-fg-faint: #64748b;       /* texto terciario, placeholders */
+  /* Estados (fijos; no editables para que sigan siendo reconocibles).
+     `success` es el verde de "correcto/éxito": igual de verde que el principal hoy, pero NO
+     sigue al tema, para que un correcto nunca se confunda con un tono elegido por el admin. */
+  --color-success: #3fb97c;
+  --color-success-light: #9fe3bf;
+  --color-danger: #c4544a;
+  --color-danger-light: #e58276;
+  --color-warning: #facc15;        /* advertencias: nunca el dorado */
+  /* Extra: resplandor azul marino de la esquina inferior del fondo. No se deriva de los tres
+     editables; es el único toque frío que evita que el fondo se vea plano. */
+  --color-atmosphere: #14284b;
+  /* Fuente de títulos (se carga en index.html). */
+  --font-display: Cinzel, Georgia, serif;
   --animate-glow: glow 9s ease-in-out infinite alternate;
   --animate-shine: shine 3.5s ease-in-out infinite;
   /* Giro del degradado que forma el borde dorado del plan semestral. */
   --animate-orbit: orbit 4s linear infinite;
   /* Crece y vuelve a su tamaño: llama la atención sobre un botón. */
   --animate-pop: pop 0.7s ease-in-out;
+  /* Menú móvil: entra desde la izquierda. */
+  --animate-drawer: drawer 0.2s ease-out;
+  /* Skeleton: destello que cruza de izquierda a derecha. */
+  --animate-skeleton: skeleton 1.4s ease-in-out infinite;
+  @keyframes skeleton {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes drawer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
   @keyframes pop {
     0%, 100% { transform: scale(1); }
     45% { transform: scale(1.15); }
@@ -46,3 +104,19 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
 }
+
+/* ── Estilo 1.5: base de los portales ── */
+.portal { color: var(--color-fg); }
+/* Borde por defecto de los portales (en capa base: cualquier `border-*` de una clase lo reemplaza). */
+@layer base { .portal, .portal *, .portal ::before, .portal ::after { border-color: var(--color-line); } }
+.portal th { color: color-mix(in srgb, var(--color-ornament) 75%, transparent); font-size: .6875rem; letter-spacing: .14em; }
+.portal td { border-top-color: var(--color-line); }
+/* Grano de película tenue y viñeta; van fijos sobre toda la pantalla y no reciben clics. */
+.portal-grain { opacity: .035; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.portal-atmosphere {
+  background:
+    radial-gradient(ellipse 65% 40% at 55% -5%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 70%),
+    radial-gradient(ellipse 55% 35% at 5% 105%, color-mix(in srgb, var(--color-atmosphere) 36%, transparent), transparent 70%),
+    radial-gradient(ellipse at center, transparent 60%, rgb(0 0 0 / .5) 100%);
+}
+@media (prefers-reduced-motion: reduce) { .portal * { transition-duration: 0s !important; animation-duration: 0s !important; } }

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "../../components/ui";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { listTeacherAssignments, setCourseEnrollmentStatus, syncTeacherStudents } from "../../features/assignments/api";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -149,7 +150,7 @@ export function AssignmentsPage() {
     });
   };
 
-  if (users.isLoading || colleges.isLoading || courses.isLoading || assignments.isLoading || access.isLoading) return <Spinner />;
+  if (users.isLoading || colleges.isLoading || courses.isLoading || assignments.isLoading || access.isLoading) return <PageSkeleton rows={3} rowHeight={140} />;
   const loadError = users.error ?? colleges.error ?? courses.error ?? assignments.error ?? access.error;
   if (loadError) return <Alert tone="error">{loadError.message}</Alert>;
 
@@ -162,15 +163,15 @@ export function AssignmentsPage() {
       </div>
       <div className="table-wrap mt-4"><table>
         <thead><tr><th>Nombre</th><th>Código</th><th>Colegio</th><th>Seleccionar</th></tr></thead>
-        <tbody>{visibleTeachers.map((teacher) => <tr key={teacher.id} className={selectedTeacherId === teacher.id ? "bg-indigo-50" : undefined}>
+        <tbody>{visibleTeachers.map((teacher) => <tr key={teacher.id} className={selectedTeacherId === teacher.id ? "bg-primary/10" : undefined}>
           <td><strong>{teacher.full_name}</strong></td><td>{teacher.user_code}</td><td>{teacher.college_id ? collegeNames.get(teacher.college_id) : "—"}</td>
-          <td><input aria-label={`Seleccionar a ${teacher.full_name}`} className="h-4 w-4 accent-indigo-600" type="checkbox" checked={selectedTeacherId === teacher.id} onChange={() => selectTeacher(teacher.id)} /></td>
+          <td><input aria-label={`Seleccionar a ${teacher.full_name}`} className="h-4 w-4 accent-primary" type="checkbox" checked={selectedTeacherId === teacher.id} onChange={() => selectTeacher(teacher.id)} /></td>
         </tr>)}</tbody>
       </table></div>
     </Card>
 
     <div className="mt-5 grid gap-3 lg:grid-cols-3">
-      {panelButtons.map((panel) => <Button key={panel.id} variant={activePanel === panel.id ? "primary" : "secondary"} disabled={!selectedTeacher} className="disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-500" onClick={() => selectPanel(panel.id)}>{panel.label}</Button>)}
+      {panelButtons.map((panel) => <Button key={panel.id} variant={activePanel === panel.id ? "primary" : "secondary"} disabled={!selectedTeacher} className="disabled:border-line disabled:bg-white/[0.04] disabled:text-fg-muted" onClick={() => selectPanel(panel.id)}>{panel.label}</Button>)}
     </div>
 
     {selectedTeacher && activePanel === "topics" && <TopicsPanel courses={teacherCourses} rows={topicRows} studentSearch={studentSearch} courseFilter={courseFilter} pending={topicMutation.isPending} error={topicMutation.error?.message} onStudentSearch={setStudentSearch} onCourseFilter={setCourseFilter} onToggle={(studentId, topicId, blocked) => topicMutation.mutate({ studentId, topicId, blocked })} />}
@@ -209,7 +210,7 @@ function TopicsPanel({ courses, rows, studentSearch, courseFilter, pending, erro
   onToggle: (studentId: string, topicId: string, blocked: boolean) => void;
 }) {
   return <Card className="mt-5"><h2 className="mb-4 font-bold">Bloquear temas a alumnos</h2>{error && <Alert tone="error">{error}</Alert>}<PanelFilters courses={courses} studentSearch={studentSearch} courseFilter={courseFilter} onStudentSearch={onStudentSearch} onCourseFilter={onCourseFilter} />
-    {rows.length ? <div className="table-wrap mt-4"><table><thead><tr><th>Alumno</th><th>Curso</th><th>Tema</th><th>Estado</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={`${row.student_id}-${row.topic_id}`}><td><strong>{row.student_name}</strong><br /><span className="text-xs text-slate-500">{row.student_code}</span></td><td>{row.course_name}</td><td>{row.topic_name}</td><td><Badge tone={row.is_blocked ? "warning" : "success"}>{row.is_blocked ? "Bloqueado" : "Habilitado"}</Badge></td><td><Button variant="ghost" disabled={pending || !row.student_id || !row.topic_id} onClick={() => onToggle(row.student_id!, row.topic_id!, row.is_blocked ?? false)}>{row.is_blocked ? "Desbloquear" : "Bloquear"}</Button></td></tr>)}</tbody></table></div> : <EmptyState>No hay temas disponibles para los filtros seleccionados.</EmptyState>}
+    {rows.length ? <div className="table-wrap mt-4"><table><thead><tr><th>Alumno</th><th>Curso</th><th>Tema</th><th>Estado</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={`${row.student_id}-${row.topic_id}`}><td><strong>{row.student_name}</strong><br /><span className="text-xs text-fg-muted">{row.student_code}</span></td><td>{row.course_name}</td><td>{row.topic_name}</td><td><Badge tone={row.is_blocked ? "warning" : "success"}>{row.is_blocked ? "Bloqueado" : "Habilitado"}</Badge></td><td><Button variant="ghost" disabled={pending || !row.student_id || !row.topic_id} onClick={() => onToggle(row.student_id!, row.topic_id!, row.is_blocked ?? false)}>{row.is_blocked ? "Desbloquear" : "Bloquear"}</Button></td></tr>)}</tbody></table></div> : <EmptyState>No hay temas disponibles para los filtros seleccionados.</EmptyState>}
   </Card>;
 }
 
@@ -225,7 +226,7 @@ function CoursesPanel({ courses, rows, studentSearch, courseFilter, pending, err
   onToggle: (courseId: string, studentId: string, status: "active" | "inactive") => void;
 }) {
   return <Card className="mt-5"><h2 className="mb-4 font-bold">Asignar o bloquear acceso de alumnos a un curso</h2>{error && <Alert tone="error">{error}</Alert>}<PanelFilters courses={courses} studentSearch={studentSearch} courseFilter={courseFilter} onStudentSearch={onStudentSearch} onCourseFilter={onCourseFilter} />
-    {rows.length ? <div className="table-wrap mt-4"><table><thead><tr><th>Alumno</th><th>Curso</th><th>Estado</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={`${row.student_id}-${row.course_id}`}><td><strong>{row.student_name}</strong><br /><span className="text-xs text-slate-500">{row.student_code}</span></td><td>{row.course_name}</td><td><Badge tone={row.enrollment_status === "active" ? "success" : "warning"}>{row.enrollment_status === "active" ? "Activo" : "Bloqueado"}</Badge></td><td><Button variant="ghost" disabled={pending || !row.student_id || !row.course_id} onClick={() => onToggle(row.course_id!, row.student_id!, row.enrollment_status === "active" ? "inactive" : "active")}>{row.enrollment_status === "active" ? "Bloquear acceso" : "Restaurar acceso"}</Button></td></tr>)}</tbody></table></div> : <EmptyState>No hay asignaciones para los filtros seleccionados.</EmptyState>}
+    {rows.length ? <div className="table-wrap mt-4"><table><thead><tr><th>Alumno</th><th>Curso</th><th>Estado</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={`${row.student_id}-${row.course_id}`}><td><strong>{row.student_name}</strong><br /><span className="text-xs text-fg-muted">{row.student_code}</span></td><td>{row.course_name}</td><td><Badge tone={row.enrollment_status === "active" ? "success" : "warning"}>{row.enrollment_status === "active" ? "Activo" : "Bloqueado"}</Badge></td><td><Button variant="ghost" disabled={pending || !row.student_id || !row.course_id} onClick={() => onToggle(row.course_id!, row.student_id!, row.enrollment_status === "active" ? "inactive" : "active")}>{row.enrollment_status === "active" ? "Bloquear acceso" : "Restaurar acceso"}</Button></td></tr>)}</tbody></table></div> : <EmptyState>No hay asignaciones para los filtros seleccionados.</EmptyState>}
   </Card>;
 }
 
@@ -240,9 +241,9 @@ function StudentsPanel({ students, selectedStudentIds, studentSearch, hasCourses
   onToggle: (studentId: string) => void;
   onConfirm: () => void;
 }) {
-  return <Card className="mt-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="font-bold">Asignar alumnos a este profesor</h2><p className="mt-1 text-sm text-slate-500">Selecciona todos los alumnos que deben permanecer asignados.</p></div><Button disabled={!hasCourses || pending} onClick={onConfirm}>Confirmar asignaciones</Button></div>
+  return <Card className="mt-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="font-bold">Asignar alumnos a este profesor</h2><p className="mt-1 text-sm text-fg-muted">Selecciona todos los alumnos que deben permanecer asignados.</p></div><Button disabled={!hasCourses || pending} onClick={onConfirm}>Confirmar asignaciones</Button></div>
     {error && <div className="mt-4"><Alert tone="error">{error}</Alert></div>}{!hasCourses && <div className="mt-4"><Alert tone="info">El profesor debe tener al menos un curso antes de recibir alumnos.</Alert></div>}
     <div className="mt-4"><Field label="Alumno"><Input placeholder="Buscar alumno por nombre o código" value={studentSearch} onChange={(event) => onStudentSearch(event.target.value)} /></Field></div>
-    {students.length ? <div className="table-wrap mt-4"><table><thead><tr><th>Alumno</th><th>Código</th><th>Estado</th><th>Seleccionar</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td><strong>{student.full_name}</strong></td><td>{student.user_code}</td><td><Badge tone={student.is_active ? "success" : "warning"}>{student.is_active ? "Activo" : "Inactivo"}</Badge></td><td><input aria-label={`Asignar a ${student.full_name}`} className="h-4 w-4 accent-indigo-600" type="checkbox" checked={selectedStudentIds.has(student.id)} onChange={() => onToggle(student.id)} /></td></tr>)}</tbody></table></div> : <EmptyState>No hay alumnos para los filtros seleccionados.</EmptyState>}
+    {students.length ? <div className="table-wrap mt-4"><table><thead><tr><th>Alumno</th><th>Código</th><th>Estado</th><th>Seleccionar</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td><strong>{student.full_name}</strong></td><td>{student.user_code}</td><td><Badge tone={student.is_active ? "success" : "warning"}>{student.is_active ? "Activo" : "Inactivo"}</Badge></td><td><input aria-label={`Asignar a ${student.full_name}`} className="h-4 w-4 accent-primary" type="checkbox" checked={selectedStudentIds.has(student.id)} onChange={() => onToggle(student.id)} /></td></tr>)}</tbody></table></div> : <EmptyState>No hay alumnos para los filtros seleccionados.</EmptyState>}
   </Card>;
 }

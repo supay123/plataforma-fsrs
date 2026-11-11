@@ -189,7 +189,9 @@ perfil del estudiante), usa `Input` con `readOnly` y `value`.
 ### Card
 
 Contenedor blanco con borde y sombra. Si pasas un `className` con `bg-` o
-`border-`, reemplaza el fondo o el borde por defecto.
+`border-`, reemplaza el fondo o el borde por defecto. Dentro de un portal
+(clase `portal`) se ve como `Frame`: degradado, borde recto y esquinas doradas.
+`glow` añade el brillo jade de los paneles principales.
 
 ### PageHeader
 
@@ -208,8 +210,49 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
 
 ### Spinner y EmptyState
 
-- `Spinner`: indicador de carga centrado.
+- `Spinner`: indicador de carga centrado. **No se usa para cargar datos**: la
+  carga siempre es con `Skeleton` (la única excepción es la carga de las
+  preguntas de la práctica del estudiante).
 - `EmptyState`: recuadro para listas vacías, con el texto como hijo.
+
+### Skeleton
+
+Marcador de carga gris con un destello que cruza de izquierda a derecha (se
+detiene con "reducir movimiento"). Archivo: `components/ui/skeleton.tsx`.
+
+- `height` y `width`: número (px) o medida CSS. Por defecto `16` y `"100%"`.
+- `rounded`: `"none" | "sm" | "md" | "lg"` (por defecto) `| "xl" | "2xl" | "3xl" | "full"`.
+- Acepta `className` y el resto de atributos de un `div`; es decorativo (`aria-hidden`).
+
+```tsx
+import { Skeleton } from "../../components/ui/skeleton";
+
+<Skeleton height={48} width={48} rounded="full" />
+<Skeleton height={20} width="60%" />
+```
+
+`PageSkeleton` (mismo archivo) es el esqueleto de una página completa: título,
+descripción y `rows` filas de `rowHeight` px, en `columns` columnas (1 a 3).
+Es lo que se devuelve mientras `isLoading` en las páginas de los portales.
+
+### Estilo 1.5 de los portales (`styles.css` y `components/ui/ornaments.tsx`)
+
+- **Variante `portal:`** (como `dark:`): aplica solo dentro de un elemento con la
+  clase `portal`. `PortalLayout` la pone junto con `dark` en su contenedor y en
+  `<html>` (para toasts y modales). Los componentes compartidos llevan
+  `portal:` solo donde el 1.5 difiere del SaaS; las pantallas que solo existen
+  en un portal usan directamente los tokens.
+- **Tokens de color** (`@theme` de `styles.css`): `primary`, `ornament`, `canvas`
+  (los tres editables), `primary-light`, `primary-pale`, `primary-ink`,
+  `sidebar`, `surface`, `surface-deep`, `line`, `line-strong`, `track`, `fg-strong`,
+  `fg`, `fg-muted`, `fg-faint` y `atmosphere`. **Estados fijos** (no siguen el tema
+  del admin): `success`/`success-light` (correcto, éxito), `danger`/`danger-light`
+  (error) y `warning` (advertencia). Lo "correcto" usa `success`, nunca `primary`. Uso: `bg-primary/10`, `text-primary-light`, `border-line`. No
+  escribir hex ni colores de Tailwind sueltos en pantallas de portal.
+- **Ornamentos** (`ornaments.tsx`, reexportados por `components/ui`): `Frame`
+  (tarjeta con esquinas; `glow`, `interactive`), `Corners`, `Divider` (rombo a
+  la izquierda), `CenteredDivider` (rombo al centro), `Eyebrow` (etiqueta dorada
+  en mayúsculas) y `ProgressBar` (barra jade, 0–100).
 
 ---
 
@@ -217,7 +260,7 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
 
 | Componente | Descripción |
 | --- | --- |
-| `PortalLayout` | Menú lateral, usuario y botón "Salir" de los portales. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. |
+| `PortalLayout` | Menú lateral, usuario y botón "Salir" de los portales. En escritorio se puede reducir a solo iconos (la cabeza de la mascota lo vuelve a expandir; el estado se recuerda en `localStorage`); en móvil es una hamburguesa que abre el menú desde la izquierda. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. Las páginas internas pueden activar el modo práctica con los hooks de `portal-mode.ts` (ver abajo). |
 | `AuthLayout` | Pantalla partida para el acceso (login, registro, invitación, nueva contraseña y renovación): fondo blanco con el logo y el formulario a la izquierda, y a la derecha una portada en índigo con la vista previa `public/image/preview.webp` (en móvil aparece debajo del formulario). Usa `wide` para formularios de dos columnas, `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro) y `cover` (`{ title, description }`) para el texto de la portada. |
 | `PublicPage` | Página pública con el logo arriba y el pie de página legal. |
 | `PublicFooter` | Pie de página con enlaces legales y datos de la empresa (ya incluido en `PublicPage`). |
@@ -305,6 +348,27 @@ Los íconos vienen de la librería [lucide-react](https://lucide.dev/icons/):
 mano ni agregues otra librería de íconos; busca primero en lucide. El único
 gráfico propio es el del Libro de Reclamaciones (`ComplaintsBookIcon`, una
 imagen PNG).
+
+### Modo práctica (`components/layout/portal-mode.ts`)
+
+Hooks para páginas dentro de `PortalLayout`; fuera de él no hacen nada.
+
+- `usePortalFocus()`: mientras la página está montada, el menú de escritorio
+  se reduce a iconos sin cambiar la preferencia guardada del usuario. Si lo
+  expande, vuelve a reducirse en la próxima práctica.
+- `useLeaveWarning(warning)`: mientras `warning` (`{ title, body,
+  confirmLabel? }`) no sea `null`, los enlaces del menú y "Salir" abren un
+  modal de advertencia (`useModal().warning`) antes de navegar o cerrar sesión.
+  Pasa una constante del módulo para que no se reinstale en cada render.
+
+```tsx
+const LEAVE_WARNING: LeaveWarning = { title: "¿Salir de la práctica?", body: "Perderás tu progreso.", confirmLabel: "Salir y perder progreso" };
+
+usePortalFocus();
+useLeaveWarning(enCurso ? LEAVE_WARNING : null);
+```
+
+Ejemplo: `pages/student/SessionPage.tsx`.
 
 ## Sesión y usuario
 

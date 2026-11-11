@@ -38,10 +38,6 @@ export interface TopicQuestion {
 }
 
 export interface AnswerFeedback { is_correct: boolean; correct_option: AnswerOption; explanation: string | null }
-export interface AnswerResult {
-  status: "accepted" | "already_answered"; session_id: string;
-  selected_option: AnswerOption; feedback: AnswerFeedback;
-}
 export interface SessionQuestion {
   session_question_id: string;
   position: number;
@@ -59,6 +55,16 @@ export interface SessionPayload {
   };
   questions: SessionQuestion[];
 }
+/** Lo que el navegador necesita para corregir una pregunta sin llamar al servidor. */
+export interface AnswerKeyEntry { correct_option: AnswerOption; explanation: string | null }
+/** Clave de respuestas cifrada con AES-GCM, indexada por session_question_id. */
+export interface EncryptedAnswerKey {
+  algorithm: "AES-GCM";
+  /** Llave AES de 256 bits en base64. */
+  key: string;
+  items: Record<string, { iv: string; data: string }>;
+}
+export interface PracticePayload extends SessionPayload { answer_key: EncryptedAnswerKey }
 export interface SessionSummary {
   session_id: string; student_id: string; student_name: string; course_id: string;
   course_name: string; topic_id: string; topic_name: string; status: string;

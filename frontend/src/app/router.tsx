@@ -1,10 +1,13 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { PortalLayout } from "../components/layout/PortalLayout";
-import { Spinner } from "../components/ui";
+import { PageSkeleton } from "../components/ui/skeleton";
 import { LoginPage } from "../features/auth/LoginPage";
 import { HomePage, NotFoundPage } from "../pages/HomePage";
 import { RoleGuard } from "./guards";
+// Referencias visuales de estilo: solo en desarrollo (no se incluyen en producción)
+const EldenHalfPage = import.meta.env.DEV ? lazy(() => import("../pages/style-guide/EldenHalfPage").then((m) => ({ default: m.EldenHalfPage }))) : null;
+const EldenSaasPage = import.meta.env.DEV ? lazy(() => import("../pages/style-guide/EldenSaasPage").then((m) => ({ default: m.EldenSaasPage }))) : null;
 const SignUpPage = lazy(() => import("../pages/public/SignUpPage").then((m) => ({ default: m.SignUpPage })));
 const InvitationPage = lazy(() => import("../pages/public/InvitationPage").then((m) => ({ default: m.InvitationPage })));
 const ResetPasswordPage = lazy(() => import("../pages/public/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
@@ -31,8 +34,10 @@ const StudentsPage = lazy(() => import("../pages/teacher/StudentsPage").then((m)
 const TopicsPage = lazy(() => import("../pages/teacher/TopicsPage").then((m) => ({ default: m.TopicsPage })));
 
 export function AppRouter() {
-  return <Suspense fallback={<Spinner />}><Routes>
+  return <Suspense fallback={<div className="mx-auto max-w-6xl p-8"><PageSkeleton /></div>}><Routes>
     <Route path="/" element={<HomePage />} />
+    {EldenHalfPage && <Route path="/textura/elden-ring-1-5" element={<EldenHalfPage />} />}
+    {EldenSaasPage && <Route path="/textura/elden-ring-saas" element={<EldenSaasPage />} />}
     <Route path="/terminos" element={<TermsPage />} />
     <Route path="/privacidad" element={<PrivacyPage />} />
     <Route path="/reembolsos" element={<RefundPolicyPage />} />

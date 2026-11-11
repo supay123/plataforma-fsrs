@@ -203,7 +203,7 @@ export function StudentPasswordResetCard({ user, email }: { user: StudentUser; e
 
   return <Card>
     <h2 className="font-bold">Credenciales</h2>
-    <p className="mt-1 text-sm text-slate-600">
+    <p className="mt-1 text-sm text-fg-muted">
       Se enviará a <strong>{email}</strong> un link para crear una nueva contraseña. El link vence en 1 hora y solo se puede usar una vez. Al cambiarla, se cerrará su sesión en todos sus dispositivos.
     </p>
     {delivery && <div className="mt-3"><Alert tone="success">Enviamos el link a <strong>{delivery.email}</strong>. Pídele que revise también la carpeta de spam.</Alert></div>}

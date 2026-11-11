@@ -1,4 +1,8 @@
-export interface CompleteSessionBody {
+export interface StartPracticeBody {
+  topic_id?: unknown;
+}
+
+export interface SubmitPracticeBody {
   session_id?: unknown;
   answers?: unknown;
 }

@@ -10,17 +10,14 @@ function_dirs=(
   admin-reset-user-credentials
   admin-student-account
   admin-update-user
-  answer-question
   complaints
-  complete-session
   export-data
+  practice-session
   get-session-review
-  get-session
   import-questions
   questions
   login-with-code
   recover-password
-  start-session
   public
   registration
   account

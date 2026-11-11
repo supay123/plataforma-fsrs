@@ -46,7 +46,7 @@ export function InviteStudentForm() {
     <Field label="Correo del estudiante" error={emailError}><Input type="email" required placeholder="estudiante@correo.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
     <Field label="Inicio"><Input required type="date" value={form.access_valid_from} onChange={(event) => setForm({ ...form, access_valid_from: event.target.value })} /></Field>
     <Field label="Vencimiento"><Input required type="date" value={form.access_valid_until} onChange={(event) => setForm({ ...form, access_valid_until: event.target.value })} /></Field>
-    <p className="text-xs text-slate-500">Le enviaremos un link para que complete sus datos y cree su contraseña. Si no eliges un grupo, el estudiante elegirá el suyo al aceptar. El link vence en 7 días.</p>
+    <p className="text-xs text-fg-muted">Le enviaremos un link para que complete sus datos y cree su contraseña. Si no eliges un grupo, el estudiante elegirá el suyo al aceptar. El link vence en 7 días.</p>
     <Button disabled={invite.isPending || !form.email || !form.access_valid_from || !form.access_valid_until}>
       {invite.isPending ? "Enviando…" : "Enviar invitación"}
     </Button>

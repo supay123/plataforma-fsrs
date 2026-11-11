@@ -62,10 +62,7 @@ function_names=(
   admin-renew-access
   import-questions
   questions
-  start-session
-  get-session
-  answer-question
-  complete-session
+  practice-session
   get-session-review
   export-data
   public

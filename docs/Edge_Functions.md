@@ -52,10 +52,7 @@ pnpm exec supabase gen types --local --schema public \
 | `admin-renew-access` | Admin | Replaces a student's inclusive access-date range and optionally reactivates the profile. |
 | `import-questions` | Admin, teacher | Validates or confirms an official-template XLSX/JSON question import. A teacher is restricted to their own courses. |
 | `questions` | Admin, teacher | Lists a topic's current questions (`GET /questions?topic_id=...`), archives one (`DELETE /questions?id=...`) or all of them (`DELETE /questions/topic?topic_id=...`). Archived questions no longer appear in new sessions but their historical results are kept. A teacher is restricted to their own courses. |
-| `start-session` | Student | Atomically resumes the student's existing in-progress session for a topic or creates one with up to 20 due-first/new questions. |
-| `get-session` | Student | Reloads an owned session. Answered questions include their `feedback`; pending questions never expose the correct answer or explanation. |
-| `answer-question` | Student | Corrects an answer server-side, maps it to FSRS `Again` or `Good`, atomically persists the answer/card/review log, and returns immediate `feedback` for the stored answer. Safe to retry. |
-| `complete-session` | Student | Closes an owned session only after all questions are answered and returns its summary. Repeated completion is safe. |
+| `practice-session` | Student | `POST /start` atomically resumes the student's in-progress session for a topic or creates one with up to 20 due-first/new questions, and returns them with an AES-GCM encrypted answer key so the browser corrects instantly. `POST /submit` saves every pending answer at once, applies FSRS (`Again`/`Good`) with the answer key from the database, and closes the session. Repeated submission is safe. |
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
@@ -86,15 +83,20 @@ pnpm exec supabase gen types --local --schema public \
 - `questions`: `GET /questions?topic_id=...` to list the topic's questions,
   `DELETE /questions?id=...` to archive one, and
   `DELETE /questions/topic?topic_id=...` to archive all of them.
-- `start-session`: `topic_id`.
-- `get-session`, `complete-session`, `get-session-review`: `session_id`.
-- `answer-question`: `session_question_id`, `selected_option` (`A`–`D`),
-  `response_time_ms`. Responds with `status` (`accepted` or
-  `already_answered`), `session_id`, the stored `selected_option`, and
-  `feedback` (`is_correct`, `correct_option`, `explanation`). The answer is
-  saved right after the response is sent; a retry once it is saved reports the
-  stored answer, even if it sends a different option. `GET` only boots the
-  function (the session page calls it on open).
+- `POST practice-session/start`: `topic_id`. Responds `201` with `session`,
+  `questions` (pending ones never include `correct_option` or `explanation` in
+  clear; already answered ones carry their `feedback`) and `answer_key`
+  (`algorithm: "AES-GCM"`, base64 `key`, and `items` keyed by
+  `session_question_id`, each with base64 `iv` and `data`; the decrypted data is
+  `{ correct_option, explanation }`). The key travels with the payload, so it
+  only hides the answers from casual inspection: grading and FSRS always use the
+  database on submit. `409 insufficient_active_questions` if the topic has too
+  few active questions.
+- `POST practice-session/submit`: `session_id` and `answers` (every pending
+  question exactly once: `session_question_id`, `selected_option` `A`–`D`,
+  `response_time_ms`; at most 20). Responds with the session summary; `409
+  incomplete_submission` if an answer is missing or extra.
+- `get-session-review`: `session_id`.
 - `export-data`: optional `college_id`, `teacher_id`, `course_id`,
   `student_id`, and `topic_id` filters.
 - `POST complaints/sheets` (`multipart/form-data`): `data` (the sheet as

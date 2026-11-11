@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader } from "../../components/ui";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { createCollege, deleteCollege, listColleges, updateCollege } from "../../features/colleges/api";
 
@@ -35,7 +36,7 @@ export function CollegesPage() {
       void client.invalidateQueries({ queryKey: ["users"] });
     },
   });
-  if (query.isLoading) return <Spinner />;
+  if (query.isLoading) return <PageSkeleton />;
   return <>
     <PageHeader title="Colegios" description="Instituciones habilitadas en la plataforma." />
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
@@ -45,7 +46,7 @@ export function CollegesPage() {
         <thead><tr><th>Código</th><th>Nombre</th><th>Estado</th><th /></tr></thead>
         <tbody>{query.data.map((college) => <tr key={college.id}>
           <td>{college.code}</td>
-          <td><strong>{college.name}</strong><br /><span className="text-xs text-slate-500">{college.description}</span></td>
+          <td><strong>{college.name}</strong><br /><span className="text-xs text-fg-muted">{college.description}</span></td>
           <td><Badge tone={college.is_active ? "success" : "warning"}>{college.is_active ? "Activo" : "Inactivo"}</Badge></td>
           <td className="space-x-2">
             <Button variant="ghost" onClick={() => {

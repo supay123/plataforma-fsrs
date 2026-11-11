@@ -3,25 +3,23 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppError } from "../../lib/api/errors";
-import type { AnswerOption, SessionPayload } from "../../types/contracts";
+import type { AnswerKeyEntry, PracticePayload } from "../../types/contracts";
 import { SessionPage } from "./SessionPage";
 
 const mocks = vi.hoisted(() => ({
-  startSession: vi.fn(),
-  answerQuestion: vi.fn(),
-  completeSession: vi.fn(),
-  warmAnswerQuestion: vi.fn(),
+  startPractice: vi.fn(),
+  submitPractice: vi.fn(),
+  decryptAnswerKey: vi.fn(),
 }));
 
 vi.mock("../../features/sessions/api", () => ({
-  startSession: mocks.startSession,
-  answerQuestion: mocks.answerQuestion,
-  completeSession: mocks.completeSession,
-  warmAnswerQuestion: mocks.warmAnswerQuestion,
+  startPractice: mocks.startPractice,
+  submitPractice: mocks.submitPractice,
 }));
+// El cifrado real se prueba en answer-key.test.ts.
+vi.mock("../../features/sessions/answer-key", () => ({ decryptAnswerKey: mocks.decryptAnswerKey }));
 
-function payload(total = 3): SessionPayload {
+function payload(total = 3): PracticePayload {
   return {
     session: {
       id: "session-1",
@@ -48,21 +46,16 @@ function payload(total = 3): SessionPayload {
         option_d: `Opción D ${index + 1}`,
       },
     })),
+    answer_key: { algorithm: "AES-GCM", key: "llave", items: {} },
   };
 }
 
 // Every question's correct option is A.
-function answerResult(body: { selected_option: AnswerOption }) {
-  return Promise.resolve({
-    status: "accepted",
-    session_id: "session-1",
-    selected_option: body.selected_option,
-    feedback: {
-      is_correct: body.selected_option === "A",
-      correct_option: "A",
-      explanation: "Porque A es la correcta.",
-    },
-  });
+function keyFor(total = 3): Record<string, AnswerKeyEntry> {
+  return Object.fromEntries(Array.from({ length: total }, (_, index) => [
+    `session-question-${index + 1}`,
+    { correct_option: "A", explanation: "Porque A es la correcta." },
+  ]));
 }
 
 function renderPage() {
@@ -83,13 +76,24 @@ describe("SessionPage", () => {
   afterEach(cleanup);
 
   beforeEach(() => {
-    mocks.startSession.mockReset().mockResolvedValue(payload());
-    mocks.answerQuestion.mockReset().mockImplementation(answerResult);
-    mocks.completeSession.mockReset().mockResolvedValue({ session: {} });
-    mocks.warmAnswerQuestion.mockReset().mockResolvedValue({ status: "ready" });
+    mocks.startPractice.mockReset().mockResolvedValue(payload());
+    mocks.decryptAnswerKey.mockReset().mockResolvedValue(keyFor());
+    mocks.submitPractice.mockReset().mockResolvedValue({ session: {} });
   });
 
-  it("shows feedback after each answer and completes once everything is answered", async () => {
+  it("shows the loading screen until the questions are decrypted", async () => {
+    let resolveKey: (value: Record<string, AnswerKeyEntry>) => void = () => undefined;
+    mocks.decryptAnswerKey.mockReturnValue(new Promise((resolve) => { resolveKey = resolve; }));
+    renderPage();
+
+    expect(screen.getByText("Preparando tu práctica…")).toBeInTheDocument();
+    expect(await screen.findByText("Preparando tu práctica…")).toBeInTheDocument();
+    resolveKey(keyFor());
+    expect(await screen.findByText("Pregunta 1 de 3")).toBeInTheDocument();
+    expect(screen.queryByText("Preparando tu práctica…")).not.toBeInTheDocument();
+  });
+
+  it("corrects locally and submits every answer once at the end", async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -98,75 +102,79 @@ describe("SessionPage", () => {
 
     await user.click(screen.getByRole("button", { name: /AOpción A 1/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(await screen.findAllByText("¡Correcto!")).not.toHaveLength(0);
+    expect(screen.getAllByText("¡Correcto!")).not.toHaveLength(0);
     expect(screen.getByText("Porque A es la correcta.")).toBeInTheDocument();
-    expect(mocks.answerQuestion).toHaveBeenCalledWith(expect.objectContaining({
-      session_question_id: "session-question-1",
-      selected_option: "A",
-    }));
     expect(screen.getByRole("button", { name: /AOpción A 1/ })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByText("Pregunta 2 de 3")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /BOpción B 2/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(await screen.findAllByText("Incorrecto. La respuesta correcta es la A.")).not.toHaveLength(0);
+    expect(screen.getAllByText("Incorrecto. La respuesta correcta es la A.")).not.toHaveLength(0);
     expect(screen.getByText("Tu respuesta")).toBeInTheDocument();
     expect(screen.getByText("Respuesta correcta")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     await user.click(screen.getByRole("button", { name: /COpción C 3/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(mocks.completeSession).not.toHaveBeenCalled();
+    expect(mocks.submitPractice).not.toHaveBeenCalled();
 
-    await user.click(await screen.findByRole("button", { name: "Finalizar examen" }));
-    expect(mocks.completeSession).toHaveBeenCalledWith("session-1", []);
+    await user.click(screen.getByRole("button", { name: "Finalizar examen" }));
+    expect(mocks.submitPractice).toHaveBeenCalledWith("session-1", [
+      expect.objectContaining({ session_question_id: "session-question-1", selected_option: "A" }),
+      expect.objectContaining({ session_question_id: "session-question-2", selected_option: "B" }),
+      expect.objectContaining({ session_question_id: "session-question-3", selected_option: "C" }),
+    ]);
     expect(await screen.findByText("Revisión")).toBeInTheDocument();
   });
 
-  it("resumes on the first pending question and keeps feedback for answered ones", async () => {
-    const resumed = payload();
+  it("resumes on the first pending question and only submits pending ones", async () => {
+    const user = userEvent.setup();
+    const resumed = payload(2);
     resumed.questions[0] = {
       ...resumed.questions[0]!,
       selected_option: "B",
       answered_at: new Date().toISOString(),
       feedback: { is_correct: false, correct_option: "A", explanation: null },
     };
-    mocks.startSession.mockResolvedValue(resumed);
+    mocks.startPractice.mockResolvedValue(resumed);
+    mocks.decryptAnswerKey.mockResolvedValue({ "session-question-2": { correct_option: "A", explanation: null } });
     renderPage();
 
-    expect(await screen.findByText("Pregunta 2 de 3")).toBeInTheDocument();
+    expect(await screen.findByText("Pregunta 2 de 2")).toBeInTheDocument();
     expect(screen.getByText("1 respondidas")).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("retries the completion while the last answer is still being saved", async () => {
-    const user = userEvent.setup();
-    mocks.startSession.mockResolvedValue(payload(1));
-    mocks.completeSession.mockReset()
-      .mockRejectedValueOnce(new AppError("incomplete_submission", "Pendiente."))
-      .mockResolvedValue({ session: {} });
-    renderPage();
-
-    await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
-    expect(mocks.warmAnswerQuestion).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: /DOpción D 2/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    await user.click(await screen.findByRole("button", { name: "Finalizar examen" }));
-    expect(await screen.findByText("Revisión", {}, { timeout: 3000 })).toBeInTheDocument();
-    expect(mocks.completeSession).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByRole("button", { name: "Finalizar examen" }));
+    expect(mocks.submitPractice).toHaveBeenCalledWith("session-1", [
+      expect.objectContaining({ session_question_id: "session-question-2", selected_option: "D" }),
+    ]);
   });
 
-  it("lets the student retry when the answer cannot be saved", async () => {
+  it("keeps the answers and lets the student retry when saving fails", async () => {
     const user = userEvent.setup();
-    mocks.answerQuestion.mockRejectedValueOnce(new Error("Sin conexión."));
+    mocks.startPractice.mockResolvedValue(payload(1));
+    mocks.decryptAnswerKey.mockResolvedValue(keyFor(1));
+    mocks.submitPractice.mockRejectedValueOnce(new Error("Sin conexión."));
     renderPage();
 
     await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar examen" }));
     expect(await screen.findByText(/Sin conexión\./)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Reintentar" }));
-    expect(await screen.findAllByText("¡Correcto!")).not.toHaveLength(0);
-    expect(mocks.answerQuestion).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText("Revisión")).toBeInTheDocument();
+    expect(mocks.submitPractice).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers a retry when the practice cannot be loaded", async () => {
+    const user = userEvent.setup();
+    mocks.startPractice.mockRejectedValueOnce(new Error("Tema bloqueado."));
+    renderPage();
+
+    expect(await screen.findByText("Tema bloqueado.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByText("Pregunta 1 de 3")).toBeInTheDocument();
   });
 });

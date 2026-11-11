@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Alert, Badge, Button, Card, Field, Input, PageHeader, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, Field, Input, PageHeader } from "../../components/ui";
+import { PageSkeleton, Skeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { StudentDataCard, StudentPasswordResetCard } from "../../features/users/StudentAccount";
 import { getStudentProfile, listUsers, renewAccess, resetCredentials, roleLabel, studentProfileQueryKey, updateUser } from "../../features/users/api";
@@ -11,7 +12,7 @@ export function UserAccountPage() {
   const { userId = "" } = useParams();
   const users = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const user = users.data?.find((item) => item.id === userId);
-  if (users.isLoading) return <Spinner />;
+  if (users.isLoading) return <PageSkeleton rows={2} rowHeight={220} columns={2} />;
   if (!user) return <Alert tone="error">No se encontró el usuario solicitado.</Alert>;
   return <UserAccountForm key={user.id} user={user} />;
 }
@@ -59,9 +60,9 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
     <PageHeader
       title={user.full_name}
       description={`${roleLabel(user.role)} · ${user.user_code}`}
-      actions={<Link className="text-sm font-semibold text-indigo-600" to="/admin/usuarios">Volver a usuarios</Link>}
+      actions={<Link className="text-sm font-semibold text-primary-light" to="/admin/usuarios">Volver a usuarios</Link>}
     />
-    {isStudent && studentProfile.isPending ? <Spinner /> : <div className="grid gap-6 lg:grid-cols-2">
+    {isStudent && studentProfile.isPending ? <Skeleton height={220} rounded="none" /> : <div className="grid gap-6 lg:grid-cols-2">
       {/* Estudiante: sus datos ocupan la primera fila; credenciales y vigencia comparten la segunda. */}
       {isStudent && studentProfile.data ? <StudentDataCard className="lg:col-span-2" user={user} profile={studentProfile.data} /> : <Card>
         <div className="mb-4 flex items-center justify-between">
@@ -88,7 +89,7 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
       </Card>}
       {isStudent && studentEmail ? <StudentPasswordResetCard user={user} email={studentEmail} /> : <Card>
         <h2 className="font-bold">Credenciales</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-fg-muted">
           Se generará {user.role === "student" ? "un PIN numérico de seis dígitos" : "una contraseña segura"} y se mostrará una sola vez.
         </p>
         {credentials && <Alert tone="success">

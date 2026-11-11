@@ -40,7 +40,7 @@ function rejectionMessage(detail: string | null) {
 }
 
 function WhatsAppLink({ children }: { children: string }) {
-  return <a href={`https://wa.me/${BUSINESS.whatsapp}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 font-semibold text-white hover:bg-indigo-500"><MessageCircle size={18} />{children}</a>;
+  return <a href={`https://wa.me/${BUSINESS.whatsapp}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 font-semibold text-white hover:bg-indigo-500 dark:rounded-lg dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"><MessageCircle size={18} />{children}</a>;
 }
 
 /** Indicaciones para encontrar el código de aprobación en la app de Yape. */
@@ -52,7 +52,7 @@ function ApprovalCodeHelp() {
       <li>Vuelve aquí, escríbelo junto con tu celular y paga antes de que termine el contador.</li>
     </ol>
     <img src="/image/codigo-yape.webp" alt="Pantalla Aprobar compras de Yape con el código de aprobación de 6 dígitos" className="mx-auto max-h-80 w-auto rounded-2xl" />
-    <p className="text-xs text-slate-500">No compartas este código con nadie: escríbelo solo en este formulario.</p>
+    <p className="text-xs text-slate-500 dark:text-slate-400">No compartas este código con nadie: escríbelo solo en este formulario.</p>
   </div>;
 }
 
@@ -95,10 +95,10 @@ export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavail
   const configError = config.error as AppError | null;
   if (configError?.code === "payments_unavailable") {
     return <div className="grid gap-4">
-      <h2 className="text-lg font-bold text-slate-950">Muy pronto podrás completar el pago aquí</h2>
-      <p className="text-sm text-slate-600">Estamos terminando el pago en línea con Yape. Mientras tanto, escríbenos y te ayudamos a activar tu {plan.name.toLowerCase()}.</p>
+      <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">Muy pronto podrás completar el pago aquí</h2>
+      <p className="text-sm text-slate-600 dark:text-slate-400">Estamos terminando el pago en línea con Yape. Mientras tanto, escríbenos y te ayudamos a activar tu {plan.name.toLowerCase()}.</p>
       <WhatsAppLink>Escribir por WhatsApp</WhatsAppLink>
-      {unavailableNote && <p className="text-xs text-slate-500">{unavailableNote}</p>}
+      {unavailableNote && <p className="text-xs text-slate-500 dark:text-slate-400">{unavailableNote}</p>}
     </div>;
   }
 
@@ -109,8 +109,8 @@ export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavail
     </div>;
   }
   if (status === "paid" || status === "processing" || status === "pending") {
-    return <p className="flex items-center justify-center gap-2 py-8 text-sm font-semibold text-slate-700">
-      {status === "paid" ? <CheckCircle2 className="text-emerald-600" size={18} /> : <LoaderCircle className="animate-spin" size={18} />}
+    return <p className="flex items-center justify-center gap-2 py-8 text-sm font-semibold text-slate-700 dark:text-slate-200">
+      {status === "paid" ? <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={18} /> : <LoaderCircle className="animate-spin" size={18} />}
       {status === "pending" ? "Mercado Pago está procesando tu pago…" : "Pago recibido. Lo estamos aplicando…"}
     </p>;
   }
@@ -132,8 +132,8 @@ export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavail
     {(status === "failed" || status === "cancelled") && <Alert tone="error">{rejectionMessage(current?.status_detail ?? null)}</Alert>}
     <div className="flex items-center justify-between gap-4">
       <div>
-        <p className="text-sm text-slate-500">Total a pagar · {plan.months} {plan.months === 1 ? "mes" : "meses"} de acceso</p>
-        <p className="text-2xl font-bold text-slate-950">{formatSoles(plan.priceSoles)}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Total a pagar · {plan.months} {plan.months === 1 ? "mes" : "meses"} de acceso</p>
+        <p className="text-2xl font-bold text-slate-950 dark:text-slate-50">{formatSoles(plan.priceSoles)}</p>
       </div>
       <img src="/image/yape-logo.svg" alt="Paga con Yape" className="h-11 w-auto shrink-0 rounded-xl" />
     </div>
@@ -142,8 +142,8 @@ export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavail
       {/* La ayuda va junto al título del campo, pero fuera del <label> para no volverse su control. */}
       <div className="grid content-start gap-1.5">
         <div className="flex items-center justify-between gap-2 text-sm">
-          <span aria-hidden className="font-medium text-slate-700">Código de aprobación</span>
-          <button type="button" aria-label="¿Dónde está el código de aprobación?" className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800"
+          <span aria-hidden className="font-medium text-slate-700 dark:text-slate-300">Código de aprobación</span>
+          <button type="button" aria-label="¿Dónde está el código de aprobación?" className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 dark:text-emerald-400 dark:hover:text-emerald-300"
             onClick={() => modal.info({ title: "¿Dónde encuentro mi código?", body: <ApprovalCodeHelp /> })}>
             <CircleHelp size={16} aria-hidden />¿Dónde está?
           </button>
@@ -152,6 +152,6 @@ export function PaymentPanel({ plan, createPayment, fetchStatus, onPaid, unavail
       </div>
     </div>
     <Button type="submit" disabled={isSubmitting || config.isPending}>{isSubmitting ? "Procesando pago…" : `Pagar ${formatSoles(plan.priceSoles)} con Yape`}</Button>
-    <p className="text-center text-xs text-slate-500">Pago procesado por Mercado Pago. Chancón no guarda tu código.</p>
+    <p className="text-center text-xs text-slate-500 dark:text-slate-400">Pago procesado por Mercado Pago. Chancón no guarda tu código.</p>
   </form>;
 }

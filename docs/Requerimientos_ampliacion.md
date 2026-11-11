@@ -104,9 +104,14 @@ curso, profesor ni estudiante.
 
 ### 3.3 Flujo del estudiante
 
+0. Al pulsar **Iniciar práctica** o **Continuar práctica**, el menú lateral se
+   reduce a iconos y aparece una pantalla de carga mientras se traen todas las
+   preguntas de la sesión con su clave de respuestas cifrada y el navegador la
+   descifra. La pantalla desaparece cuando todo está listo.
 1. El estudiante selecciona una alternativa y pulsa **Confirmar respuesta**.
-2. La plataforma registra la respuesta en el servidor. Desde ese momento la
-   respuesta es definitiva y no puede cambiarse.
+2. La corrección se hace en el navegador con la clave descifrada, sin llamar
+   al servidor, así que es instantánea. Desde ese momento la respuesta es
+   definitiva y no puede cambiarse.
 3. Se muestra de inmediato:
    - si la respuesta fue **correcta** o **incorrecta**;
    - la alternativa seleccionada y la alternativa correcta, diferenciadas
@@ -114,41 +119,47 @@ curso, profesor ni estudiante.
    - la explicación del profesor, con soporte LaTeX. Si la pregunta no tiene
      explicación, este bloque no se muestra.
 4. El estudiante pulsa **Siguiente** para continuar con la próxima pregunta.
-5. Tras responder la última pregunta, pulsa **Finalizar examen** y ve el
-   dashboard del examen descrito en la sección 8.1 del documento original, sin
-   cambios.
+5. Tras responder la última pregunta, pulsa **Finalizar examen**: todas las
+   respuestas se envían juntas al servidor, que las guarda y cierra la sesión.
+   Luego ve el dashboard del examen descrito en la sección 8.1 del documento
+   original, sin cambios.
 
 ### 3.4 Continuidad de la sesión
 
-- Si el estudiante recarga la página, cierra el navegador o vuelve más tarde a
-  una sesión en curso, las preguntas ya respondidas conservan su respuesta y
-  muestran su corrección. La sesión continúa desde la primera pregunta
-  pendiente.
-- Como cada respuesta queda guardada en el servidor al confirmarla, el progreso
-  no depende del navegador ni del dispositivo.
+- Las respuestas solo se guardan al pulsar **Finalizar examen**. Si el
+  estudiante sale antes (recarga, cierra el navegador o navega a otra página),
+  pierde las respuestas de esa práctica y, al volver, la sesión en curso
+  empieza de nuevo con las mismas preguntas.
+- Si durante la práctica abre el menú para ir a otra sección o pulsa **Salir**,
+  un modal de advertencia le avisa que perderá todo su progreso hasta ese
+  momento y le pide confirmar.
 
 ### 3.5 Protección de respuestas
 
 Esta regla reemplaza la nota **Protección de respuestas** de la sección 8.1 del
 documento original:
 
-> La corrección se realiza en el backend. La respuesta correcta y la
-> explicación de una pregunta se envían al navegador únicamente después de que
-> el servidor haya registrado la respuesta del estudiante a esa misma pregunta.
-> Las preguntas pendientes de la sesión nunca exponen su respuesta correcta ni
-> su explicación.
+> La respuesta correcta y la explicación de las preguntas pendientes viajan
+> cifradas (AES-GCM) junto con la sesión y nunca en claro. El navegador las
+> descifra para corregir al instante. Como la llave viaja con la sesión, el
+> cifrado evita que se lean a simple vista pero no es un secreto absoluto; por
+> eso la nota, los porcentajes y FSRS se calculan siempre en el backend con la
+> clave de la base de datos al finalizar, sin confiar en la corrección del
+> navegador.
 
 ### 3.6 FSRS
 
 No cambian las reglas de la sección 7 del documento original: una respuesta
-correcta se califica como `Good` y una incorrecta como `Again`. La tarjeta FSRS
-de cada pregunta se actualiza en el momento en que se responde.
+correcta se califica como `Good` y una incorrecta como `Again`. Las tarjetas
+FSRS de todas las preguntas se actualizan juntas al finalizar el examen.
 
 ### 3.7 Errores de conexión
 
-- Mientras se corrige la respuesta, la pantalla muestra un indicador de espera.
-- Si falla la conexión, se informa al estudiante y se le permite reintentar.
-- Reintentar es seguro: una misma pregunta nunca se registra dos veces.
+- Si falla la carga inicial, se informa al estudiante y se le permite
+  reintentar.
+- Si falla el envío final, las respuestas siguen en pantalla y el estudiante
+  puede reintentar sin recargar. Reintentar es seguro: una misma pregunta nunca
+  se registra dos veces.
 
 ### 3.8 Plantilla de Excel
 
@@ -162,14 +173,14 @@ responder la pregunta** y nuevamente en la revisión final del examen.
    correcta y la explicación antes de pasar a la siguiente pregunta.
 2. Una respuesta confirmada no puede modificarse.
 3. Antes de responder una pregunta, el navegador no recibe su respuesta
-   correcta ni su explicación.
-4. Al recargar una sesión en curso, las preguntas respondidas muestran su
-   corrección y la sesión continúa en la primera pregunta pendiente.
-5. El dashboard y la revisión al finalizar el examen muestran los mismos datos
+   correcta ni su explicación en claro: solo cifradas.
+4. Tras la carga inicial, cada corrección se muestra en menos de 1 segundo.
+5. Salir desde el menú durante una práctica muestra un modal de advertencia.
+6. El dashboard y la revisión al finalizar el examen muestran los mismos datos
    que antes.
-6. Los porcentajes por tema y por curso, y la programación FSRS, se calculan
+7. Los porcentajes por tema y por curso, y la programación FSRS, se calculan
    igual que antes.
-7. Las sesiones que estaban en curso cuando se publicó el cambio pueden
+8. Las sesiones que estaban en curso cuando se publicó el cambio pueden
    completarse con normalidad.
 
 ## 4. Perfil de usuario (por definir)

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner, Textarea } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { ModalForm } from "../../components/ui/modal-form";
 import { useModal } from "../../components/ui/use-modal";
 import { courseTopicsPath } from "../../lib/portal-paths";
@@ -228,7 +229,7 @@ export function CoursesView() {
     modal.create({
       title: "Duplicar curso",
       body: <div className="grid gap-2">
-        <p>Se creará una copia de <strong className="text-slate-900">{course.name}</strong> con sus temas y preguntas, para el mismo profesor.</p>
+        <p>Se creará una copia de <strong className="text-fg-strong">{course.name}</strong> con sus temas y preguntas, para el mismo profesor.</p>
         <p>La copia se llamará «{course.name} - duplicado» y empezará sin progreso de estudiantes.</p>
       </div>,
       confirmLabel: "Duplicar curso",
@@ -239,7 +240,7 @@ export function CoursesView() {
     modal.delete({
       title: "Eliminar curso",
       body: <div className="grid gap-2">
-        <p>¿Seguro que quieres eliminar <strong className="text-slate-900">{course.name}</strong>?</p>
+        <p>¿Seguro que quieres eliminar <strong className="text-fg-strong">{course.name}</strong>?</p>
         <p>
           Esta acción es permanente: el curso dejará de estar disponible para estudiantes y profesores.
         </p>
@@ -249,7 +250,7 @@ export function CoursesView() {
     });
   };
 
-  if (query.isLoading) return <Spinner />;
+  if (query.isLoading) return <PageSkeleton />;
 
   if (isAdmin) return <>
     <PageHeader title="Cursos" description="Todos los cursos de la plataforma, agrupados por profesor." actions={<Button onClick={openCreate}>Nuevo Curso</Button>} />
@@ -264,8 +265,8 @@ export function CoursesView() {
     {duplicate.error && <div className="mt-4"><Alert tone="error">{duplicate.error.message}</Alert></div>}
     {adminGroups.length ? <div className="mt-6 grid gap-6">{adminGroups.map((group) => <section key={group.teacherId}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-bold text-slate-950">{group.teacherName}</h2>
-        <span className="text-sm text-slate-500">{courseCount(group.courses.length)}</span>
+        <h2 className="text-lg font-bold text-fg-strong">{group.teacherName}</h2>
+        <span className="text-sm text-fg-muted">{courseCount(group.courses.length)}</span>
       </div>
       <div className="grid gap-4">{!group.courses.length && <EmptyState>No hay cursos disponibles. Crea uno.</EmptyState>}{group.courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
@@ -273,8 +274,8 @@ export function CoursesView() {
             <h3 className="font-bold">{course.name}</h3>
             <Badge tone={statusTone(course.status)}>{course.status}</Badge>
           </div>
-          <p className="mt-1 text-sm text-slate-500">{course.description || "Sin descripción"}</p>
-          <p className="mt-1 text-xs text-slate-400">{course.colleges?.name ?? "Sin colegio"}</p>
+          <p className="mt-1 text-sm text-fg-muted">{course.description || "Sin descripción"}</p>
+          <p className="mt-1 text-xs text-fg-faint">{course.colleges?.name ?? "Sin colegio"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => openEdit(course)}>Editar</Button>
@@ -304,7 +305,7 @@ export function CoursesView() {
       onSubmit={() => move.mutate()}
       error={move.error?.message}
     >
-      <p className="text-sm text-slate-600">Elige el profesor que se quedará con <strong className="text-slate-900">{moving.name}</strong>. Solo se muestran profesores del mismo colegio. Los estudiantes del curso pasarán a ser los del nuevo profesor.</p>
+      <p className="text-sm text-fg-muted">Elige el profesor que se quedará con <strong className="text-fg-strong">{moving.name}</strong>. Solo se muestran profesores del mismo colegio. Los estudiantes del curso pasarán a ser los del nuevo profesor.</p>
       <Field label="Nuevo profesor">
         <Select required value={moveTeacherId} onChange={(event) => setMoveTeacherId(event.target.value)}>
           <option value="">Selecciona un profesor</option>
@@ -319,7 +320,7 @@ export function CoursesView() {
     <PageHeader title="Mis cursos" description="Administra cursos y sus temas." />
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="grid gap-4">{courses.length ? courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div><div className="flex items-center gap-2"><h2 className="font-bold">{course.name}</h2><Badge tone={statusTone(course.status)}>{course.status}</Badge></div><p className="mt-1 text-sm text-slate-500">{course.description}</p></div>
+        <div><div className="flex items-center gap-2"><h2 className="font-bold">{course.name}</h2><Badge tone={statusTone(course.status)}>{course.status}</Badge></div><p className="mt-1 text-sm text-fg-muted">{course.description}</p></div>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => { save.reset(); setEditingId(course.id); setForm({ name: course.name, description: course.description ?? "", teacher_id: course.teacher_id, college_id: course.college_id }); }}>Editar</Button>
           <Button variant="ghost" disabled={toggle.isPending && toggle.variables?.id === course.id} onClick={() => toggle.mutate(course)}>{course.status === "active" ? "Desactivar" : "Activar"}</Button>

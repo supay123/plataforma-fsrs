@@ -45,7 +45,7 @@ export function SecurityPage() {
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
         <h2 className="font-bold">Pregunta de seguridad</h2>
-        <p className="mt-1 text-sm text-slate-600">La respuesta se guarda protegida y no podrá consultarse después.</p>
+        <p className="mt-1 text-sm text-fg-muted">La respuesta se guarda protegida y no podrá consultarse después.</p>
         <div className="mt-4 grid gap-4">
           {message && <Alert tone="success">{message}</Alert>}
           {error && <Alert tone="error">{error}</Alert>}
@@ -56,7 +56,7 @@ export function SecurityPage() {
       </Card>
       <Card>
         <h2 className="font-bold">Restablecer credenciales</h2>
-        <p className="mt-1 text-sm text-slate-600">Genera una nueva contraseña. Se mostrará una sola vez.</p>
+        <p className="mt-1 text-sm text-fg-muted">Genera una nueva contraseña. Se mostrará una sola vez.</p>
         {credentials && <Alert tone="success"><strong>Nueva credencial</strong><br />{credentials.user_code} / {credentials.temporary_password}<Button type="button" variant="ghost" className="mt-2" onClick={() => void navigator.clipboard.writeText(`${credentials.user_code}\n${credentials.temporary_password ?? ""}`)}>Copiar</Button></Alert>}
         <Button className="mt-4" type="button" variant="secondary" disabled={resetting} onClick={() => void reset()}>{resetting ? "Restableciendo…" : "Restablecer credenciales"}</Button>
       </Card>
