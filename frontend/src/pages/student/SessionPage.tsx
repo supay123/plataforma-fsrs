@@ -1,10 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePortalFocus, useLeaveWarning, type LeaveWarning } from "../../components/layout/portal-mode";
 import { Alert, Button, Card, Eyebrow, PageHeader } from "../../components/ui";
 import { decryptAnswerKey } from "../../features/sessions/answer-key";
 import { startPractice, submitPractice } from "../../features/sessions/api";
+import { LoadingProgress } from "../../features/sessions/LoadingProgress";
+import type { LoadStage } from "../../features/sessions/loading-progress";
+import { MascotTips } from "../../features/sessions/MascotTips";
 import { MathText } from "../../lib/math";
 import type { AnswerFeedback, AnswerKeyEntry, AnswerOption, SessionAnswer, SessionPayload, SessionQuestion } from "../../types/contracts";
 
@@ -18,8 +21,9 @@ const LEAVE_WARNING: LeaveWarning = {
 };
 
 /** Trae las preguntas y descifra su clave para corregir sin esperar al servidor. */
-async function loadPractice(topicId: string): Promise<Practice> {
+async function loadPractice(topicId: string, onStage: (stage: LoadStage) => void): Promise<Practice> {
   const { answer_key, ...payload } = await startPractice(topicId);
+  onStage("preparing");
   const key = await decryptAnswerKey(answer_key);
   if (payload.questions.some((item) => !item.selected_option && !key[item.session_question_id])) {
     throw new Error("No se pudo preparar la corrección de la práctica. Vuelve a intentarlo.");
@@ -56,16 +60,17 @@ function optionClass(answerOption: AnswerOption, feedback: AnswerFeedback | null
 }
 
 /** Pantalla mientras se traen y descifran las preguntas (única carga que no usa skeleton). */
-function PracticeLoading() {
-  return <div role="status" aria-live="polite" className="mx-auto mt-10 grid max-w-md justify-items-center gap-5 text-center sm:mt-20">
-    <div className="relative h-14 w-14">
-      <span className="absolute inset-0 animate-spin rounded-full border-2 border-line border-t-primary-light" />
-      <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-ornament" />
-    </div>
-    <div>
+/** Tiempo que la barra se queda al 100 % antes de mostrar la primera pregunta (la barra anima ~0,5 s). */
+const DONE_HOLD_MS = 800;
+
+function PracticeLoading({ stage, stageSince, startedAt, done, onRetry }: { stage: LoadStage; stageSince: number; startedAt: number; done: boolean; onRetry: () => void }) {
+  return <div className="mx-auto mt-4 grid max-w-md justify-items-center gap-4 text-center sm:mt-10">
+    <div role="status" aria-live="polite">
       <p className="font-display text-xl tracking-wide text-primary-pale">Preparando tu práctica…</p>
       <p className="mt-1 text-sm text-fg-muted">Estamos cargando tus preguntas. En un momento empiezas y cada respuesta se corregirá al instante.</p>
     </div>
+    <LoadingProgress stage={stage} stageSince={stageSince} startedAt={startedAt} done={done} onRetry={onRetry} />
+    <MascotTips />
   </div>;
 }
 
@@ -73,6 +78,8 @@ export function SessionPage() {
   const { topicId = "" } = useParams();
   const navigate = useNavigate();
   const [practice, setPractice] = useState<Practice | null>(null);
+  // La práctica ya está lista, pero la primera pregunta espera a que se vea la barra completa.
+  const [revealed, setRevealed] = useState(false);
   const [answers, setAnswers] = useState<Record<string, LocalAnswer>>({});
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<AnswerOption | null>(null);
@@ -91,9 +98,20 @@ export function SessionPage() {
 
   usePortalFocus();
 
+  // Cada intento tiene un número: si se reintenta, la respuesta de uno anterior se ignora.
+  const attempt = useRef(0);
+  const [loading, setLoading] = useState({ stage: "downloading" as LoadStage, stageSince: 0, startedAt: 0 });
   const start = useMutation({
-    mutationFn: () => loadPractice(topicId),
-    onSuccess: (data) => {
+    mutationFn: (id: number) => {
+      const now = Date.now();
+      setLoading({ stage: "downloading", stageSince: now, startedAt: now });
+      return loadPractice(topicId, (stage) => {
+        if (attempt.current === id) setLoading((current) => ({ ...current, stage, stageSince: Date.now() }));
+      });
+    },
+    onSuccess: (data, id) => {
+      if (attempt.current !== id) return;
+      setRevealed(false);
       setPractice(data);
       setAnswers({});
       setStartedAt(Date.now());
@@ -101,9 +119,13 @@ export function SessionPage() {
     },
   });
   const startMutation = start.mutate;
+  const begin = useCallback(() => {
+    attempt.current += 1;
+    startMutation(attempt.current);
+  }, [startMutation]);
   useEffect(() => {
-    startMutation();
-  }, [topicId, startMutation]);
+    begin();
+  }, [topicId, begin]);
 
   const submit = useMutation({
     mutationFn: (session: { id: string; answers: SessionAnswer[] }) => submitPractice(session.id, session.answers),
@@ -111,6 +133,12 @@ export function SessionPage() {
       navigate(`/estudiante/sesiones/${session.id}/revision`, { replace: true });
     },
   });
+
+  useEffect(() => {
+    if (!practice) return;
+    const timer = window.setTimeout(() => setRevealed(true), DONE_HOLD_MS);
+    return () => window.clearTimeout(timer);
+  }, [practice]);
 
   // Hasta que la práctica se guarda, salir desde el menú pide confirmación.
   useLeaveWarning(practice && !submit.isSuccess ? LEAVE_WARNING : null);
@@ -131,10 +159,12 @@ export function SessionPage() {
   if (start.error) {
     return <div className="mx-auto mt-10 grid max-w-md gap-4">
       <Alert tone="error">{start.error.message}</Alert>
-      <Button onClick={() => start.mutate()}>Reintentar</Button>
+      <Button onClick={begin}>Reintentar</Button>
     </div>;
   }
-  if (!practice || !question) return <PracticeLoading />;
+  if (!practice || !question || !revealed) {
+    return <PracticeLoading stage={loading.stage} stageSince={loading.stageSince} startedAt={loading.startedAt} done={Boolean(practice)} onRetry={begin} />;
+  }
 
   const { payload, key } = practice;
   const activeQuestion = question;

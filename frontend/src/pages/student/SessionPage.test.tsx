@@ -1,10 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, configure, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnswerKeyEntry, PracticePayload } from "../../types/contracts";
 import { SessionPage } from "./SessionPage";
+
+// La primera pregunta aparece tras dejar ver la barra completa (~0,8 s).
+configure({ asyncUtilTimeout: 3000 });
 
 const mocks = vi.hoisted(() => ({
   startPractice: vi.fn(),
@@ -91,6 +94,16 @@ describe("SessionPage", () => {
     resolveKey(keyFor());
     expect(await screen.findByText("Pregunta 1 de 3")).toBeInTheDocument();
     expect(screen.queryByText("Preparando tu práctica…")).not.toBeInTheDocument();
+  });
+
+  it("shows the progress bar complete before the first question", async () => {
+    renderPage();
+
+    const bar = await screen.findByRole("progressbar", { name: "Progreso de la carga" });
+    await vi.waitFor(() => expect(bar).toHaveAttribute("aria-valuenow", "100"));
+    expect(screen.getByText("¡Listo!")).toBeInTheDocument();
+    expect(screen.queryByText("Pregunta 1 de 3")).not.toBeInTheDocument();
+    expect(await screen.findByText("Pregunta 1 de 3")).toBeInTheDocument();
   });
 
   it("corrects locally and submits every answer once at the end", async () => {

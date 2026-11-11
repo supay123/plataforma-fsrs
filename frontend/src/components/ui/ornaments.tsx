@@ -56,6 +56,6 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
 export function ProgressBar({ value, label }: { value: number; label?: string }) {
   const percent = Math.max(0, Math.min(100, value));
   return <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} className="h-1 w-full rounded-full bg-track">
-    <div className="h-full rounded-full bg-gradient-to-r from-primary to-primary-light" style={{ width: `${percent}%` }} />
+    <div className="h-full rounded-full bg-gradient-to-r from-primary to-primary-light transition-[width] duration-500 ease-out" style={{ width: `${percent}%` }} />
   </div>;
 }

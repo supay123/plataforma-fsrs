@@ -1,9 +1,10 @@
 import clsx from "clsx";
 import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, Menu, PanelLeftClose, Settings, Users, X } from "lucide-react";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { PlanExpiryBanner } from "../../features/payments/PlanExpiryBanner";
+import { preloadMascot } from "../../features/sessions/preload-mascot";
 import { roleLabel } from "../../features/users/api";
 import type { AppRole } from "../../types/contracts";
 import { Button } from "../ui";
@@ -43,6 +44,12 @@ export function PortalLayout({ role }: { role: AppRole }) {
     root.classList.add(...added);
     return () => root.classList.remove(...added);
   }, []);
+  // El estudiante practica con la mascota 3D: se baja en segundo plano, sin competir con la carga inicial.
+  useEffect(() => {
+    if (role !== "student") return;
+    const timer = window.setTimeout(preloadMascot, 1500);
+    return () => window.clearTimeout(timer);
+  }, [role]);
   const { profile, logout } = useAuth();
   const modal = useModal();
   const navigate = useNavigate();

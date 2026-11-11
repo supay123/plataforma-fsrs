@@ -65,6 +65,12 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
   --animate-orbit: orbit 4s linear infinite;
   /* Crece y vuelve a su tamaño: llama la atención sobre un botón. */
   --animate-pop: pop 0.7s ease-in-out;
+  /* Aparición suave (consejos de la mascota). */
+  --animate-tip: tip 0.4s ease-out;
+  @keyframes tip {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   /* Menú móvil: entra desde la izquierda. */
   --animate-drawer: drawer 0.2s ease-out;
   /* Skeleton: destello que cruza de izquierda a derecha. */

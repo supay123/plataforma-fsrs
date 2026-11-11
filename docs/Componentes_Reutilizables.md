@@ -215,6 +215,21 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
   preguntas de la práctica del estudiante).
 - `EmptyState`: recuadro para listas vacías, con el texto como hijo.
 
+### Mascota 3D con consejos (`MascotTips`, `ui/mascot-scene.tsx`)
+
+`features/sessions/MascotTips.tsx` muestra la mascota (`public/models/mascot.glb`,
+con `three` + `@react-three/fiber`) y rota consejos cortos de
+`features/sessions/practice-tips.ts` cada 5 s, sin repetir ninguno hasta mostrar
+todos. Saluda (`wave`) al cambiar de consejo y respeta `prefers-reduced-motion`.
+La escena se carga con `lazy` para no meter `three` en el paquete principal, y
+sin WebGL se ve la cabeza 2D. Se usa en la carga de la práctica del estudiante.
+
+Junto a la mascota, `features/sessions/LoadingProgress.tsx` muestra una
+`ProgressBar` por etapas reales (`loading-progress.ts`): avanza despacio dentro
+de cada etapa y salta cuando termina de verdad la descarga o el descifrado. A
+los 20 s avisa "Esto a veces puede tardar"; al minuto pide contactar al negocio
+(WhatsApp) y ofrece "Reintentar". Al terminar, la barra se queda al 100 % ("¡Listo!") ~0,8 s antes de mostrar la primera pregunta. `PortalLayout` precarga el modelo 3D (`preloadMascot`) para el estudiante, y la cabeza 2D cubre el tiempo hasta que el modelo esté listo.
+
 ### Skeleton
 
 Marcador de carga gris con un destello que cruza de izquierda a derecha (se
