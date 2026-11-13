@@ -4,14 +4,17 @@ import { useNavigate, useParams } from "react-router-dom";
 import { usePortalFocus, useLeaveWarning, type LeaveWarning } from "../../components/layout/portal-mode";
 import { Alert, Button, Card, Eyebrow, PageHeader } from "../../components/ui";
 import { decryptAnswerKey } from "../../features/sessions/answer-key";
-import { startPractice, submitPractice } from "../../features/sessions/api";
+import { getXpRules, startPractice, submitPractice } from "../../features/sessions/api";
 import { LoadingProgress } from "../../features/sessions/LoadingProgress";
 import type { LoadStage } from "../../features/sessions/loading-progress";
 import { MascotTips } from "../../features/sessions/MascotTips";
+import { answerXp, trailingStreak } from "../../features/xp/xp";
+import { XpFloat } from "../../features/xp/XpFloat";
+import { XpResult } from "../../features/xp/XpResult";
 import { MathText } from "../../lib/math";
-import type { AnswerFeedback, AnswerKeyEntry, AnswerOption, SessionAnswer, SessionPayload, SessionQuestion } from "../../types/contracts";
+import type { AnswerFeedback, AnswerKeyEntry, AnswerOption, SessionAnswer, SessionPayload, SessionQuestion, XpAward, XpRules } from "../../types/contracts";
 
-interface Practice { payload: SessionPayload; key: Record<string, AnswerKeyEntry> }
+interface Practice { payload: SessionPayload; key: Record<string, AnswerKeyEntry>; xpRules: XpRules | null }
 type LocalAnswer = Pick<SessionAnswer, "selected_option" | "response_time_ms">;
 
 const LEAVE_WARNING: LeaveWarning = {
@@ -22,13 +25,15 @@ const LEAVE_WARNING: LeaveWarning = {
 
 /** Trae las preguntas y descifra su clave para corregir sin esperar al servidor. */
 async function loadPractice(topicId: string, onStage: (stage: LoadStage) => void): Promise<Practice> {
+  // Los montos de xp son un adorno: si fallan, la práctica sigue sin mostrarlos.
+  const xpRules = getXpRules().catch(() => null);
   const { answer_key, ...payload } = await startPractice(topicId);
   onStage("preparing");
   const key = await decryptAnswerKey(answer_key);
   if (payload.questions.some((item) => !item.selected_option && !key[item.session_question_id])) {
     throw new Error("No se pudo preparar la corrección de la práctica. Vuelve a intentarlo.");
   }
-  return { payload, key };
+  return { payload, key, xpRules: await xpRules };
 }
 
 function isAnswered(question: SessionQuestion, answers: Record<string, LocalAnswer>): boolean {
@@ -38,6 +43,14 @@ function isAnswered(question: SessionQuestion, answers: Record<string, LocalAnsw
 function firstPendingIndex(questions: SessionQuestion[], answers: Record<string, LocalAnswer>, after = -1): number {
   const next = questions.findIndex((item, itemIndex) => itemIndex > after && !isAnswered(item, answers));
   return next < 0 ? questions.length - 1 : next;
+}
+
+/** ¿Acertó la pregunta? null si aún no la responde. */
+function wasCorrect(question: SessionQuestion, answers: Record<string, LocalAnswer>, key: Record<string, AnswerKeyEntry>): boolean | null {
+  if (question.feedback) return question.feedback.is_correct;
+  const answer = answers[question.session_question_id];
+  const entry = key[question.session_question_id];
+  return answer && entry ? answer.selected_option === entry.correct_option : null;
 }
 
 function letterClass(answerOption: AnswerOption, feedback: AnswerFeedback | null, chosen: AnswerOption | null, selected: AnswerOption | null): string {
@@ -82,6 +95,7 @@ export function SessionPage() {
   const [revealed, setRevealed] = useState(false);
   const [answers, setAnswers] = useState<Record<string, LocalAnswer>>({});
   const [index, setIndex] = useState(0);
+  const [award, setAward] = useState<{ sessionId: string; xp: XpAward } | null>(null);
   const [selected, setSelected] = useState<AnswerOption | null>(null);
   const [startedAt, setStartedAt] = useState(0);
   // Alto real de la barra fija en móvil, para reservar justo ese espacio al final.
@@ -129,8 +143,9 @@ export function SessionPage() {
 
   const submit = useMutation({
     mutationFn: (session: { id: string; answers: SessionAnswer[] }) => submitPractice(session.id, session.answers),
-    onSuccess: (_, session) => {
-      navigate(`/estudiante/sesiones/${session.id}/revision`, { replace: true });
+    onSuccess: (data, session) => {
+      if (data.xp) setAward({ sessionId: session.id, xp: data.xp });
+      else navigate(`/estudiante/sesiones/${session.id}/revision`, { replace: true });
     },
   });
 
@@ -156,6 +171,9 @@ export function SessionPage() {
     [question],
   );
 
+  if (award) {
+    return <XpResult award={award.xp} onContinue={() => navigate(`/estudiante/sesiones/${award.sessionId}/revision`, { replace: true })} />;
+  }
   if (start.error) {
     return <div className="mx-auto mt-10 grid max-w-md gap-4">
       <Alert tone="error">{start.error.message}</Alert>
@@ -174,6 +192,10 @@ export function SessionPage() {
   const feedback: AnswerFeedback | null = question.feedback ?? (localAnswer && entry
     ? { is_correct: localAnswer.selected_option === entry.correct_option, correct_option: entry.correct_option, explanation: entry.explanation }
     : null);
+  // Xp de esta respuesta (solo vista previa): acierto más bono si completa una racha de 3, 7 o 20.
+  const gain = feedback?.is_correct && practice.xpRules
+    ? answerXp(trailingStreak(payload.questions.slice(0, index + 1).map((item) => wasCorrect(item, answers, key) === true)), practice.xpRules)
+    : null;
   const answeredCount = payload.questions.filter((item) => isAnswered(item, answers)).length;
   const allAnswered = answeredCount === payload.questions.length;
 
@@ -204,7 +226,7 @@ export function SessionPage() {
     {/* En móvil la pregunta va directo sobre el fondo, sin marco, para ganar espacio. */}
     <Card glow className="mx-auto max-w-3xl max-sm:border-0 max-sm:bg-none max-sm:p-0 max-sm:shadow-none sm:p-6">
       <h2 className="text-xl font-semibold text-fg-strong"><MathText>{question.question.statement}</MathText></h2>
-      <div className="mt-4 grid gap-3 sm:mt-6">
+      <div className="relative mt-4 grid gap-3 sm:mt-6">
         {options.map(([answerOption, text]) => <button
           key={answerOption}
           disabled={Boolean(feedback) || submit.isPending}
@@ -220,6 +242,7 @@ export function SessionPage() {
           {feedback && !feedback.is_correct && answerOption === chosen &&
             <span className="text-xs font-semibold text-danger-light">Tu respuesta</span>}
         </button>)}
+        {gain && <XpFloat key={question.session_question_id} base={gain.base} bonus={gain.bonus} streak={gain.streak} />}
       </div>
       {feedback && <div className="mt-4 grid gap-3 sm:mt-6">
         <div className="hidden sm:block">

@@ -7,7 +7,9 @@ import type {
   FsrsConfig,
   StoredCard,
 } from "../_shared/interfaces/fsrs.interfaces.ts";
+import type { XpAmounts } from "../_shared/interfaces/xp.interfaces.ts";
 import type { EdgeContext } from "../_shared/types.ts";
+import { computeSessionXp } from "../_shared/xp.ts";
 import { nonNegativeInteger, option, uuid } from "../_shared/validation.ts";
 import type { SubmitPracticeBody, SubmittedAnswer } from "./interfaces.ts";
 
@@ -206,5 +208,42 @@ export async function submitPractice(
   if (resultError) {
     throw new AppError(500, "session_result_failed", resultError.message);
   }
-  return json({ session: result, request_id: requestId });
+
+  // El xp se calcula siempre en el servidor con las respuestas guardadas, en el
+  // orden en que se mostraron. Otorgarlo es idempotente: reenviar la sesión
+  // devuelve el mismo resultado sin sumar de nuevo.
+  const [{ data: answered, error: answeredError }, { data: rules, error: rulesError }] =
+    await Promise.all([
+      context.supabaseAdmin
+        .from(TABLES.assessmentSessionQuestions)
+        .select("is_correct")
+        .eq("session_id", completedId)
+        .order("position"),
+      context.supabaseAdmin.rpc(RPCS.collegeXpRules, {
+        p_college_id: student.college_id,
+      }),
+    ]);
+  if (answeredError || rulesError || !rules) {
+    throw new AppError(
+      500,
+      "xp_calculation_failed",
+      (answeredError ?? rulesError)?.message,
+    );
+  }
+  const xp = computeSessionXp(
+    (answered ?? []).map((row) => row.is_correct === true),
+    rules as XpAmounts,
+  );
+  const { data: award, error: awardError } = await context.supabaseAdmin.rpc(
+    RPCS.awardSessionXp,
+    { p_student_id: student.id, p_session_id: completedId, p_xp: xp.total },
+  );
+  if (awardError || !award) {
+    throw new AppError(500, "xp_award_failed", awardError?.message);
+  }
+  return json({
+    session: result,
+    xp: { ...(award as Record<string, Json>), breakdown: xp },
+    request_id: requestId,
+  });
 }

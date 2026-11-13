@@ -341,6 +341,24 @@ también se reutilizan: las rutas son `/admin/cursos/:courseId` y
 profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
 (`courseTopicsPath` e `importQuestionsPath`), así no se repiten rutas por rol.
 
+## Xp y niveles (`features/xp/`)
+
+- `XpResult` (`XpResult.tsx`): pantalla de fin de sesión. El xp ganado crece
+  como número (`useCountUp`) y la barra de nivel se llena, y por cada nivel que
+  sube cambia el número con una animación corta. Con `prefers-reduced-motion`
+  muestra el estado final sin animar. Recibe el `XpAward` que devuelve
+  `practice-session/submit` y `onContinue`.
+- `XpFloat` (`XpFloat.tsx`): "+N xp" flotante durante la sesión. Aparece sobre
+  las opciones, sube hacia la derecha y se desvanece; la racha de 3, 7 o 20
+  sale aparte como un bono dorado. Va dentro de un contenedor `relative`, con
+  `key` por pregunta para repetir la animación. Las animaciones son
+  `animate-xp-float` y `animate-xp-bonus` (`styles.css`); con
+  `prefers-reduced-motion` queda como texto fijo.
+- `xp.ts`: `answerXp`/`trailingStreak` (vista previa del xp por respuesta y
+  racha; el oficial lo calcula el servidor) y `buildLevelSegments` (tramos de la
+  barra).
+- `useCountUp(target)` y `prefersReducedMotion()` (`use-count-up.ts`).
+
 ## Utilidades (`lib/`)
 
 | Utilidad | Archivo | Descripción |

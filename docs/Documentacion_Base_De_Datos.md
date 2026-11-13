@@ -1129,3 +1129,39 @@ desde Asignaciones).
 `SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
 
 - `public.edge_change_student_group(p_student_id, p_teacher_id, p_actor_id)`: cambia el grupo en una sola transacción. Valida el profesor entre los de `edge_registration_teachers()`, desactiva las matrículas activas del estudiante en cursos de otros profesores y programa el borrado de su progreso, lo matricula en los cursos no archivados del nuevo profesor (si vuelve a uno que dejó, se cancela su borrado) y le asigna la institución del profesor, que devuelve. Errores: `user_not_found`, `invalid_teacher`.
+
+## Niveles y xp del estudiante
+
+Del estudiante solo se guarda su nivel y el xp que lleva dentro de ese nivel
+(no el total acumulado). Pasar al nivel N cuesta
+`floor(base_xp + base_xp * (N - 1)^(1 + growth) * growth)` (`public.xp_for_level`).
+Con base 100 y growth 0.2: 0→1 = 100, 1→2 = 120, 2→3 = 145. Si el admin cambia
+la fórmula, el nivel y el xp guardados no se tocan: solo cambia el costo del
+siguiente nivel.
+
+### public.college_xp_settings
+
+Una fila por colegio (`college_id`): `base_xp` (100), `growth` (0.2),
+`xp_per_correct` (75), `streak_3_bonus` (15), `streak_7_bonus` (42),
+`streak_20_bonus` (137), con rangos validados por constraints. Se crea con los
+valores por defecto al migrar y de forma perezosa para colegios nuevos. RLS:
+solo el admin lee y escribe; las Edge Functions usan `service_role`.
+
+### public.student_levels
+
+`student_id`, `level` (0 al empezar) y `xp` (0 al empezar), sin nivel máximo.
+RLS: el estudiante lee su fila y el admin todas; solo se escribe con
+`service_role`.
+
+### public.assessment_sessions.xp_award
+
+`jsonb` con el resultado de otorgar el xp de la sesión (null hasta que se
+otorga). Hace idempotente el cierre.
+
+### Funciones relacionadas
+
+`SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
+
+- `public.edge_college_xp_rules(p_college_id)`: reglas del colegio; crea la fila por defecto si no existe.
+- `public.edge_student_xp_state(p_student_id)`: montos del colegio más nivel, xp y `xp_to_next` del estudiante.
+- `public.edge_award_session_xp(p_student_id, p_session_id, p_xp)`: suma el xp, sube los niveles que correspondan y guarda el resultado en la sesión una sola vez.

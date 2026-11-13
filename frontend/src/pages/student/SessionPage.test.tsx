@@ -13,11 +13,13 @@ const mocks = vi.hoisted(() => ({
   startPractice: vi.fn(),
   submitPractice: vi.fn(),
   decryptAnswerKey: vi.fn(),
+  getXpRules: vi.fn(),
 }));
 
 vi.mock("../../features/sessions/api", () => ({
   startPractice: mocks.startPractice,
   submitPractice: mocks.submitPractice,
+  getXpRules: mocks.getXpRules,
 }));
 // El cifrado real se prueba en answer-key.test.ts.
 vi.mock("../../features/sessions/answer-key", () => ({ decryptAnswerKey: mocks.decryptAnswerKey }));
@@ -82,6 +84,9 @@ describe("SessionPage", () => {
     mocks.startPractice.mockReset().mockResolvedValue(payload());
     mocks.decryptAnswerKey.mockReset().mockResolvedValue(keyFor());
     mocks.submitPractice.mockReset().mockResolvedValue({ session: {} });
+    mocks.getXpRules.mockReset().mockResolvedValue({
+      xp_per_correct: 75, streak_3_bonus: 15, streak_7_bonus: 42, streak_20_bonus: 137, level: 0, xp: 0, xp_to_next: 100,
+    });
   });
 
   it("shows the loading screen until the questions are decrypted", async () => {
@@ -140,6 +145,50 @@ describe("SessionPage", () => {
     ]);
     expect(await screen.findByText("Revisión")).toBeInTheDocument();
   });
+
+  it("shows the xp earned by each correct answer and by the streak of 3", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Pregunta 1 de 3");
+    for (let question = 1; question <= 3; question += 1) {
+      await user.click(screen.getByRole("button", { name: new RegExp(`AOpción A ${question}`) }));
+      await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
+      expect(screen.getByText("+75 xp")).toBeInTheDocument();
+      if (question < 3) {
+        expect(screen.queryByText(/seguidas/)).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Siguiente" }));
+      }
+    }
+    expect(screen.getByText("Tres seguidas: +15 xp")).toBeInTheDocument();
+  });
+
+  it("keeps working without xp when the rules cannot be loaded", async () => {
+    const user = userEvent.setup();
+    mocks.getXpRules.mockRejectedValue(new Error("fallo"));
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
+    await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
+    expect(screen.queryByText("+75 xp")).not.toBeInTheDocument();
+    expect(screen.getAllByText("¡Correcto!")).not.toHaveLength(0);
+  });
+
+  it("shows the xp result after finishing and then goes to the review", async () => {
+    const user = userEvent.setup();
+    mocks.startPractice.mockResolvedValue(payload(1));
+    mocks.decryptAnswerKey.mockResolvedValue(keyFor(1));
+    mocks.submitPractice.mockResolvedValue({
+      session: {},
+      xp: { xp_gained: 75, level_before: 0, xp_before: 90, level: 1, xp: 65, thresholds: [100, 120], breakdown: { total: 75, correct_xp: 75, streak_bonuses: [] } },
+    });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
+    await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar examen" }));
+    expect(await screen.findByText("Práctica terminada")).toBeInTheDocument();
+    expect(await screen.findByText("¡Subiste de nivel!", {}, { timeout: 8000 })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ver revisión" }));
+    expect(await screen.findByText("Revisión")).toBeInTheDocument();
+  }, 15000);
 
   it("resumes on the first pending question and only submits pending ones", async () => {
     const user = userEvent.setup();

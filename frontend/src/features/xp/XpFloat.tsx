@@ -1,0 +1,16 @@
+import { streakLabel } from "./xp";
+
+/**
+ * Xp ganado por una respuesta, estilo videojuego: aparece sobre las opciones, sube
+ * hacia la derecha y se desvanece. La racha sale aparte, como un bono. Con
+ * `prefers-reduced-motion` no se anima y queda como texto fijo.
+ * Va dentro de un contenedor `relative`; no captura clics.
+ */
+export function XpFloat({ base, bonus, streak }: { base: number; bonus: number; streak: number }) {
+  return <div aria-live="polite" className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-start gap-2 px-4 pb-2 sm:px-6">
+    <p className="font-display text-3xl tabular-nums text-primary-light [text-shadow:0_0_18px_var(--color-primary)] motion-safe:animate-xp-float">+{base} xp</p>
+    {bonus > 0 && <div className="border border-ornament/70 bg-surface-deep/95 px-3 py-1.5 shadow-[0_0_28px_-6px_var(--color-ornament)] motion-safe:animate-xp-bonus">
+      <p className="font-display text-2xl tabular-nums text-primary-pale">{streakLabel(streak)}: +{bonus} xp</p>
+    </div>}
+  </div>;
+}

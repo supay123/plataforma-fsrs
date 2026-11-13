@@ -72,6 +72,19 @@ export interface SessionSummary {
   answered_questions: number; correct_count: number; incorrect_count: number;
   correct_percentage: number | null; error_percentage: number | null;
 }
+/** Montos de xp del colegio y nivel actual del estudiante (GET practice-session/xp-rules). */
+export interface XpRules {
+  xp_per_correct: number; streak_3_bonus: number; streak_7_bonus: number; streak_20_bonus: number;
+  level: number; xp: number; xp_to_next: number;
+}
+export interface XpBreakdown {
+  total: number; correct_xp: number; streak_bonuses: Array<{ streak: number; xp: number }>;
+}
+/** Xp otorgado al cerrar la sesión. `thresholds` trae el costo de cada nivel que cruzó. */
+export interface XpAward {
+  xp_gained: number; level_before: number; xp_before: number; level: number; xp: number;
+  thresholds: number[]; breakdown: XpBreakdown;
+}
 export interface ReviewQuestion {
   position: number; statement: string; option_a: string; option_b: string;
   option_c: string; option_d: string; selected_option: AnswerOption;

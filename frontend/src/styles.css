@@ -83,6 +83,24 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
     from { transform: translateX(-100%); }
     to { transform: translateX(0); }
   }
+  /* Xp ganado: aparece, sube hacia la derecha y se desvanece (como en un videojuego). */
+  --animate-xp-float: xp-float 1.8s ease-out forwards;
+  /* Bono de racha: igual, pero entra un poco después y dura más. */
+  --animate-xp-bonus: xp-bonus 2.6s ease-out 0.45s both;
+  @keyframes xp-float {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.7); }
+    12% { opacity: 1; transform: translate(0, -6px) scale(1.15); }
+    28% { transform: translate(6px, -18px) scale(1); }
+    60% { opacity: 1; }
+    100% { opacity: 0; transform: translate(70px, -120px) scale(0.95); }
+  }
+  @keyframes xp-bonus {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+    10% { opacity: 1; transform: translate(0, -8px) scale(1.25); }
+    22% { transform: translate(4px, -16px) scale(1); }
+    65% { opacity: 1; }
+    100% { opacity: 0; transform: translate(60px, -150px) scale(0.95); }
+  }
   @keyframes pop {
     0%, 100% { transform: scale(1); }
     45% { transform: scale(1.15); }
