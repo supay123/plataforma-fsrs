@@ -2,12 +2,15 @@ import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePortalFocus, useLeaveWarning, type LeaveWarning } from "../../components/layout/portal-mode";
-import { Alert, Button, Card, Eyebrow, PageHeader } from "../../components/ui";
+import { Flame } from "lucide-react";
+import { Alert, Button, Card, Eyebrow, ProgressBar } from "../../components/ui";
 import { decryptAnswerKey } from "../../features/sessions/answer-key";
 import { getXpRules, startPractice, submitPractice } from "../../features/sessions/api";
 import { LoadingProgress } from "../../features/sessions/LoadingProgress";
 import type { LoadStage } from "../../features/sessions/loading-progress";
 import { MascotTips } from "../../features/sessions/MascotTips";
+import { PracticeMascot, type MascotMood } from "../../features/sessions/PracticeMascot";
+import { useInactivity } from "../../features/sessions/use-inactivity";
 import { answerXp, trailingStreak } from "../../features/xp/xp";
 import { XpFloat } from "../../features/xp/XpFloat";
 import { XpResult } from "../../features/xp/XpResult";
@@ -55,31 +58,34 @@ function wasCorrect(question: SessionQuestion, answers: Record<string, LocalAnsw
 
 function letterClass(answerOption: AnswerOption, feedback: AnswerFeedback | null, chosen: AnswerOption | null, selected: AnswerOption | null): string {
   if (feedback) {
-    if (answerOption === feedback.correct_option) return "border-success text-success-light";
-    if (answerOption === chosen) return "border-danger text-danger-light";
+    if (answerOption === feedback.correct_option) return "border-success text-success-text";
+    if (answerOption === chosen) return "border-danger text-danger-text";
   // Selección neutra (sin color): el verde queda solo para "correcto" y el rojo para "incorrecto".
-  } else if (selected === answerOption) return "border-fg-muted text-fg-strong";
-  return "border-line-strong text-fg";
+  } else if (selected === answerOption) return "border-fg text-fg";
+  return "border-line-strong text-fg-muted";
 }
 
 function optionClass(answerOption: AnswerOption, feedback: AnswerFeedback | null, chosen: AnswerOption | null, selected: AnswerOption | null): string {
   if (feedback) {
-    if (answerOption === feedback.correct_option) return "flex border-success bg-success/10";
-    if (answerOption === chosen) return "flex border-danger bg-danger/10";
+    if (answerOption === feedback.correct_option) return "flex border-success bg-success-soft [--edge:var(--c-success)]";
+    if (answerOption === chosen) return "flex border-danger bg-danger-soft [--edge:var(--c-danger)]";
     // On mobile the feedback only keeps the student's answer and the correct one.
-    return "hidden opacity-40 sm:flex";
+    return "hidden opacity-40 [--edge:var(--c-line-strong)] sm:flex";
   }
-  return selected === answerOption ? "flex border-fg-muted bg-white/[0.04]" : "flex hover:border-line-strong hover:bg-white/[0.02]";
+  return selected === answerOption ? "flex border-fg bg-sunken [--edge:var(--c-fg)]" : "flex border-line-strong bg-blocks [--edge:var(--c-line-strong)] hover:bg-sunken";
 }
 
 /** Pantalla mientras se traen y descifran las preguntas (única carga que no usa skeleton). */
 /** Tiempo que la barra se queda al 100 % antes de mostrar la primera pregunta (la barra anima ~0,5 s). */
 const DONE_HOLD_MS = 800;
+const INACTIVITY_BEFORE_SLEEP_MS = 60_000;
+// Hacia dónde mira la mascota al elegir A, B, C o D (las opciones quedan debajo de ella).
+const GAZE_BY_OPTION: Record<AnswerOption, { x: number; y: number }> = { A: { x: 0.5, y: -0.2 }, B: { x: 0.5, y: -0.5 }, C: { x: 0.5, y: -0.8 }, D: { x: 0.5, y: -1 } };
 
 function PracticeLoading({ stage, stageSince, startedAt, done, onRetry }: { stage: LoadStage; stageSince: number; startedAt: number; done: boolean; onRetry: () => void }) {
   return <div className="mx-auto mt-4 grid max-w-md justify-items-center gap-4 text-center sm:mt-10">
     <div role="status" aria-live="polite">
-      <p className="font-display text-xl tracking-wide text-primary-pale">Preparando tu práctica…</p>
+      <p className="type-heading text-xl">Preparando tu práctica…</p>
       <p className="mt-1 text-sm text-fg-muted">Estamos cargando tus preguntas. En un momento empiezas y cada respuesta se corregirá al instante.</p>
     </div>
     <LoadingProgress stage={stage} stageSince={stageSince} startedAt={startedAt} done={done} onRetry={onRetry} />
@@ -97,6 +103,7 @@ export function SessionPage() {
   const [index, setIndex] = useState(0);
   const [award, setAward] = useState<{ sessionId: string; xp: XpAward } | null>(null);
   const [selected, setSelected] = useState<AnswerOption | null>(null);
+  const sleeping = useInactivity(INACTIVITY_BEFORE_SLEEP_MS, practice !== null && award === null);
   const [startedAt, setStartedAt] = useState(0);
   // Alto real de la barra fija en móvil, para reservar justo ese espacio al final.
   const [barHeight, setBarHeight] = useState(0);
@@ -218,65 +225,74 @@ export function SessionPage() {
     });
   }
 
-  return <div className="max-sm:[&>header]:mb-4 max-sm:[&_h1]:text-xl">
-    <PageHeader
-      title={`Pregunta ${index + 1} de ${payload.questions.length}`}
-      description={`${answeredCount} respondidas`}
-    />
-    {/* En móvil la pregunta va directo sobre el fondo, sin marco, para ganar espacio. */}
-    <Card glow className="mx-auto max-w-3xl max-sm:border-0 max-sm:bg-none max-sm:p-0 max-sm:shadow-none sm:p-6">
-      <h2 className="text-xl font-semibold text-fg-strong"><MathText>{question.question.statement}</MathText></h2>
-      <div className="relative mt-4 grid gap-3 sm:mt-6">
-        {options.map(([answerOption, text]) => <button
-          key={answerOption}
-          disabled={Boolean(feedback) || submit.isPending}
-          onClick={() => setSelected(answerOption)}
-          className={`min-h-14 items-center gap-4 border px-4 py-3 text-left transition duration-150 disabled:cursor-default ${
-            optionClass(answerOption, feedback, chosen, selected)
-          }`}
-        >
-          <strong className={`grid h-8 w-8 shrink-0 place-items-center border font-display text-sm font-normal ${letterClass(answerOption, feedback, chosen, selected)}`}>{answerOption}</strong>
-          <span className="flex-1 text-lg text-fg-strong"><MathText>{text}</MathText></span>
-          {feedback && answerOption === feedback.correct_option &&
-            <span className="text-xs font-semibold text-success-light">Respuesta correcta</span>}
-          {feedback && !feedback.is_correct && answerOption === chosen &&
-            <span className="text-xs font-semibold text-danger-light">Tu respuesta</span>}
-        </button>)}
-        {gain && <XpFloat key={question.session_question_id} base={gain.base} bonus={gain.bonus} streak={gain.streak} />}
-      </div>
-      {feedback && <div className="mt-4 grid gap-3 sm:mt-6">
-        <div className="hidden sm:block">
-          <Alert tone={feedback.is_correct ? "success" : "error"}>
-            {feedback.is_correct
-              ? "¡Correcto!"
-              : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`}
-          </Alert>
+  // Aciertos seguidos hasta la pregunta actual (cuenta la actual solo si ya se respondió).
+  const streak = trailingStreak(payload.questions.slice(0, index + (feedback ? 1 : 0)).map((item) => wasCorrect(item, answers, key) === true));
+  const mood: MascotMood = !feedback ? "idle" : feedback.is_correct ? "happy" : "sad";
+  const resultText = feedback ? (feedback.is_correct ? "¡Correcto!" : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`) : "";
+
+  return <div className="mx-auto grid max-w-2xl gap-6">
+    <h1 className="sr-only">Práctica</h1>
+    <div className="flex items-center gap-4">
+      <div className="flex-1"><ProgressBar value={(answeredCount / payload.questions.length) * 100} label="Avance de la práctica" /></div>
+      <span className={`inline-flex items-center gap-1 text-sm font-bold tabular-nums ${streak > 0 ? "text-warning-text" : "text-fg-faint"}`} aria-label={`${streak} aciertos seguidos`}><Flame size={18} className={streak > 0 ? "fill-current" : undefined} />{streak}</span>
+    </div>
+
+    <div className="flex items-end gap-3 sm:gap-4">
+      <PracticeMascot mood={mood} event={sleeping ? "sleep" : gain && gain.bonus > 0 ? "streak" : undefined} gaze={selected && !feedback ? GAZE_BY_OPTION[selected] : null} size={56} className="sm:h-[72px]! sm:w-[72px]!" />
+      <Card className="min-w-0 flex-1 p-4 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <Eyebrow>{`Pregunta ${index + 1} de ${payload.questions.length}`}</Eyebrow>
+          <p className="text-xs text-fg-faint">{`${answeredCount} respondidas`}</p>
         </div>
-        {feedback.explanation && <div className="border border-line bg-surface-deep p-4">
-          <Eyebrow>Explicación</Eyebrow>
-          <div className="mt-2 text-fg"><MathText>{feedback.explanation}</MathText></div>
-        </div>}
-      </div>}
-      {submit.error && <div className="mt-4"><Alert tone="error">
-        {submit.error.message} Tus respuestas siguen aquí; puedes reintentar sin recargar.
-      </Alert></div>}
-      {/* En móvil la acción queda fija abajo (estilo Duolingo) y muestra el resultado. */}
-      <div ref={barRef} className={`fixed inset-x-0 bottom-0 z-20 grid gap-3 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:static sm:mt-6 sm:flex sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 ${
-        !feedback ? "border-line bg-sidebar" : feedback.is_correct ? "border-success/40 bg-sidebar" : "border-danger/40 bg-sidebar"
-      }`}>
-        {feedback && <p className={`font-semibold sm:hidden ${feedback.is_correct ? "text-success-light" : "text-danger-light"}`}>
-          {feedback.is_correct ? "¡Correcto!" : `Incorrecto. La respuesta correcta es la ${feedback.correct_option}.`}
-        </p>}
+        <h2 className="mt-2 text-xl font-semibold sm:text-2xl"><MathText>{question.question.statement}</MathText></h2>
+      </Card>
+    </div>
+
+    <div className="relative grid gap-3">
+      {options.map(([answerOption, text]) => <button
+        key={answerOption}
+        disabled={Boolean(feedback) || submit.isPending}
+        onClick={() => setSelected(answerOption)}
+        className={`min-h-14 items-center gap-4 rounded-xl border-2 px-4 py-3 text-left shadow-[0_4px_0_var(--edge)] transition duration-100 enabled:active:translate-y-1 enabled:active:shadow-none disabled:cursor-default ${
+          optionClass(answerOption, feedback, chosen, selected)
+        }`}
+      >
+        <strong className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border-2 text-sm ${letterClass(answerOption, feedback, chosen, selected)}`}>{answerOption}</strong>
+        <span className="min-w-0 flex-1 text-lg"><MathText>{text}</MathText></span>
+        {feedback && answerOption === feedback.correct_option &&
+          <span className="text-xs font-semibold text-success-text">Respuesta correcta</span>}
+        {feedback && !feedback.is_correct && answerOption === chosen &&
+          <span className="text-xs font-semibold text-danger-text">Tu respuesta</span>}
+      </button>)}
+      {gain && <XpFloat key={question.session_question_id} base={gain.base} bonus={gain.bonus} streak={gain.streak} />}
+    </div>
+
+    {feedback?.explanation && <div className="rounded-2xl border-2 border-line bg-sunken p-4 text-on-blocks">
+      <Eyebrow>Explicación</Eyebrow>
+      <div className="mt-2"><MathText>{feedback.explanation}</MathText></div>
+    </div>}
+    {submit.error && <Alert tone="error">
+      {submit.error.message} Tus respuestas siguen aquí; puedes reintentar sin recargar.
+    </Alert>}
+
+    {/* Pie fijo: resultado y acción. Deja libre el menú lateral (--menu-w) y reserva su alto al final. */}
+    <div ref={barRef} className={`fixed inset-x-0 bottom-0 z-20 border-t-2 bg-blocks text-on-blocks transition-colors md:left-(--menu-w) ${
+      !feedback ? "border-line" : feedback.is_correct ? "border-success" : "border-danger"
+    }`}>
+      <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-3 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:py-4">
+        {feedback
+          ? <p className={`type-heading text-lg ${feedback.is_correct ? "text-success-text" : "text-danger-text"}`}>{resultText}</p>
+          : <p className="text-sm text-fg-muted">Elige una opción y confírmala.</p>}
         {!feedback
           ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={!selected} onClick={confirm}>Confirmar respuesta</Button>
           : allAnswered
             ? <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={submit.isPending} onClick={finish}>
               {submit.isPending ? "Guardando respuestas…" : submit.error ? "Reintentar" : "Finalizar examen"}
             </Button>
-            : <Button className="h-12 w-full sm:h-auto sm:w-auto" onClick={next}>Siguiente</Button>}
+            : <Button className="h-12 w-full sm:h-auto sm:w-auto" variant={feedback.is_correct ? "primary" : "danger"} onClick={next}>Siguiente</Button>}
       </div>
-    </Card>
-    {/* Espacio para que la barra fija no tape el final del contenido en móvil. */}
-    <div aria-hidden className="sm:hidden" style={{ height: barHeight }} />
+    </div>
+    {/* Espacio para que el pie fijo no tape el final del contenido. */}
+    <div aria-hidden style={{ height: barHeight }} />
   </div>;
 }

@@ -1,3 +1,4 @@
+import { collegeCodeById } from "./college-code.ts";
 import { appOrigin } from "./app-url.ts";
 import { RPCS, TABLES } from "./database.constants.ts";
 import { invitationEmail, sendEmail } from "./email.ts";
@@ -58,8 +59,12 @@ export function invitationExpiry(
   return afterTtl < lastAccessMoment ? afterTtl : lastAccessMoment;
 }
 
-export function invitationLink(origin: string, code: string): string {
-  return linkWithCode(origin, INVITATION_PATH, code);
+export function invitationLink(
+  origin: string,
+  code: string,
+  instId?: string | null,
+): string {
+  return linkWithCode(origin, INVITATION_PATH, code, instId);
 }
 
 export function invalidInvitation(): AppError {
@@ -213,7 +218,11 @@ export async function createInvitation(
           teacher_name: group.teacher_name,
           college_name: group.college_name,
         },
-        invitationLink(appOrigin(request), code),
+        invitationLink(
+          appOrigin(request),
+          code,
+          await collegeCodeById(context, group.college_id),
+        ),
         expiresAt,
       ),
     );
@@ -278,7 +287,11 @@ export async function resendInvitation(
           teacher_name: previous.teacher?.full_name,
           college_name: previous.college?.name,
         },
-        invitationLink(appOrigin(request), code),
+        invitationLink(
+          appOrigin(request),
+          code,
+          await collegeCodeById(context, previous.college_id),
+        ),
         expiresAt.toISOString(),
       ),
     );

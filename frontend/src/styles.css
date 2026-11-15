@@ -4,12 +4,13 @@
    (AuthLayout la pone también en <html> para que toasts y modales la hereden). */
 @custom-variant dark (&:where(.dark, .dark *));
 .dark { color-scheme: dark; }
-/* Portales (estudiante, profesor y admin): estilo 1.5. Siempre va junto a `dark`; las variantes
-   `portal:` solo cambian lo que el 1.5 hace distinto del SaaS. Se declara después de `dark` para
-   que gane cuando ambas tocan la misma propiedad. PortalLayout la pone también en <html>. */
+/* Portales (estudiante, profesor y admin): estilo Chancón. Siempre va junto a `dark`; las variantes
+   `portal:` solo cambian lo que el portal hace distinto del estilo SaaS de las páginas públicas.
+   Se declara después de `dark` para que gane cuando ambas tocan la misma propiedad.
+   PortalLayout la pone también en <html>. */
 @custom-variant portal (&:where(.portal, .portal *));
 
-:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #4a69b1; background: #f8fafc; font-synthesis: none; }
+:root { font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif; color: #4a69b1; background: #f8fafc; font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select, textarea { font: inherit; }
@@ -21,67 +22,89 @@ th { padding: .75rem; text-align: left; font-size: .75rem; text-transform: upper
 td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; }
 
 /* Landing: luces que respiran y cuadrícula tenue de fondo. */
+@theme inline {
+  /* ── Colores del estilo Chancón ───────────────────────────────────────────────────────────
+     Todos salen de variables `--c-*` que calcula src/lib/theme/palette.ts a partir de 4 colores
+     (Primario, Secundario, Fondo base y Fondo bloques). Aquí solo se les da nombre para Tailwind:
+     bg-primary, text-primary-text, border-line, bg-success/10 (acepta opacidad)…
+     Los fondos y su texto NO están aquí: son las utilidades bg-base / bg-blocks y text-on-base /
+     text-on-blocks (más abajo), que calculan blanco o negro por separado para cada fondo. */
+  --color-primary: var(--c-primary);
+  --color-primary-strong: var(--c-primary-strong); /* borde inferior de los botones 3D */
+  --color-primary-soft: var(--c-primary-soft);     /* fondos suaves: ítem activo, opción elegida */
+  --color-primary-text: var(--c-primary-text);     /* texto del color de marca (cifras, enlaces) */
+  --color-on-primary: var(--c-on-primary);         /* texto sobre un fondo de marca */
+  --color-secondary: var(--c-secondary);
+  --color-secondary-soft: var(--c-secondary-soft);
+  --color-secondary-text: var(--c-secondary-text);
+  /* Neutros derivados del Fondo bloques y su texto */
+  --color-line: var(--c-line);                 /* bordes de tarjetas, menú y separadores */
+  --color-line-strong: var(--c-line-strong);   /* bordes de controles */
+  --color-sunken: var(--c-sunken);             /* campos, pistas de barras, cajas internas */
+  /* Texto: depende del fondo en el que esté (text-on-base / text-on-blocks lo fijan) */
+  --color-fg: var(--c-fg);
+  --color-fg-muted: var(--c-fg-muted);
+  --color-fg-faint: var(--c-fg-faint);
+  /* Estados (fijos; no editables para que sigan siendo reconocibles) */
+  --color-success: var(--c-success);
+  --color-success-strong: var(--c-success-strong);
+  --color-success-soft: var(--c-success-soft);
+  --color-success-text: var(--c-success-text);
+  --color-on-success: var(--c-on-success);
+  --color-danger: var(--c-danger);
+  --color-danger-strong: var(--c-danger-strong);
+  --color-danger-soft: var(--c-danger-soft);
+  --color-danger-text: var(--c-danger-text);
+  --color-on-danger: var(--c-on-danger);
+  --color-warning: var(--c-warning);
+  --color-warning-strong: var(--c-warning-strong);
+  --color-warning-soft: var(--c-warning-soft);
+  --color-warning-text: var(--c-warning-text);
+  --color-on-warning: var(--c-on-warning);
+}
+
 @theme {
-  /* ── Colores del estilo 1.5 (portales) ────────────────────────────────────────────────
-     Un solo lugar para todos. Los tres primeros son los que el admin podrá editar; el resto
-     hoy son valores fijos que luego se derivarán de ellos. Uso: bg-primary, text-primary-light,
-     border-line, from-surface, text-fg-muted… (acepta opacidad: bg-primary/10). */
-  /* Editables */
-  --color-primary: #3fb97c;        /* verde: botones, barras, activo, correcto */
-  --color-ornament: #c9a961;       /* dorado: solo ornamentos (esquinas, rombos, líneas, etiquetas) */
-  --color-canvas: #070b12;         /* fondo de la página (no llamarlo "base": choca con text-base) */
-  /* Derivados del verde */
-  --color-primary-light: #9fe3bf;  /* cifras y enlaces */
-  --color-primary-pale: #d5eee1;   /* títulos y texto de botones */
-  --color-primary-ink: #06140d;    /* texto sobre verde sólido (barra de toast, chips rellenos) */
-  /* Derivados del fondo */
-  --color-sidebar: #050810;        /* menú lateral */
-  --color-surface: #0e1621;        /* tarjeta, parte alta del degradado */
-  --color-surface-deep: #0a1019;   /* tarjeta (parte baja), cajas internas, hundidos */
-  --color-line: #1e2a38;           /* bordes de tarjetas, menú, separadores de tabla */
-  --color-line-strong: #2a3747;    /* bordes de controles (campos, botón secundario, letras de opción) */
-  --color-track: #1a2533;          /* fondo de barras de progreso y skeleton */
-  /* Texto (claro sobre fondo oscuro) */
-  --color-fg-strong: #f1f5f9;      /* texto destacado dentro de tarjetas */
-  --color-fg: #e2e8f0;             /* texto general */
-  --color-fg-muted: #94a3b8;       /* texto secundario */
-  --color-fg-faint: #64748b;       /* texto terciario, placeholders */
-  /* Estados (fijos; no editables para que sigan siendo reconocibles).
-     `success` es el verde de "correcto/éxito": igual de verde que el principal hoy, pero NO
-     sigue al tema, para que un correcto nunca se confunda con un tono elegido por el admin. */
-  --color-success: #3fb97c;
-  --color-success-light: #9fe3bf;
-  --color-danger: #c4544a;
-  --color-danger-light: #e58276;
-  --color-warning: #facc15;        /* advertencias: nunca el dorado */
-  /* Extra: resplandor azul marino de la esquina inferior del fondo. No se deriva de los tres
-     editables; es el único toque frío que evita que el fondo se vea plano. */
-  --color-atmosphere: #14284b;
-  /* Fuente de títulos (se carga en index.html). */
-  --font-display: Cinzel, Georgia, serif;
+  /* Fuentes (se cargan en index.html): Archivo para títulos (type-display, type-heading) y
+     Plus Jakarta Sans para el cuerpo (font-body). Valen para todo el sitio. */
+  --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-title: Archivo, ui-sans-serif, system-ui, sans-serif;
   --animate-glow: glow 9s ease-in-out infinite alternate;
   --animate-shine: shine 3.5s ease-in-out infinite;
   /* Giro del degradado que forma el borde dorado del plan semestral. */
   --animate-orbit: orbit 4s linear infinite;
   /* Crece y vuelve a su tamaño: llama la atención sobre un botón. */
   --animate-pop: pop 0.7s ease-in-out;
+  /* Cabeza de la mascota según el ánimo (practica): reposo, acierto, error y pensando. */
+  --animate-mascot-bob: mascot-bob 3s ease-in-out infinite;
+  --animate-mascot-happy: mascot-happy 0.6s ease-out;
+  --animate-mascot-sad: mascot-sad 0.6s ease-out forwards;
+  --animate-mascot-think: mascot-think 1.2s ease-in-out infinite;
+  @keyframes mascot-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes mascot-happy {
+    0% { transform: translateY(0) scale(1); }
+    30% { transform: translateY(-14px) scale(1.06) rotate(-6deg); }
+    60% { transform: translateY(0) scale(0.97); }
+    100% { transform: none; }
+  }
+  @keyframes mascot-sad {
+    0%, 100% { transform: none; }
+    20% { transform: translateX(-6px) rotate(-4deg); }
+    40% { transform: translateX(6px) rotate(4deg); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateY(3px) rotate(-3deg); }
+  }
+  @keyframes mascot-think { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg) translateY(-3px); } }
   /* Aparición suave (consejos de la mascota). */
   --animate-tip: tip 0.4s ease-out;
   @keyframes tip {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  /* Menú móvil: entra desde la izquierda. */
-  --animate-drawer: drawer 0.2s ease-out;
   /* Skeleton: destello que cruza de izquierda a derecha. */
   --animate-skeleton: skeleton 1.4s ease-in-out infinite;
   @keyframes skeleton {
     from { background-position: 200% 0; }
     to { background-position: -200% 0; }
-  }
-  @keyframes drawer {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(0); }
   }
   /* Xp ganado: aparece, sube hacia la derecha y se desvanece (como en un videojuego). */
   --animate-xp-float: xp-float 1.8s ease-out forwards;
@@ -129,18 +152,79 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
   mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
 }
 
-/* ── Estilo 1.5: base de los portales ── */
-.portal { color: var(--color-fg); }
-/* Borde por defecto de los portales (en capa base: cualquier `border-*` de una clase lo reemplaza). */
-@layer base { .portal, .portal *, .portal ::before, .portal ::after { border-color: var(--color-line); } }
-.portal th { color: color-mix(in srgb, var(--color-ornament) 75%, transparent); font-size: .6875rem; letter-spacing: .14em; }
-.portal td { border-top-color: var(--color-line); }
-/* Grano de película tenue y viñeta; van fijos sobre toda la pantalla y no reciben clics. */
-.portal-grain { opacity: .035; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-.portal-atmosphere {
-  background:
-    radial-gradient(ellipse 65% 40% at 55% -5%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 70%),
-    radial-gradient(ellipse 55% 35% at 5% 105%, color-mix(in srgb, var(--color-atmosphere) 36%, transparent), transparent 70%),
-    radial-gradient(ellipse at center, transparent 60%, rgb(0 0 0 / .5) 100%);
+/* ── Estilo Chancón: base de los portales ─────────────────────────────────────────────────
+   Valores por defecto de la paleta (respaldo hasta que el JS aplique el tema; palette.test.ts
+   comprueba que coincidan con paletteVars(DEFAULT_PALETTE)). Van en :root (<html>): así un tema
+   distinto aplicado como estilo en línea sobre <html> los reemplaza y lo heredan toasts y modales. */
+:root {
+  --c-base: #0a0f16;
+  --c-blocks: #151b23;
+  --c-on-base: #ffffff;
+  --c-on-blocks: #ffffff;
+  --c-on-base-muted: color-mix(in oklab, #ffffff 64%, #0a0f16);
+  --c-on-base-faint: color-mix(in oklab, #ffffff 42%, #0a0f16);
+  --c-on-blocks-muted: color-mix(in oklab, #ffffff 64%, #151b23);
+  --c-on-blocks-faint: color-mix(in oklab, #ffffff 42%, #151b23);
+  --c-scheme: dark;
+  --c-line: color-mix(in oklab, #ffffff 11%, #151b23);
+  --c-line-strong: color-mix(in oklab, #ffffff 20%, #151b23);
+  --c-sunken: color-mix(in oklab, #ffffff 7%, #151b23);
+  --c-base-line: color-mix(in oklab, #ffffff 20%, #0a0f16);
+  --c-primary: #3fb97c;
+  --c-primary-strong: color-mix(in oklab, #3fb97c 72%, #000000);
+  --c-primary-soft: color-mix(in oklab, #3fb97c 14%, #151b23);
+  --c-primary-text: color-mix(in oklab, #3fb97c 78%, #ffffff);
+  --c-on-primary: #000000;
+  --c-secondary: #c9a961;
+  --c-secondary-soft: color-mix(in oklab, #c9a961 16%, #151b23);
+  --c-secondary-text: color-mix(in oklab, #c9a961 72%, #ffffff);
+  --c-success: #29b85a;
+  --c-success-strong: color-mix(in oklab, #29b85a 72%, #000000);
+  --c-success-soft: color-mix(in oklab, #29b85a 15%, #151b23);
+  --c-success-text: color-mix(in oklab, #29b85a 70%, #ffffff);
+  --c-on-success: #000000;
+  --c-danger: #e5484d;
+  --c-danger-strong: color-mix(in oklab, #e5484d 72%, #000000);
+  --c-danger-soft: color-mix(in oklab, #e5484d 15%, #151b23);
+  --c-danger-text: color-mix(in oklab, #e5484d 70%, #ffffff);
+  --c-on-danger: #000000;
+  --c-warning: #f5c518;
+  --c-warning-strong: color-mix(in oklab, #f5c518 72%, #000000);
+  --c-warning-soft: color-mix(in oklab, #f5c518 15%, #151b23);
+  --c-warning-text: color-mix(in oklab, #f5c518 70%, #ffffff);
+  --c-on-warning: #000000;
 }
+html.portal {
+  /* Texto por defecto: el de la página. Las utilidades text-on-base / text-on-blocks lo cambian. */
+  --c-fg: var(--c-on-base);
+  --c-fg-muted: var(--c-on-base-muted);
+  --c-fg-faint: var(--c-on-base-faint);
+  color-scheme: var(--c-scheme);
+  color: var(--c-on-base);
+  background: var(--c-base);
+  font-family: var(--font-body);
+}
+/* Los dos fondos y su texto. El texto es blanco o negro según el contraste, por separado para cada
+   fondo; text-on-base / text-on-blocks además fijan qué gris usan text-fg-muted, text-fg-faint y compañía. */
+@utility bg-base { background-color: var(--c-base); }
+@utility bg-blocks { background-color: var(--c-blocks); }
+@utility text-on-base { color: var(--c-on-base); --c-fg: var(--c-on-base); --c-fg-muted: var(--c-on-base-muted); --c-fg-faint: var(--c-on-base-faint); }
+@utility text-on-blocks { color: var(--c-on-blocks); --c-fg: var(--c-on-blocks); --c-fg-muted: var(--c-on-blocks-muted); --c-fg-faint: var(--c-on-blocks-faint); }
+/* Alias de los grises para el código nuevo (equivalen a text-fg-muted y text-fg-faint). */
+@utility text-muted { color: var(--c-fg-muted); }
+@utility text-faint { color: var(--c-fg-faint); }
+/* Tipografía de títulos: Archivo, con eje de ancho. `display` para títulos de página y cifras
+   grandes; `heading` para títulos dentro de tarjetas, donde los nombres largos deben caber. */
+@utility type-display { font-family: var(--font-title); font-weight: 800; font-stretch: 125%; }
+@utility type-heading { font-family: var(--font-title); font-weight: 700; font-stretch: 110%; }
+/* Cuerpo dentro de un título: vuelve a la fuente base (font-body fija solo la familia). */
+@utility type-body { font-family: var(--font-body); font-weight: 400; font-stretch: 100%; }
+
+/* Borde por defecto de los portales (en capa base: cualquier `border-*` de una clase lo reemplaza). */
+@layer base { .portal, .portal *, .portal ::before, .portal ::after { border-color: var(--c-line); } }
+/* Las celdas de una cuadrícula pueden encogerse: sin esto, una tabla o un texto largo ensancha su
+   columna y la página se sale de la pantalla. Las utilidades (min-w-*) siguen ganando. */
+@layer base { .portal .grid > *, .portal .md\:grid > * { min-width: 0; } }
+.portal th { color: var(--c-fg-muted); font-size: .75rem; letter-spacing: .08em; }
+.portal td { border-top-color: var(--c-line); }
 @media (prefers-reduced-motion: reduce) { .portal * { transition-duration: 0s !important; animation-duration: 0s !important; } }

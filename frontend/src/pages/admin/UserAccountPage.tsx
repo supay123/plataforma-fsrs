@@ -60,9 +60,9 @@ function UserAccountForm({ user }: { user: NonNullable<Awaited<ReturnType<typeof
     <PageHeader
       title={user.full_name}
       description={`${roleLabel(user.role)} · ${user.user_code}`}
-      actions={<Link className="text-sm font-semibold text-primary-light" to="/admin/usuarios">Volver a usuarios</Link>}
+      actions={<Link className="text-sm font-semibold text-primary-text" to="/admin/usuarios">Volver a usuarios</Link>}
     />
-    {isStudent && studentProfile.isPending ? <Skeleton height={220} rounded="none" /> : <div className="grid gap-6 lg:grid-cols-2">
+    {isStudent && studentProfile.isPending ? <Skeleton height={220} /> : <div className="grid gap-6 lg:grid-cols-2">
       {/* Estudiante: sus datos ocupan la primera fila; credenciales y vigencia comparten la segunda. */}
       {isStudent && studentProfile.data ? <StudentDataCard className="lg:col-span-2" user={user} profile={studentProfile.data} /> : <Card>
         <div className="mb-4 flex items-center justify-between">

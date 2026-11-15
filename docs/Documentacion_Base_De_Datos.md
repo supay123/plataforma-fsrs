@@ -1145,7 +1145,16 @@ Una fila por colegio (`college_id`): `base_xp` (100), `growth` (0.2),
 `xp_per_correct` (75), `streak_3_bonus` (15), `streak_7_bonus` (42),
 `streak_20_bonus` (137), con rangos validados por constraints. Se crea con los
 valores por defecto al migrar y de forma perezosa para colegios nuevos. RLS:
-solo el admin lee y escribe; las Edge Functions usan `service_role`.
+solo el admin lee y escribe (Configuración → Puntos, `features/xp/XpSettings.tsx`); las Edge Functions usan `service_role`.
+
+### public.college_themes
+
+Colores de un colegio por modo: clave `(college_id, mode)` con `mode` `light` o `dark`
+y los 4 colores `primary_color`, `secondary_color`, `base_color` y `blocks_color`
+(`#rrggbb` en minúsculas, validado por constraint). Sin filas, el colegio usa los
+colores por defecto de la plataforma; restablecer los colores borra sus filas. RLS:
+solo el admin lee y escribe; la lectura pública sin sesión la hace la Edge Function
+`public` (`GET /public/theme`) con `service_role`.
 
 ### public.student_levels
 

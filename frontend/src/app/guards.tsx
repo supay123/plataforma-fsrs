@@ -10,7 +10,7 @@ const home: Record<AppRole, string> = { admin: "/admin", teacher: "/profesor", s
 export function RoleGuard({ role, children, allowExpired = false }: { role: AppRole; children: ReactNode; allowExpired?: boolean }) {
   const { loading, profile } = useAuth();
   const location = useLocation();
-  if (loading) return <div className="dark portal min-h-screen bg-canvas p-8"><div className="mx-auto max-w-6xl"><PageSkeleton /></div></div>;
+  if (loading) return <div className="dark portal min-h-dvh bg-base p-8 text-on-base"><div className="mx-auto max-w-6xl"><PageSkeleton /></div></div>;
   if (!profile) return <Navigate to={`${home[role]}/login`} state={{ from: location.pathname }} replace />;
   if (!profile.is_active) return <Navigate to={`${home[role]}/login`} replace />;
   if (profile.role !== role) return <Navigate to={home[profile.role]} replace />;

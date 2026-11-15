@@ -56,7 +56,7 @@ pnpm exec supabase gen types --local --schema public \
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
-| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to; `GET /public/payment-config` returns the Mercado Pago `public_key` the browser needs to turn the Yape phone and approval code into a token (`503 payments_unavailable` while `MERCADOPAGO_PUBLIC_KEY` is not set). |
+| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to; `GET /public/theme` returns the colors of an institution (`?inst=<college code>`, `theme: null` when it has none); `GET /public/payment-config` returns the Mercado Pago `public_key` the browser needs to turn the Yape phone and approval code into a token (`503 payments_unavailable` while `MERCADOPAGO_PUBLIC_KEY` is not set). |
 | `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` charges the chosen plan with Yape through Mercado Pago; `GET /registration/payment` reports its status and activates the account once Mercado Pago approves it. No account exists until the first payment is confirmed. |
 | `mercadopago` | Mercado Pago signature | `POST /mercadopago/webhook` receives Mercado Pago **Order** notifications (`type: order`), verifies `x-signature` (HMAC-SHA256 of `id:<data.id in lowercase>;request-id:<x-request-id>;ts:<ts>;`) with the secret stored in Vault as `mercadopago_webhook_secret`, fetches the order (`GET /v1/orders/{id}`) and applies it. Called by Mercado Pago, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
@@ -108,6 +108,12 @@ pnpm exec supabase gen types --local --schema public \
   `details.sheet_number` so the retry reuses the number and leaves no gaps.
 - `GET public/colleges`: no body. Responds with `colleges` (`id`, `name`).
   Creates `Chancón – Particular` once if no college is active.
+- `GET public/theme?inst=<college code>`: colors of an institution for the login
+  page. Responds `{ theme: null }` (200, not an error) when `inst` is missing, the
+  college does not exist or it has no colors; otherwise `{ theme: { light, dark } }`,
+  each one `null` or `{ primary, secondary, base, blocks }` (`#rrggbb`). Emailed
+  links (invitation, password reset) carry `&instId=<college code>` so the browser
+  loads these colors before sign-in.
 - `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`,
   `college_id`, `college_name`): active teachers of an active college with at
   least one non-archived course. The sign-up form, the admin invitation form

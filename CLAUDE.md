@@ -70,103 +70,84 @@ pnpm exec supabase gen types --local --schema public > supabase/functions/_share
 
 ## Estilo visual
 
-Fantasía oscura sobria ("Elden Ring" atenuado) con los colores de la marca:
-debe sentirse como un juego para adultos, nunca infantil, y conservar la
-seriedad de un SaaS. Hay dos variantes, cada una con su referencia visual
-(guía de estilo en `src/pages/style-guide/`, solo disponible en desarrollo):
+Estilo **Chancón**: oscuro sobrio, redondeado, con botones y tarjetas de borde inferior
+grueso, jade como color de marca y dorado como acento. Debe sentirse como un juego
+para adultos, nunca infantil, y conservar la seriedad de un SaaS. Referencia visual
+(solo en desarrollo): `/textura/chancon` (`src/pages/style-guide/ChanconStylePage.tsx`).
 
-- **Portales (estudiante, profesor y admin): estilo 1.5**, descrito abajo.
-  Referencia: `/textura/elden-ring-1-5` (`EldenHalfPage.tsx`). **En
-  migración**: aplicado en `components/ui`, `PortalLayout` y las pantallas del
-  estudiante, profesor y admin (variante `portal:` y tokens en `styles.css`);
-  falta revisar cada pantalla a la vista.
-- **Home y páginas públicas: estilo SaaS**, más sobrio: Inter en todo, sin
-  esquinas ni grano; Cinzel solo en los títulos (`font-display`); acento
-  verde sin dorado; botón principal verde sólido con texto oscuro. Referencia:
-  `/textura/elden-ring-saas` (`EldenSaasPage.tsx`). **Aplicado** en la home,
-  `PlanCards`, el pie de `PublicLayout`, el login y el registro (con colores
-  `emerald` de Tailwind hasta tener los tokens). Pendiente: invitación, nueva
-  contraseña, renovación (`AuthLayout` sin `dark`), páginas legales (sus
-  enlaces siguen en índigo) y libro de reclamaciones.
+- **Portales (estudiante, profesor y admin)**: **aplicado** (variante `portal:`,
+  tokens en `styles.css`, paleta en `src/lib/theme/palette.ts`). Detalle de tokens,
+  utilidades y layout en
+  [docs/Componentes_Reutilizables.md](docs/Componentes_Reutilizables.md).
+- **Login y registro** (`AuthLayout dark`): usan Chancón con los colores centralizados
+  (`bg-base`, `bg-blocks`, `primary`), así que cambian con el tema de la institución y
+  con el interruptor claro/oscuro.
+- **Home y páginas públicas**: colores **fijos** (SaaS oscuro con `slate`/`emerald`; no siguen
+  el tema). Ya usan las fuentes nuevas (Archivo + Plus Jakarta Sans). Invitación, nueva
+  contraseña y renovación siguen con su aspecto claro actual, pendientes de indicación.
 
-**El estilo es universal.** Todos los componentes de una zona usan el mismo
-estilo. Si algo no se ve bien dentro de un recuadro con esquinas (p. ej. un
-formulario largo), se quita el recuadro; no se inventa otro marco. Las
-esquinas doradas van en contenedores (tarjetas, paneles, modales), no en
-controles (botones, inputs, filas de tabla). Cualquier excepción a esta regla
-se conversa con el usuario antes de aplicarla; no se decide sola.
+**El estilo es universal.** Todos los componentes de una zona usan el mismo estilo; no se
+inventa otro marco. Cualquier excepción a esta regla se conversa con el usuario antes de
+aplicarla; no se decide sola.
 
 Excepciones aprobadas (no hay otras):
 
 - **Impresión y PDF** (libro de reclamaciones impreso, hoja de reclamos en PDF)
   mantienen su estilo claro de siempre; no usan el tema.
 - **Imágenes con fondo propio** (QR y pantalla de Yape, logo de Yape, imagen del
-  Libro de reclamaciones) conservan su fondo; todo lo que no es imagen sigue el
-  estilo.
-- **Correos HTML** (`supabase/functions/_shared/email.ts`): cambio sutil a la
-  marca (botón verde jade con texto oscuro, en lugar del índigo `#4f46e5`).
-  Colores fijos: no siguen el tema que edite el admin.
-- **Advertencias** (alertas, botón y modal `warning`): amarillo (`yellow-400`),
-  nunca el dorado `#c9a961`, que es solo ornamento.
-- **Login, registro y todas las páginas públicas**: estilo SaaS (el de la home),
-  no el 1.5, y en oscuro (el formulario del login deja de ser blanco).
-- **Secciones claras de la home** ("Cómo funciona" y "Preguntas frecuentes"):
-  se quedan claras, con colores fijos que no editan el tema. Solo el verde
-  principal las alcanza, mediante una variante oscura calculada para que se lea
-  sobre fondo claro.
+  Libro de reclamaciones) conservan su fondo; todo lo que no es imagen sigue el estilo.
+- **Correos HTML** (`supabase/functions/_shared/email.ts`): cambio sutil a la marca
+  (botón verde jade con texto oscuro, en lugar del índigo `#4f46e5`). Colores fijos: no
+  siguen el tema que edite el admin.
+- **Advertencias** (alertas, botón y modal `warning`): amarillo (`warning`), nunca el
+  acento dorado.
 
-Tema editable por el admin (aún no implementado): un solo tema global para toda
-la plataforma, legible sin iniciar sesión (el login lo necesita). La fuente de
-verdad es la base de datos; `localStorage` solo lo guarda como caché para
-aplicarlo antes de pintar. Los colores del tema por defecto siempre quedan
-definidos en `styles.css` como respaldo. El verde principal es de elección
-libre (sin limitar el tono); solo se valida que se lea sobre el fondo.
+**Colores (centralizados y editables por institución):** cada institución elige solo
+**4 colores por modo** (claro y oscuro): `primary` (Primario), `secondary` (Secundario) y
+los fondos `base` (Fondo base) y `blocks` (Fondo bloques). El texto **no se elige**: sobre
+cada fondo es blanco o negro según el contraste, calculado por separado (`text-on-base`
+sobre `bg-base`, `text-on-blocks` sobre `bg-blocks`); el resto se deriva. Los estados son
+fijos y no siguen el tema: correcto = `success`, error = `danger`, advertencia = `warning`.
+"Correcto" nunca usa `primary`. No validar ni limitar el color que elija el admin: el
+diseño se adapta. Los valores por defecto (claro y oscuro) viven en `palette.ts`
+(`DEFAULT_PALETTES`) y el oscuro también en `styles.css` (respaldo).
 
-No restilizar pantallas sueltas a medias: se migra por pantalla completa. La
-fuente Cinzel se carga en `index.html` y está disponible como `font-display`
-(`@theme` de `src/styles.css`).
+**Tema por institución** (flujo completo):
+- BD: `college_themes` (colegio + modo + 4 colores `#rrggbb`). Sin filas = colores por
+  defecto (así funcionan los colegios anteriores). Restablecer = borrar las filas.
+- Endpoint público `GET /public/theme?inst=<code del colegio>`: `{ theme: null }` (200, no es
+  error) si no hay colores; si hay, `{ theme: { light, dark } }` (cada uno puede ser null).
+- `instId` = `colleges.code` (único sin importar mayúsculas, `colleges_code_unique_ci`).
+  Se guarda en `localStorage` (`instId`) y llega por la URL (`?instId=`) en los links de
+  invitación y de restablecer contraseña, o del perfil tras iniciar sesión
+  (`InstitutionThemeSync`). Los colores devueltos se cachean en `localStorage`
+  (`instTheme`) y se aplican antes de pintar (`bootstrapTheme`).
+- Modo claro/oscuro: interruptor (`ThemeToggle`); se guarda en `localStorage`
+  (`themeMode`) y sobrevive al logout; sin elección usa el del navegador. Los portales
+  usan los colores de su institución en el modo elegido.
+- En Configuración del admin (`features/settings/AdminSettings.tsx`) el selector de institución va sobre las
+  pestañas y es la referencia de lo que se guarda en Colores y Puntos (Seguridad es de la cuenta).
+- El admin edita los colores en Configuración → Colores (`features/theme/ThemeSettings.tsx`),
+  con modal de aviso al guardar y al restablecer (afecta a toda la institución).
+- El logo es una imagen clara: con un fondo de bloques claro se muestra sobre un fondo
+  oscuro propio (`Logo onLight`); una variante del logo para fondos claros sigue pendiente.
+
+**Tipografía:** Archivo para títulos y cifras (`type-display` para títulos de página,
+`type-heading` dentro de tarjetas) y Plus Jakarta Sans para el cuerpo. Sin cursivas.
+
+**Reglas de layout** (evitan desbordes horizontales): los portales usan una cuadrícula
+`menú | contenido` (`minmax(0, 1fr)`); toda cuadrícula debe poder encogerse (los textos
+largos se recortan con "…" en vez de ensanchar la página) y las columnas responden al
+ancho del contenedor (`@container`, variantes `@xl:`), no al de la ventana. En móvil el
+menú es una barra inferior de iconos.
 
 **Modo oscuro por clase.** Los componentes compartidos (`components/ui`,
-`PasswordChecklist`, `PlanPicker`, `PaymentPanel`) llevan variantes `dark:`
-junto a su aspecto claro; se activan con la clase `dark` (variante definida en
-`styles.css`). `<AuthLayout dark>` la pone en su contenedor y en `<html>`, para
-que toasts y modales (montados fuera de la pantalla) también la hereden. Así
-cada pantalla migra sin tocar las que no. Al migrar un portal, activar `dark`
-en su layout; cuando ya no quede ninguna pantalla clara, retirar los estilos
-claros. Las pantallas que solo existen en oscuro (login, registro) llevan
-colores oscuros directos, sin `dark:`.
+`PasswordChecklist`, `PlanPicker`, `PaymentPanel`) llevan variantes `dark:` junto a su
+aspecto claro (para las páginas públicas) y `portal:` para los portales. `PortalLayout`
+pone `dark` y `portal` en su contenedor y en `<html>`, para que toasts y modales
+(montados fuera de la pantalla) también las hereden.
 
-Lo siguiente describe el estilo 1.5.
-
-- **Paleta** (sale de la mascota y el logo):
-  - Fondo marino casi negro `#070b12`, menú `#050810`, tarjetas con degradado
-    `#0e1621 → #0a1019`, bordes `#1e2a38`.
-  - Principal verde jade `#3fb97c` (botones, barras, activo, correcto); claro
-    `#9fe3bf` (cifras, enlaces); pálido `#d5eee1` (títulos).
-  - Dorado `#c9a961` **solo en ornamentos**: esquinas, rombos, líneas y
-    etiquetas pequeñas. Nunca como fondo ni en botones.
-  - Error `#c4544a` / texto `#e58276`. Texto `slate-200`, secundario `slate-400`.
-  - **Colores de estado fijos** (no los edita el admin ni siguen al tema): correcto/éxito
-    verde (`success`, `#3fb97c`), error rojo (`danger`) y advertencia amarillo
-    (`warning`). "Correcto" nunca usa `primary`, que sí es editable.
-  - Sin índigo, violeta ni degradados morados.
-- **Tipografía**: Cinzel para títulos de página, nombres de curso, títulos de
-  pregunta y cifras grandes; Inter para todo lo demás (menú, botones, cuerpo,
-  porcentajes de tarjeta con `tabular-nums`). Sin cursivas.
-- **Ornamentos**: esquinas doradas de 10 px en todas las tarjetas; bordes
-  rectos (sin `rounded`); separador con rombo bajo el título de página
-  (alineado a la izquierda) y centrado en el menú; rombo dorado en el ítem
-  activo del menú; números romanos para listas ordenadas cortas (temas).
-- **Textos**: encabezados alineados a la izquierda; etiquetas en mayúsculas
-  pequeñas doradas (`text-[11px] font-semibold tracking-[0.18em]`); botones en
-  minúscula, Inter semibold, borde jade con fondo jade al 10 %.
-- **Efectos**: brillo jade sutil en los paneles principales, grano de película
-  al 3,5 %, viñeta. Animaciones cortas sin rebotes; respetar
-  `prefers-reduced-motion`.
-- **Colores centralizados**: al migrar, definirlos como tokens semánticos en
-  `@theme` de `src/styles.css` (p. ej. `primary`, `ornament`, `surface`,
-  `danger`) y usar esos nombres en las clases; no escribir hex ni colores de
-  Tailwind sueltos en componentes nuevos.
+No restilizar pantallas sueltas a medias: se migra por pantalla completa.
 
 ## Reglas de trabajo
 
@@ -174,6 +155,19 @@ Lo siguiente describe el estilo 1.5.
   commitear debe poder descartarse limpiamente.
 - No inventar casos especiales ni segmentos de usuario no pedidos; preguntar antes.
 - Textos de UI y documentación en español.
+
+## Código y comentarios
+
+- **Nombres claros y completos**: cada variable, función, parámetro y archivo dice qué es
+  o qué hace sin necesidad de un comentario, aunque el nombre resulte largo. Sin
+  abreviaturas (`numero` y no `nro`, `parametro` y no `p`, `respuesta` y no `res`) salvo que
+  el usuario lo indique. Las siglas estándar del dominio (`id`, `url`, `xp`, `fsrs`) están bien.
+- **Comentar poco**: solo lo que explica *por qué* una función o un comando funciona como
+  funciona cuando eso no se deduce leyéndolo (una restricción oculta, un caso límite, una
+  decisión no evidente). "Complicado" es por su funcionamiento, no porque quien lee no
+  conozca el lenguaje. No comentar lo que el código ya dice, ni línea por línea, ni
+  repetir el nombre de lo que viene debajo.
+- Un comentario que se vuelve falso al cambiar el código se corrige o se borra en el mismo cambio.
 
 ## Documentación
 

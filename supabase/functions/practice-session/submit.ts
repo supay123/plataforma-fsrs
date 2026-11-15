@@ -209,6 +209,9 @@ export async function submitPractice(
     throw new AppError(500, "session_result_failed", resultError.message);
   }
 
+  if (!student.college_id) {
+    throw new AppError(409, "college_required", "The student has no college.");
+  }
   // El xp se calcula siempre en el servidor con las respuestas guardadas, en el
   // orden en que se mostraron. Otorgarlo es idempotente: reenviar la sesión
   // devuelve el mismo resultado sin sumar de nuevo.
@@ -227,7 +230,7 @@ export async function submitPractice(
     throw new AppError(
       500,
       "xp_calculation_failed",
-      (answeredError ?? rulesError)?.message,
+      (answeredError ?? rulesError)?.message ?? "Unable to compute the xp.",
     );
   }
   const xp = computeSessionXp(
@@ -239,7 +242,7 @@ export async function submitPractice(
     { p_student_id: student.id, p_session_id: completedId, p_xp: xp.total },
   );
   if (awardError || !award) {
-    throw new AppError(500, "xp_award_failed", awardError?.message);
+    throw new AppError(500, "xp_award_failed", awardError?.message ?? "Unable to award xp.");
   }
   return json({
     session: result,

@@ -261,7 +261,7 @@ export function HomePage() {
       <Reveal className="relative flex flex-col items-center text-center sm:pt-8">
         <Logo className="h-8 sm:h-20" />
         {/* En celular el título es más pequeño y no fuerza el salto de línea. */}
-        <h1 className="mt-3 max-w-7xl font-display text-2xl font-semibold tracking-wide sm:mt-4 sm:text-5xl">
+        <h1 className="mt-3 max-w-7xl type-heading text-2xl sm:mt-4 sm:text-5xl">
           No estudies TODO. <span className="bg-gradient-to-r from-emerald-200 to-emerald-400 bg-clip-text text-transparent">Estudia lo que no sabes</span>
           <br className="hidden sm:inline" /> e INGRESA a la UNSAAC
         </h1>
@@ -294,7 +294,7 @@ export function HomePage() {
       <div className="relative mx-auto max-w-5xl">
         <Reveal>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Cómo funciona</p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-wide sm:text-4xl">3 pasos para ingresar con {BUSINESS.brand.toUpperCase()}</h2>
+          <h2 className="mt-3 type-heading text-3xl sm:text-4xl">3 pasos para ingresar con {BUSINESS.brand.toUpperCase()}</h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-600">{BUSINESS.brand} no reemplaza a tu academia: la teoría la aprendes allí o en tus libros, y aquí compruebas con preguntas si de verdad la dominas.</p>
         </Reveal>
         <ol className="mt-12 grid gap-6 md:grid-cols-3">
@@ -319,7 +319,7 @@ export function HomePage() {
       <Glow className="-left-40 bottom-10 h-96 w-96 bg-slate-400/10 [animation-delay:-3s]" />
       <Reveal className="relative">
         <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-300">Planes</p>
-        <h2 className="mt-3 font-display text-3xl font-semibold tracking-wide sm:text-4xl">Elige tu plan</h2>
+        <h2 className="mt-3 type-heading text-3xl sm:text-4xl">Elige tu plan</h2>
         <p className="mx-auto mt-3 max-w-2xl text-slate-300">Menos de {formatSoles(dailyCap)} al día. Sin renovación automática: vuelves a pagar solo si decides seguir.</p>
       </Reveal>
       <Reveal delay={150} className="relative"><PlanCards className="mt-10 w-full" /></Reveal>
@@ -328,7 +328,7 @@ export function HomePage() {
     <section id="preguntas" className="scroll-mt-16 bg-slate-100 px-4 py-20 text-slate-900">
       <Reveal className="mx-auto max-w-3xl">
         <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Dudas</p>
-        <h2 className="mt-3 text-center font-display text-3xl font-semibold tracking-wide">Preguntas frecuentes</h2>
+        <h2 className="mt-3 text-center type-heading text-3xl">Preguntas frecuentes</h2>
         <div className="mt-8 grid gap-3">{faqs.map((faq) => <FaqItem key={faq.question} {...faq} />)}</div>
       </Reveal>
     </section>

@@ -49,13 +49,20 @@ export function CollegesPage() {
           <td><strong>{college.name}</strong><br /><span className="text-xs text-fg-muted">{college.description}</span></td>
           <td><Badge tone={college.is_active ? "success" : "warning"}>{college.is_active ? "Activo" : "Inactivo"}</Badge></td>
           <td className="space-x-2">
-            <Button variant="ghost" onClick={() => {
+            <Button size="sm" variant="ghost" onClick={() => {
               setEditingId(college.id);
               setForm({ code: college.code, name: college.name, description: college.description ?? "" });
             }}>Editar</Button>
-            <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: college.id, active: !college.is_active })}>{college.is_active ? "Desactivar" : "Activar"}</Button>
-            <Button variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
+            <Button size="sm" variant="ghost" disabled={toggle.isPending} onClick={() => college.is_active ? modal.warning({
+              title: "Desactivar colegio",
+              mascot: "wrong",
+              confirmLabel: "Desactivar",
+              body: <p>Este cambio afecta a todas las personas de <strong>{college.name}</strong>: sus profesores y estudiantes. Puedes volver a activarlo cuando quieras.</p>,
+              onConfirm: () => toggle.mutateAsync({ id: college.id, active: false }),
+            }) : toggle.mutate({ id: college.id, active: true })}>{college.is_active ? "Desactivar" : "Activar"}</Button>
+            <Button size="sm" variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
               title: "Eliminar colegio",
+              mascot: "wrong",
               confirmLabel: "Eliminar definitivamente",
               body: <>
                 <p><strong>Esta acción no se puede deshacer.</strong></p>
@@ -65,7 +72,7 @@ export function CollegesPage() {
             })}>Eliminar</Button>
           </td>
         </tr>)}</tbody>
-      </table></div> : <EmptyState>No hay colegios registrados.</EmptyState>}</Card>
+      </table></div> : <EmptyState mascot>No hay colegios registrados.</EmptyState>}</Card>
       <Card>
         <h2 className="mb-4 font-bold">{editingId ? "Editar colegio" : "Nuevo colegio"}</h2>
         {save.error && <Alert tone="error">{save.error.message}</Alert>}

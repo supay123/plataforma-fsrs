@@ -17,7 +17,7 @@ export function LoadingProgress({ stage, stageSince, startedAt, done = false, on
     <p className="text-xs text-fg-muted">{done ? "¡Listo!" : STAGE_LABEL[stage]}</p>
     {notice === "slow" && <p className="text-sm text-fg">Esto a veces puede tardar.</p>}
     {notice === "stuck" && <div className="grid justify-items-center gap-3">
-      <p className="text-sm text-warning">
+      <p className="text-sm text-warning-text">
         Esto está tardando más de lo normal. <a className="underline underline-offset-4" href={`https://wa.me/${BUSINESS.whatsapp}`} target="_blank" rel="noreferrer">Contáctanos</a> para corregirlo.
       </p>
       <Button variant="secondary" onClick={onRetry}>Reintentar</Button>

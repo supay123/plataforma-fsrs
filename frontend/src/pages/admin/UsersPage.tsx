@@ -103,13 +103,23 @@ export function UsersPage() {
             <td>{colleges.data?.find((college) => college.id === user.college_id)?.name ?? "—"}</td>
             <td>{accessBadge(user)}{expiredLabel(user) && <span className="mt-1 block text-xs text-fg-muted">{expiredLabel(user)}</span>}</td>
             <td className="space-x-2">
-              <Link className="text-sm font-semibold text-primary-light" to={`/admin/usuarios/${user.id}`}>Editar</Link>
-              {user.role === "teacher" && <Link className="text-sm font-semibold text-primary-light" to={`/admin/asignaciones?profesor=${user.id}`}>Asignaciones</Link>}
-              <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: user.id, active: !user.is_active })}>
+              <Link className="text-sm font-semibold text-primary-text" to={`/admin/usuarios/${user.id}`}>Editar</Link>
+              {user.role === "teacher" && <Link className="text-sm font-semibold text-primary-text" to={`/admin/asignaciones?profesor=${user.id}`}>Asignaciones</Link>}
+              <Button size="sm" variant="ghost" disabled={toggle.isPending} onClick={() => user.is_active ? modal.warning({
+                title: "Desactivar usuario",
+                mascot: "wrong",
+                confirmLabel: "Desactivar",
+                body: <>
+                  <p><strong>{user.full_name}</strong> ya no podrá iniciar sesión.</p>
+                  {user.role === "teacher" && <p className="mt-2">Antes de desactivarlo, revisa si tiene estudiantes asignados: dejarán de contar con su profesor.</p>}
+                </>,
+                onConfirm: () => toggle.mutateAsync({ id: user.id, active: false }),
+              }) : toggle.mutate({ id: user.id, active: true })}>
                 {user.is_active ? "Desactivar" : "Activar"}
               </Button>
-              <Button variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
+              <Button size="sm" variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
                 title: "Eliminar usuario",
+                mascot: "wrong",
                 confirmLabel: "Eliminar definitivamente",
                 body: <>
                   <p><strong>Esta acción no se puede deshacer.</strong></p>

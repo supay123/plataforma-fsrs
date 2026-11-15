@@ -1,3 +1,4 @@
+import { collegeCodeOfUser } from "./college-code.ts";
 import { appOrigin } from "./app-url.ts";
 import { TABLES } from "./database.constants.ts";
 import { passwordResetEmail, sendEmail } from "./email.ts";
@@ -86,7 +87,11 @@ export async function sendPasswordResetLink(
       passwordResetEmail(
         recipient.email,
         recipient.name,
-        passwordResetLink(appOrigin(request), code),
+        passwordResetLink(
+          appOrigin(request),
+          code,
+          await collegeCodeOfUser(context, recipient.userId),
+        ),
         PASSWORD_RESET_TTL_MINUTES,
       ),
     );

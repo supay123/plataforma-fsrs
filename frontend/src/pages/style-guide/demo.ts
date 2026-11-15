@@ -1,6 +1,6 @@
-// Guía de estilo (solo desarrollo): datos y estado compartidos por las páginas /textura/*. Solo usan lo
-// que ya existe en "Mi aprendizaje" (sin XP, medallas ni rachas). Se registra solo en desarrollo; borrar la
-// carpeta pages/style-guide y sus rutas en app/router.tsx cuando los portales estén migrados.
+// Guía de estilo (solo desarrollo): datos y estado de la página /textura/chancon. Usan lo que existe en
+// "Mi aprendizaje" más el xp por acierto (rama de gamificación), con muchos cursos como un colegio real. Se registra solo en desarrollo;
+// borrar la carpeta pages/style-guide y sus rutas en app/router.tsx cuando los portales estén migrados.
 import { useEffect, useRef, useState } from "react";
 
 export type DemoView = "panel" | "curso" | "practica";
@@ -8,19 +8,36 @@ export type DemoOption = "A" | "B" | "C" | "D";
 
 export const student = { name: "Manuel Student", role: "Estudiante" };
 
-export const courses = [
-  { id: "mat", name: "Matemática", description: "Este es el curso de matemática.", percentage: 72.5, sessions: 4 },
-  { id: "com", name: "Comunicación", description: "", percentage: 58, sessions: 1 },
-] as const;
+type DemoCourse = { id: string; name: string; description: string; percentage: number | null; sessions: number };
 
-export const totalScore = (courses[0].percentage + courses[1].percentage) / 2;
+// Un colegio normal tiene entre 15 y 30 cursos; la demo usa 20, con algunos sin practicar.
+const courseRows: [string, number | null, number][] = [
+  ["Matemática", 72.5, 4], ["Comunicación", 58, 1], ["Aritmética", 81, 6], ["Álgebra", 64, 3],
+  ["Geometría", 49.5, 2], ["Trigonometría", null, 0], ["Física", 55, 2], ["Química", 68, 3],
+  ["Biología", 77, 5], ["Razonamiento matemático", 61, 4], ["Razonamiento verbal", 70, 2],
+  ["Lenguaje", null, 0], ["Literatura", 83, 1], ["Historia del Perú", 59, 2],
+  ["Historia universal", null, 0], ["Geografía", 66, 1], ["Economía", null, 0], ["Filosofía", 74, 1],
+  ["Psicología", null, 0], ["Educación cívica", 52, 1],
+];
+export const courses: DemoCourse[] = courseRows.map(([name, percentage, sessions], i) => ({
+  id: `c${i}`, name, percentage, sessions,
+  description: i === 0 ? "Este es el curso de matemática." : "",
+}));
+
+const practiced = courses.filter((course) => course.percentage !== null);
+export const totalScore = practiced.reduce((sum, course) => sum + course.percentage!, 0) / practiced.length;
 export const totalGrade = Number((totalScore / 5).toFixed(1));
+export const gradeOf = (percentage: number) => Number((percentage / 5).toFixed(1));
 
 export const topics = [
   { id: "conj", name: "Conjuntos", percentage: 72.5 as number | null, sessions: 4, blocked: false, material: true },
   { id: "exp", name: "Leyes de exponentes", percentage: null as number | null, sessions: 0, blocked: false, material: false },
   { id: "pol", name: "Polinomios reales", percentage: null as number | null, sessions: 0, blocked: true, material: false },
+  { id: "prod", name: "Productos notables", percentage: null as number | null, sessions: 0, blocked: false, material: false },
+  { id: "ecu", name: "Ecuaciones lineales", percentage: null as number | null, sessions: 0, blocked: false, material: false },
 ];
+
+export const XP_PER_CORRECT = 75;
 
 export const question = {
   total: 20,

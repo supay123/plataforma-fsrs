@@ -163,7 +163,7 @@ export function AssignmentsPage() {
       </div>
       <div className="table-wrap mt-4"><table>
         <thead><tr><th>Nombre</th><th>Código</th><th>Colegio</th><th>Seleccionar</th></tr></thead>
-        <tbody>{visibleTeachers.map((teacher) => <tr key={teacher.id} className={selectedTeacherId === teacher.id ? "bg-primary/10" : undefined}>
+        <tbody>{visibleTeachers.map((teacher) => <tr key={teacher.id} className={selectedTeacherId === teacher.id ? "bg-primary-soft" : undefined}>
           <td><strong>{teacher.full_name}</strong></td><td>{teacher.user_code}</td><td>{teacher.college_id ? collegeNames.get(teacher.college_id) : "—"}</td>
           <td><input aria-label={`Seleccionar a ${teacher.full_name}`} className="h-4 w-4 accent-primary" type="checkbox" checked={selectedTeacherId === teacher.id} onChange={() => selectTeacher(teacher.id)} /></td>
         </tr>)}</tbody>
@@ -171,7 +171,7 @@ export function AssignmentsPage() {
     </Card>
 
     <div className="mt-5 grid gap-3 lg:grid-cols-3">
-      {panelButtons.map((panel) => <Button key={panel.id} variant={activePanel === panel.id ? "primary" : "secondary"} disabled={!selectedTeacher} className="disabled:border-line disabled:bg-white/[0.04] disabled:text-fg-muted" onClick={() => selectPanel(panel.id)}>{panel.label}</Button>)}
+      {panelButtons.map((panel) => <Button key={panel.id} variant={activePanel === panel.id ? "primary" : "secondary"} disabled={!selectedTeacher} onClick={() => selectPanel(panel.id)}>{panel.label}</Button>)}
     </div>
 
     {selectedTeacher && activePanel === "topics" && <TopicsPanel courses={teacherCourses} rows={topicRows} studentSearch={studentSearch} courseFilter={courseFilter} pending={topicMutation.isPending} error={topicMutation.error?.message} onStudentSearch={setStudentSearch} onCourseFilter={setCourseFilter} onToggle={(studentId, topicId, blocked) => topicMutation.mutate({ studentId, topicId, blocked })} />}
@@ -179,7 +179,11 @@ export function AssignmentsPage() {
     {selectedTeacher && activePanel === "students" && <StudentsPanel students={visibleCollegeStudents} selectedStudentIds={selectedStudentIds} studentSearch={studentSearch} hasCourses={teacherCourses.length > 0} pending={syncMutation.isPending} error={syncMutation.error?.message} onStudentSearch={setStudentSearch} onToggle={toggleStudent} onConfirm={() => modal.create({
       title: "Confirmar asignaciones",
       confirmLabel: "Continuar",
-      body: "Los alumnos que se asignen a un profesor serán automáticamente asignados a todos sus cursos, incluso a aquellos que se creen después de confirmar esta operación. Si se desactivan asignaciones en esta pantalla, los alumnos ya no estarán matriculados en los cursos de este profesor.",
+      mascot: "wrong",
+      body: <>
+        <p>Quedarán asignados <strong>{selectedStudentIds.size} {selectedStudentIds.size === 1 ? "alumno" : "alumnos"}</strong> a <strong>{selectedTeacher.full_name}</strong>, que tiene {teacherCourses.length} {teacherCourses.length === 1 ? "curso" : "cursos"}.</p>
+        <p className="mt-2">Los alumnos asignados serán matriculados automáticamente en todos sus cursos, incluso en los que se creen después. Si desactivas asignaciones en esta pantalla, esos alumnos dejarán de estar matriculados en los cursos de este profesor.</p>
+      </>,
       onConfirm: () => syncMutation.mutateAsync(),
     })} />}
   </>;

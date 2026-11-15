@@ -52,3 +52,8 @@ export function buildLevelSegments(award: Pick<XpAward, "level_before" | "xp_bef
     levelUp: index < last,
   }));
 }
+
+/** XP que cuesta pasar al nivel `nextLevel`; misma fórmula que `public.xp_for_level` en la BD. */
+export function xpForLevel(nextLevel: number, baseXp: number, growth: number): number {
+  return Math.floor(baseXp + baseXp * Math.pow(nextLevel - 1, 1 + growth) * growth);
+}

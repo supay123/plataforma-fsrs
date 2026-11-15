@@ -77,8 +77,8 @@ function EmailVerification({ delivery, newEmail, onResent, onVerified, onCancel 
     finally { setBusy(false); }
   };
 
-  return <form className="grid gap-3 border border-primary/40 bg-primary/10 p-4" onSubmit={(event) => { event.preventDefault(); void verify(); }}>
-    <p className="text-sm text-fg-strong">Enviamos un código de 6 dígitos a <strong>{delivery.email}</strong>. Tu correo cambiará cuando lo verifiques. Vence en 10 minutos.</p>
+  return <form className="grid gap-3 rounded-2xl border-2 border-primary bg-primary-soft p-4" onSubmit={(event) => { event.preventDefault(); void verify(); }}>
+    <p className="text-sm text-fg">Enviamos un código de 6 dígitos a <strong>{delivery.email}</strong>. Tu correo cambiará cuando lo verifiques. Vence en 10 minutos.</p>
     {error && <Alert tone="error">{error}</Alert>}
     <Field label="Código de verificación">
       <Input value={code} inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="max-w-48 text-center text-lg tracking-[0.4em]"
@@ -86,7 +86,7 @@ function EmailVerification({ delivery, newEmail, onResent, onVerified, onCancel 
     </Field>
     <div className="flex flex-wrap items-center gap-3">
       <Button disabled={busy || code.length !== 6}>{busy ? "Verificando…" : "Verificar correo"}</Button>
-      <button type="button" className="text-sm font-semibold text-primary-light hover:text-primary-light disabled:cursor-not-allowed disabled:text-fg-faint" disabled={busy || waitSeconds > 0} onClick={() => void resend()}>
+      <button type="button" className="text-sm font-semibold text-primary-text hover:text-primary-text disabled:cursor-not-allowed disabled:text-fg-faint" disabled={busy || waitSeconds > 0} onClick={() => void resend()}>
         {waitSeconds > 0 ? `Reenviar código en ${waitSeconds} s` : "Reenviar código"}
       </button>
       <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
@@ -94,7 +94,7 @@ function EmailVerification({ delivery, newEmail, onResent, onVerified, onCancel 
   </form>;
 }
 
-function ProfileForm({ profile }: { profile: AccountProfile }) {
+function ProfileForm({ profile, onOutcome }: { profile: AccountProfile; onOutcome?: (outcome: "saved" | "failed") => void }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { refreshProfile } = useAuth();
@@ -122,6 +122,7 @@ function ProfileForm({ profile }: { profile: AccountProfile }) {
         reset(formValues(updated));
         void refreshProfile();
         toast.success(SAVED);
+        onOutcome?.("saved");
       }
       if (emailChanged) {
         setEmailChange({ email: newEmail, delivery: await requestEmailChange(newEmail) });
@@ -129,6 +130,7 @@ function ProfileForm({ profile }: { profile: AccountProfile }) {
       }
     } catch (reason) {
       toast.error(SAVE_FAILED);
+      onOutcome?.("failed");
       const { field, message } = await fieldError(reason);
       if (field && field in values) setError(field as keyof Values, { message }, { shouldFocus: true });
     }
@@ -155,7 +157,7 @@ function ProfileForm({ profile }: { profile: AccountProfile }) {
         </div>
         {/* Solo lectura: el grupo (profesor) lo cambia el administrador. */}
         <Field label="Grupo" hideLabel>
-          <Input variant="soft" icon={<Users size={20} />} readOnly value={profile.group_name ?? ""} placeholder="Sin grupo asignado" className="cursor-default read-only:text-fg-muted read-only:focus:border-line-strong read-only:focus:bg-surface-deep read-only:focus:ring-0" />
+          <Input variant="soft" icon={<Users size={20} />} readOnly value={profile.group_name ?? ""} placeholder="Sin grupo asignado" className="cursor-default read-only:text-fg-muted read-only:focus:border-line-strong read-only:focus:bg-sunken read-only:focus:ring-0" />
         </Field>
       </div>
       <div><Button disabled={isSubmitting || !isDirty}>{isSubmitting ? "Guardando…" : "Guardar cambios"}</Button></div>
@@ -201,7 +203,7 @@ function PasswordReset({ hasEmail }: { hasEmail: boolean }) {
         <KeyRound size={16} className="mr-2" />
         {busy === "send" ? "Enviando…" : waitSeconds > 0 ? `Reenviar link en ${waitSeconds} s` : delivery ? "Reenviar link" : "Restablecer contraseña"}
       </Button>
-      {delivery && <Button type="button" variant="ghost" disabled={Boolean(busy)} onClick={() => void cancel()}>{busy === "cancel" ? "Cancelando…" : "Cancelar"}</Button>}
+      {delivery && <Button type="button" variant="primary" disabled={Boolean(busy)} onClick={() => void cancel()}>{busy === "cancel" ? "Cancelando…" : "Cancelar"}</Button>}
     </div>
   </div>;
 }
@@ -228,7 +230,7 @@ function ProfileSkeleton() {
 }
 
 /** Perfil del estudiante: sus datos y el cambio de contraseña por correo. */
-export function ProfileSection() {
+export function ProfileSection({ onOutcome }: { onOutcome?: (outcome: "saved" | "failed") => void }) {
   const toast = useToast();
   const account = useQuery({ queryKey: accountProfileQueryKey, queryFn: getAccountProfile });
 
@@ -241,7 +243,7 @@ export function ProfileSection() {
     <Card>
       <h2 className="font-bold">Mi perfil</h2>
       <p className="mt-1 text-sm text-fg-muted">Si cambias tu correo, te enviaremos un código para verificarlo.</p>
-      <div className="mt-4"><ProfileForm profile={account.data} /></div>
+      <div className="mt-4"><ProfileForm profile={account.data} onOutcome={onOutcome} /></div>
     </Card>
     <Card>
       <h2 className="font-bold">Contraseña</h2>

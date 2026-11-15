@@ -46,7 +46,7 @@ const STEPS = ["Tus datos", "Verifica tu correo", "Pago"];
 
 function Steps({ current }: { current: number }) {
   return <ol className="mb-5 grid grid-cols-3 gap-2 text-xs font-semibold sm:text-sm">
-    {STEPS.map((label, index) => <li key={label} aria-current={index === current ? "step" : undefined} className={clsx("flex items-center gap-2 border-t-4 pt-2", index <= current ? "border-emerald-500 text-emerald-300" : "border-white/10 text-slate-500")}>
+    {STEPS.map((label, index) => <li key={label} aria-current={index === current ? "step" : undefined} className={clsx("flex items-center gap-2 border-t-4 pt-2", index <= current ? "border-primary text-primary-text" : "border-line text-fg-faint")}>
       <span className="hidden sm:inline">{index + 1}.</span>{label}
     </li>)}
   </ol>;
@@ -87,10 +87,10 @@ function VerifyEmail({ registration, firstCode, onVerified, onBack }: { registra
 
   return <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void verify(); }}>
     <div>
-      <h2 className="text-lg font-semibold text-slate-50">Revisa tu correo</h2>
+      <h2 className="text-lg font-semibold text-fg">Revisa tu correo</h2>
       {delivery
-        ? <p className="text-sm text-slate-400">Enviamos un código de 6 dígitos a <strong>{delivery.email}</strong>. Vence en 10 minutos. Si no lo ves, revisa la carpeta de spam.</p>
-        : <p className="text-sm text-slate-400">Tus datos están guardados, pero no pudimos enviar el código a <strong>{registration.email}</strong>. Vuelve a intentarlo con "Enviar código".</p>}
+        ? <p className="text-sm text-fg-muted">Enviamos un código de 6 dígitos a <strong>{delivery.email}</strong>. Vence en 10 minutos. Si no lo ves, revisa la carpeta de spam.</p>
+        : <p className="text-sm text-fg-muted">Tus datos están guardados, pero no pudimos enviar el código a <strong>{registration.email}</strong>. Vuelve a intentarlo con "Enviar código".</p>}
     </div>
     {error && <Alert tone="error">{error}</Alert>}
     {notice && <Alert tone="success">{notice}</Alert>}
@@ -100,10 +100,10 @@ function VerifyEmail({ registration, firstCode, onVerified, onBack }: { registra
     </Field>
     <Button disabled={busy || code.length !== 6}>{busy ? "Verificando…" : "Verificar correo"}</Button>
     <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-      <button type="button" className="font-semibold text-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:text-slate-500" disabled={busy || waitSeconds > 0} onClick={() => void resend()}>
+      <button type="button" className="font-semibold text-primary-text hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint" disabled={busy || waitSeconds > 0} onClick={() => void resend()}>
         {waitSeconds > 0 ? `Reenviar código en ${waitSeconds} s` : delivery ? "Reenviar código" : "Enviar código"}
       </button>
-      <button type="button" className="font-semibold text-slate-400 hover:text-slate-100" onClick={onBack}>Corregir mis datos</button>
+      <button type="button" className="font-semibold text-fg-muted hover:text-fg" onClick={onBack}>Corregir mis datos</button>
     </div>
   </form>;
 }
@@ -187,10 +187,10 @@ export function SignUpPage() {
 
   return <AuthLayout dark wide cover={{ title: "Empieza a prepararte hoy", description: "Practica con las preguntas de tu grupo y recibe la explicación de cada respuesta al instante." }} action={<Link
     to="/estudiante/login"
-    className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400 hover:bg-white/5"
+    className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm font-semibold text-fg transition hover:border-primary hover:bg-line"
   ><LogIn className="h-4 w-4" aria-hidden />Iniciar sesión</Link>}>
     <div className="mb-4">
-      <h1 className="font-display text-2xl font-semibold tracking-wide text-slate-50">Crea tu cuenta</h1>
+      <h1 className="type-display text-2xl">Crea tu cuenta</h1>
     </div>
     <div className="mb-4"><PlanPicker plan={plan} onChange={(id) => setSearchParams({ plan: id }, { replace: true })} /></div>
     <Steps current={step} />
@@ -213,13 +213,13 @@ export function SignUpPage() {
         </div>
         <Field label="Grupo" hideLabel error={errors.teacher_id?.message}>
           {/* Cada grupo es un profesor; sin grupo elegido, el select se ve como placeholder. */}
-          <Select variant="soft" icon={<Users size={20} />} disabled={!teachers.data} className={clsx(!teacherId && "text-slate-500", "[&>option]:text-slate-100")} {...register("teacher_id")}>
+          <Select variant="soft" icon={<Users size={20} />} disabled={!teachers.data} className={clsx(!teacherId && "text-fg0", "[&>option]:text-fg")} {...register("teacher_id")}>
             <option value="">{teachers.isPending ? "Cargando grupos..." : "Selecciona tu grupo"}</option>
             {teachers.data?.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
           </Select>
         </Field>
       </div>
-      <p className="-mb-2 text-sm text-slate-400">Con tu <strong>correo</strong> y esta <strong>contraseña</strong> ingresarás a Chancón.</p>
+      <p className="-mb-2 text-sm text-fg-muted">Con tu <strong>correo</strong> y esta <strong>contraseña</strong> ingresarás a Chancón.</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Contraseña" hideLabel error={errors.password?.message}><PasswordInput variant="soft" icon={<LockKeyhole size={20} />} placeholder="Contraseña" autoComplete="new-password" {...register("password")} /></Field>
         <Field label="Repite tu contraseña" hideLabel error={errors.password_confirmation?.message}><PasswordInput variant="soft" icon={<LockKeyhole size={20} />} placeholder="Repite tu contraseña" autoComplete="new-password" {...register("password_confirmation")} /></Field>
@@ -227,9 +227,9 @@ export function SignUpPage() {
       {/* Las reglas aparecen cuando empieza a escribir alguna de las contraseñas. */}
       {(password || passwordConfirmation) && <PasswordChecklist password={password} />}
 
-      <label className="flex items-start gap-2 text-sm text-slate-300">
-        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-emerald-500" {...register("accepted_terms")} />
-        <span>Acepto los <Link className="font-semibold text-emerald-400 hover:text-emerald-300" to="/terminos" target="_blank">términos y condiciones</Link> y la <Link className="font-semibold text-emerald-400 hover:text-emerald-300" to="/privacidad" target="_blank">política de privacidad</Link>.</span>
+      <label className="flex items-start gap-2 text-sm text-fg-muted">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" {...register("accepted_terms")} />
+        <span>Acepto los <Link className="font-semibold text-primary-text hover:text-fg" to="/terminos" target="_blank">términos y condiciones</Link> y la <Link className="font-semibold text-primary-text hover:text-fg" to="/privacidad" target="_blank">política de privacidad</Link>.</span>
       </label>
       {errors.accepted_terms && <span className="text-xs text-rose-400">{errors.accepted_terms.message}</span>}
 

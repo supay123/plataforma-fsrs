@@ -56,21 +56,21 @@ export function PendingInvitations() {
   return <Card>
     <h2 className="mb-4 font-bold">Invitaciones pendientes</h2>
     {invitations.isPending
-      ? <div role="status" aria-busy="true" aria-label="Cargando invitaciones" className="grid gap-3">{[0, 1].map((item) => <Skeleton key={item} height={72} rounded="none" />)}</div>
+      ? <div role="status" aria-busy="true" aria-label="Cargando invitaciones" className="grid gap-3">{[0, 1].map((item) => <Skeleton key={item} height={72} />)}</div>
       : !invitations.data?.length
       ? <EmptyState>No hay invitaciones pendientes.</EmptyState>
       : <ul className="grid gap-3">{invitations.data.map((invitation) => {
         const expired = new Date(invitation.expires_at) <= new Date();
-        return <li key={invitation.id} className="grid gap-2 border border-line p-3 text-sm">
+        return <li key={invitation.id} className="grid gap-2 rounded-xl border-2 border-line p-3 text-sm">
           <div className="flex items-start justify-between gap-2">
-            <strong className="break-all text-fg-strong">{invitation.email}</strong>
+            <strong className="break-all text-fg">{invitation.email}</strong>
             <Badge tone={expired ? "warning" : "success"}>{expired ? "Vencida" : "Pendiente"}</Badge>
           </div>
           <p className="text-fg-muted">{groupLabel(invitation)} · Acceso del {formatDay(invitation.access_valid_from)} al {formatDay(invitation.access_valid_until)}</p>
           <p className="text-xs text-fg-muted">{expired ? "El link venció" : "El link vence"} el {formatDate(invitation.expires_at)}.</p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" disabled={resend.isPending} onClick={() => void resendTo(invitation)}>Reenviar</Button>
-            <Button type="button" variant="danger" disabled={cancel.isPending} onClick={() => confirmCancel(invitation)}>Anular</Button>
+            <Button size="sm" type="button" variant="secondary" disabled={resend.isPending} onClick={() => void resendTo(invitation)}>Reenviar</Button>
+            <Button size="sm" type="button" variant="danger" disabled={cancel.isPending} onClick={() => confirmCancel(invitation)}>Anular</Button>
           </div>
         </li>;
       })}</ul>}

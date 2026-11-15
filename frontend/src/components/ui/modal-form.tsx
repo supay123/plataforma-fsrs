@@ -1,7 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { Alert, Button } from "./index";
-import { Corners } from "./ornaments";
 
 export interface ModalFormProps {
   title: string;
@@ -43,18 +42,17 @@ export function ModalForm({
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
     <button aria-label="Cerrar diálogo" className="absolute inset-0 bg-slate-950/55 portal:bg-black/70" disabled={pending} onClick={onCancel} />
-    <section aria-modal="true" aria-labelledby="modal-form-title" role="dialog" className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:rounded-xl dark:border dark:border-white/10 dark:bg-slate-900 portal:rounded-none portal:border-line portal:bg-gradient-to-b portal:from-surface portal:to-surface-deep portal:shadow-[0_0_60px_-30px_var(--color-primary)]">
-      <Corners />
+    <section aria-modal="true" aria-labelledby="modal-form-title" role="dialog" className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:rounded-xl dark:border dark:border-white/10 dark:bg-slate-900 portal:rounded-2xl portal:border-2 portal:border-line portal:bg-blocks portal:text-on-blocks portal:shadow-[0_4px_0_var(--c-line)]">
       <button
         aria-label="Cerrar"
-        className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full portal:rounded-none text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100 portal:text-fg-muted portal:hover:bg-white/[0.04] portal:hover:text-fg-strong"
+        className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full portal:rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100 portal:text-fg-muted portal:hover:bg-sunken portal:hover:text-fg"
         disabled={pending}
         onClick={onCancel}
         type="button"
       >
         <X aria-hidden="true" className="h-5 w-5" />
       </button>
-      <h2 id="modal-form-title" className="pr-10 text-lg font-bold text-slate-950 dark:text-slate-50 portal:font-display portal:text-xl portal:font-normal portal:tracking-wide portal:text-primary-pale">{title}</h2>
+      <h2 id="modal-form-title" className="pr-10 text-lg font-bold text-slate-950 dark:text-slate-50 portal:text-xl portal:type-heading portal:text-fg">{title}</h2>
       <form className="mt-4 grid gap-4" onSubmit={(event) => { event.preventDefault(); if (!pending) onSubmit(); }}>
         {children}
         {error && <Alert tone="error">{error}</Alert>}

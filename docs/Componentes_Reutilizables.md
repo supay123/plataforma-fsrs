@@ -140,7 +140,10 @@ Botón con estilos de la aplicación. Acepta todas las props de `<button>`.
 
 | Prop | Valores |
 | --- | --- |
-| `variant` | `"primary"` (por defecto), `"secondary"`, `"danger"`, `"ghost"` |
+| `variant` | `"primary"` (por defecto), `"secondary"`, `"danger"`, `"warning"`, `"ghost"` |
+| `size` | `"md"` (por defecto) o `"sm"`, más compacto, para acciones dentro de filas y tarjetas de lista |
+
+En los portales los botones tienen el borde inferior grueso del estilo Chancón.
 
 Convención para que todos los botones se vean igual en toda la app:
 
@@ -190,13 +193,16 @@ perfil del estudiante), usa `Input` con `readOnly` y `value`.
 
 Contenedor blanco con borde y sombra. Si pasas un `className` con `bg-` o
 `border-`, reemplaza el fondo o el borde por defecto. Dentro de un portal
-(clase `portal`) se ve como `Frame`: degradado, borde recto y esquinas doradas.
-`glow` añade el brillo jade de los paneles principales.
+(clase `portal`) es una tarjeta `bg-blocks` con su texto (`text-on-blocks`), borde de 2 px,
+esquinas redondeadas y borde inferior grueso. `glow` resalta el borde con el color
+de marca (paneles principales).
 
 ### PageHeader
 
 Encabezado de página del portal: `title`, `description` opcional y `actions`
-opcionales (botones a la derecha).
+opcionales (botones a la derecha). El título usa `type-display` (Archivo ancho).
+`className` permite quitar el margen inferior (`mb-0! portal:mb-0!`) cuando la
+página ya separa sus bloques con `gap`.
 
 ### Alert
 
@@ -215,14 +221,55 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
   preguntas de la práctica del estudiante).
 - `EmptyState`: recuadro para listas vacías, con el texto como hijo.
 
-### Mascota 3D con consejos (`MascotTips`, `ui/mascot-scene.tsx`)
+### Mascota 3D (`ui/mascot-scene.tsx`, `MascotTips`, `PracticeMascot`)
 
-`features/sessions/MascotTips.tsx` muestra la mascota (`public/models/mascot.glb`,
-con `three` + `@react-three/fiber`) y rota consejos cortos de
-`features/sessions/practice-tips.ts` cada 5 s, sin repetir ninguno hasta mostrar
-todos. Saluda (`wave`) al cambiar de consejo y respeta `prefers-reduced-motion`.
-La escena se carga con `lazy` para no meter `three` en el paquete principal, y
-sin WebGL se ve la cabeza 2D. Se usa en la carga de la práctica del estudiante.
+La mascota es una **cabeza 3D** (`public/models/mascot_head.glb`, 75 KB, con meshopt;
+ficha técnica en `public/models/mascot_head_notes.md`) dibujada con `three` +
+`@react-three/fiber`. Todo el 3D se carga con `lazy` para no meter `three` en el
+paquete principal.
+
+- `ui/mascot-model.ts`: URL del modelo, decodificador meshopt y `preloadMascotModel()`.
+- `ui/use-mascot-animation.ts`: `clipForEvent(evento)` (función pura) traduce un evento
+  de la app a un clip (`rest`→`idle`, `loading`→`think`, `correct`, `wrong`,
+  `streak`→`celebrate`, `levelUp`, `finish`, `sleep`, `appear`, `disappear`, `tip`) y el
+  hook `useMascotAnimation` hace el *crossfade* y vuelve al reposo cuando termina un clip
+  de una sola vez.
+- `ui/mascot-scene.tsx`: `<MascotScene event eventKey rest framing />`. Cámara
+  ortográfica, luz neutra y **tinte desde el tema**: la piel (`M_Skin`) toma
+  `--c-primary` y el dorado (`M_Accent`) toma `--c-secondary` de `<html>`, y se vuelve a
+  teñir si esas variables cambian. Con `prefers-reduced-motion` queda en pose de reposo.
+- `features/sessions/MascotTips.tsx`: carga de las 20 preguntas. La mascota piensa
+  (`loading`) y hace un saltito (`tip`) al cambiar cada consejo, que rota cada 5 s sin
+  repetir hasta mostrarlos todos (`practice-tips.ts`).
+- `features/sessions/PracticeMascot.tsx`: junto a la pregunta y en `XpResult`. Props:
+  `mood` (`idle`, `happy`, `sad`, `thinking`), `event` opcional (`streak`, `levelUp`,
+  `finish`…), `size` y `className`. Su lienzo 3D es 3 veces más alto que la cabeza y
+  sobresale por arriba (sin recibir clics) para que los saltos se vean completos.
+- Sin WebGL, con movimiento reducido y mientras baja el modelo se ve la cabeza PNG
+  (`public/image/mascota-cabeza.png`) con las animaciones CSS `mascot-*` de `styles.css`.
+- `features/sessions/preload-mascot.ts`: `PortalLayout` baja el 3D en segundo plano
+  para el estudiante.
+
+**Regla: una sola mascota por pantalla** (dos solo en casos muy justificados, nunca más;
+cada una crea su propio contexto WebGL). El menú lateral cuenta como una y sigue siendo el PNG.
+
+Reutilizables para colocar la mascota (`features/mascot/`):
+
+- `MascotAdvice`: cabeza + globo de texto (`tone`: `neutral`, `warning`, `success`; `event`
+  y `eventKey` para reaccionar; `gaze` para que mire hacia un lado; `actions` para botones).
+  Funciona igual en móvil: la cabeza queda a la izquierda y el globo ocupa el resto.
+- `MascotHelp` (profesor): un `MascotAdvice` con un mensaje de la pantalla y, a un clic,
+  «Ayuda de esta pantalla» (pasos en orden) y el enlace «Contáctanos por WhatsApp». Se abre
+  sola solo la primera vez que se entra a esa pantalla (`localStorage`, clave por `screen`).
+- Mensajes como funciones puras con prueba, solo con datos que la pantalla ya carga:
+  `dashboard-advice.ts` (inicio del estudiante), `review-advice.ts` (revisión),
+  `teacher-advice.ts` (lista de estudiantes y resultados) y `palette-advice.ts` (contraste
+  de los colores de la institución; orienta, nunca bloquea).
+- `useModal()`: la opción `mascot` (por ejemplo `"wrong"`, el clip amable de aviso) pone la
+  mascota sobre el título; se usa en las advertencias del administrador.
+- `EmptyState mascot`: mascota dormida sobre el texto, solo en pantallas sin otra mascota.
+- `useInactivity` (`features/sessions`): `true` tras un tiempo sin tocar nada; la práctica
+  duerme a la mascota a los 60 s.
 
 Junto a la mascota, `features/sessions/LoadingProgress.tsx` muestra una
 `ProgressBar` por etapas reales (`loading-progress.ts`): avanza despacio dentro
@@ -250,24 +297,56 @@ import { Skeleton } from "../../components/ui/skeleton";
 descripción y `rows` filas de `rowHeight` px, en `columns` columnas (1 a 3).
 Es lo que se devuelve mientras `isLoading` en las páginas de los portales.
 
-### Estilo 1.5 de los portales (`styles.css` y `components/ui/ornaments.tsx`)
+### Estilo Chancón de los portales (`styles.css`, `lib/theme/` y `components/ui/ornaments.tsx`)
+
+Estilo de los tres portales (estudiante, profesor y admin). Referencia visual, solo en
+desarrollo: `/textura/chancon` (`pages/style-guide/ChanconStylePage.tsx`). Las páginas
+públicas, el login y el registro siguen con el estilo SaaS (variantes claras y `dark:`)
+hasta que se migren.
 
 - **Variante `portal:`** (como `dark:`): aplica solo dentro de un elemento con la
   clase `portal`. `PortalLayout` la pone junto con `dark` en su contenedor y en
-  `<html>` (para toasts y modales). Los componentes compartidos llevan
-  `portal:` solo donde el 1.5 difiere del SaaS; las pantallas que solo existen
-  en un portal usan directamente los tokens.
-- **Tokens de color** (`@theme` de `styles.css`): `primary`, `ornament`, `canvas`
-  (los tres editables), `primary-light`, `primary-pale`, `primary-ink`,
-  `sidebar`, `surface`, `surface-deep`, `line`, `line-strong`, `track`, `fg-strong`,
-  `fg`, `fg-muted`, `fg-faint` y `atmosphere`. **Estados fijos** (no siguen el tema
-  del admin): `success`/`success-light` (correcto, éxito), `danger`/`danger-light`
-  (error) y `warning` (advertencia). Lo "correcto" usa `success`, nunca `primary`. Uso: `bg-primary/10`, `text-primary-light`, `border-line`. No
-  escribir hex ni colores de Tailwind sueltos en pantallas de portal.
-- **Ornamentos** (`ornaments.tsx`, reexportados por `components/ui`): `Frame`
-  (tarjeta con esquinas; `glow`, `interactive`), `Corners`, `Divider` (rombo a
-  la izquierda), `CenteredDivider` (rombo al centro), `Eyebrow` (etiqueta dorada
-  en mayúsculas) y `ProgressBar` (barra jade, 0–100).
+  `<html>` (para toasts y modales). Los componentes compartidos llevan `portal:`
+  solo donde el portal difiere del SaaS; las pantallas que solo existen en un
+  portal usan directamente los tokens.
+- **Paleta central** (`lib/theme/palette.ts`): cada institución elige solo **4
+  colores por modo (claro y oscuro)**: `primary` (Primario), `secondary` (Secundario) y
+  los dos fondos `base` (Fondo base) y `blocks` (Fondo bloques). El
+  texto no se elige: sobre cada fondo se calcula blanco o negro, el que dé más
+  contraste, por separado. Todo lo demás se deriva con `color-mix`. Los estados
+  (`success`, `danger`, `warning`) son fijos. `paletteVars()` devuelve las variables
+  `--c-*`; `applyPalette(html, palette)` las aplica. El modo claro/oscuro, el `instId` y los
+  colores guardados los gestiona `lib/theme/theme-store.ts` y `ThemeProvider`
+  (`useTheme()` da `mode`, `toggleMode`, `instId`); `ThemeToggle` es el interruptor.
+  En modo claro `PortalLayout` y `AuthLayout` no ponen la clase `dark` (sí `portal`). Los valores por defecto también están en `styles.css` (bloque `:root`) como
+  respaldo; `palette.test.ts` comprueba que coincidan.
+- **Fondos y texto**: `bg-base` + `text-on-base` (fondo de la página) y `bg-blocks` +
+  `text-on-blocks` (menú, tarjetas, paneles, campos). Cada uno fija los grises de lo que
+  contiene, así que `text-fg`, `text-fg-muted` y `text-fg-faint` (alias `text-muted`,
+  `text-faint`) toman el gris del fondo en el que estén. Los campos usan `bg-sunken`
+  con `text-on-blocks`.
+- **Tokens de color** (`@theme inline` de `styles.css`): `primary`, `primary-strong`,
+  `primary-soft`, `primary-text`, `on-primary`, `secondary`, `secondary-soft`, `secondary-text`,
+  `line`, `line-strong`, `sunken`, `fg*` y, por estado, `success`, `danger` y
+  `warning` con sufijos `-strong`, `-soft`, `-text` y `on-`. "Correcto" usa `success`,
+  nunca `primary`. Acepta opacidad (`bg-success/10`). No escribir hex ni colores de
+  Tailwind sueltos en pantallas de portal.
+- **Tipografía**: Archivo para títulos (`type-display`, ancho 125 %, para títulos de
+  página y cifras grandes; `type-heading`, ancho 110 %, para títulos dentro de tarjetas)
+  y Plus Jakarta Sans para el cuerpo (por defecto en el portal; `type-body` vuelve al
+  cuerpo dentro de un título). Es la tipografía de todo el sitio, también de la home y
+  las páginas públicas (Cinzel ya no se usa). Se cargan en `index.html`.
+- **Forma**: tarjetas, modales y campos con esquinas redondeadas y borde de 2 px;
+  botones y tarjetas pulsables con borde inferior grueso (`--edge`). Sin esquinas
+  doradas, sin grano ni viñeta. El dorado (acento) va en el rombo de `Eyebrow`, el
+  ítem activo del menú y los números romanos de los temas.
+- **Ornamentos** (`ornaments.tsx`, reexportados por `components/ui`): `Eyebrow`
+  (etiqueta en mayúsculas con rombo de acento) y `ProgressBar` (0–100; `size="sm"`,
+  `tone="success"`).
+- **Layout**: las cuadrículas del portal deben poder encogerse (en `styles.css`,
+  `.portal .grid > *` tiene `min-width: 0`) y las columnas de contenido responden al
+  ancho del contenedor (`@container` en `PortalLayout`; variantes `@xl:`, `@4xl:`…),
+  no al de la ventana, porque el menú lateral le quita espacio.
 
 ---
 
@@ -275,7 +354,7 @@ Es lo que se devuelve mientras `isLoading` en las páginas de los portales.
 
 | Componente | Descripción |
 | --- | --- |
-| `PortalLayout` | Menú lateral, usuario y botón "Salir" de los portales. En escritorio se puede reducir a solo iconos (la cabeza de la mascota lo vuelve a expandir; el estado se recuerda en `localStorage`); en móvil es una hamburguesa que abre el menú desde la izquierda. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. Las páginas internas pueden activar el modo práctica con los hooks de `portal-mode.ts` (ver abajo). |
+| `PortalLayout` | Estructura de los portales. Escritorio: cuadrícula `menú \| contenido` con menú lateral `sticky` (usuario y "Salir" abajo) que se puede reducir a solo iconos (la cabeza de la mascota lo vuelve a expandir; el estado se recuerda en `localStorage`). Móvil: cabecera con el logo y "Cerrar sesión", y barra inferior fija de iconos con las mismas secciones. Durante una práctica la barra se oculta y la cabecera ofrece salir. Expone `--menu-w` (ancho del menú) para elementos fijos como el pie de la práctica. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. Las páginas internas pueden activar el modo práctica con los hooks de `portal-mode.ts` (ver abajo). |
 | `AuthLayout` | Pantalla partida para el acceso (login, registro, invitación, nueva contraseña y renovación): fondo blanco con el logo y el formulario a la izquierda, y a la derecha una portada en índigo con la vista previa `public/image/preview.webp` (en móvil aparece debajo del formulario). Usa `wide` para formularios de dos columnas, `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro) y `cover` (`{ title, description }`) para el texto de la portada. |
 | `PublicPage` | Página pública con el logo arriba y el pie de página legal. |
 | `PublicFooter` | Pie de página con enlaces legales y datos de la empresa (ya incluido en `PublicPage`). |
@@ -371,6 +450,8 @@ profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
 | `studentAccess(perfil)` | `lib/student-access.ts` | Situación del plan del estudiante hoy en Lima: `active` (con `daysLeft`), `expired` (con `daysSinceExpiry`) o `not_started`. Úsala en lugar de comparar fechas a mano. También exporta `RENEWAL_NOTICE_DAYS` (3) y `EXPIRED_REVIEW_DAYS` (7). |
 | `formatDay(valor)` | `lib/dates.ts` | Fecha sin hora (`AAAA-MM-DD`, como las vigencias de acceso) en `DD/MM/AAAA`. Úsala en lugar de `formatDate` para esas fechas: `formatDate` las mostraría un día antes. |
 | `loadYouTubeApi()` y `YouTubePlayer` | `lib/youtube.ts` | Carga una sola vez la API del reproductor de YouTube (falla si el script está bloqueado) y tipa lo que usa la app: reproducir, silenciar, activar el sonido y su estado. La usa el video del home. |
+| `normalizeSearch(texto)` | `lib/text.ts` | Minúsculas, sin tildes y sin espacios sobrantes: para buscadores ("historia" encuentra "Historia del Perú"). |
+| `paletteVars(paleta)`, `applyPalette(elemento, paleta)`, `blackOrWhite(fondo)` | `lib/theme/palette.ts` | Paleta del portal: variables CSS a partir de 4 colores (marca, acento y fondos `page` y `nav`), con el texto en blanco o negro según el contraste. Ver "Estilo Chancón". |
 | `MathText` | `lib/math.tsx` | Muestra texto con fórmulas LaTeX (`$...$` y `$$...$$`) usando KaTeX. |
 | `roleLabel(rol)` | `features/users/api.ts` | Nombre en español del nivel de acceso: "Administrador", "Profesor" o "Estudiante". |
 
@@ -387,8 +468,9 @@ imagen PNG).
 Hooks para páginas dentro de `PortalLayout`; fuera de él no hacen nada.
 
 - `usePortalFocus()`: mientras la página está montada, el menú de escritorio
-  se reduce a iconos sin cambiar la preferencia guardada del usuario. Si lo
-  expande, vuelve a reducirse en la próxima práctica.
+  se reduce a iconos sin cambiar la preferencia guardada del usuario (si lo
+  expande, vuelve a reducirse en la próxima práctica); en móvil se oculta la barra
+  inferior y la cabecera muestra un botón para salir.
 - `useLeaveWarning(warning)`: mientras `warning` (`{ title, body,
   confirmLabel? }`) no sea `null`, los enlaces del menú y "Salir" abren un
   modal de advertencia (`useModal().warning`) antes de navegar o cerrar sesión.

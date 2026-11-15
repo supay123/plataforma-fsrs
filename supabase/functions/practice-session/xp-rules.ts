@@ -18,7 +18,7 @@ export async function xpRules(
     { p_student_id: student.id },
   );
   if (error || !data) {
-    throw new AppError(500, "xp_state_failed", error?.message);
+    throw new AppError(500, "xp_state_failed", error?.message ?? "Unable to load the xp state.");
   }
   return json(data);
 }

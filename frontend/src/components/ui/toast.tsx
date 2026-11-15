@@ -32,14 +32,14 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
     onFocus={() => setPaused(true)}
     onBlur={() => setPaused(false)}
     className={clsx(
-      "pointer-events-auto relative flex items-stretch gap-3 overflow-hidden rounded-xl border p-4 text-sm shadow-lg portal:rounded-none portal:shadow-[0_0_30px_-16px_black]",
-      isSuccess ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-950 dark:text-emerald-100 portal:border-success/50 portal:bg-surface-deep portal:text-success-light" : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-400/30 dark:bg-rose-950 dark:text-rose-100 portal:border-danger/50 portal:bg-surface-deep portal:text-fg",
+      "pointer-events-auto relative flex items-stretch gap-3 overflow-hidden rounded-xl border p-4 text-sm shadow-lg portal:rounded-xl portal:border-2 portal:bg-blocks portal:text-on-blocks portal:shadow-[0_4px_0_var(--c-line)]",
+      isSuccess ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-950 dark:text-emerald-100 portal:border-success" : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-400/30 dark:bg-rose-950 dark:text-rose-100 portal:border-danger",
     )}
   >
-    <Icon size={20} aria-hidden="true" className={clsx("mt-0.5 shrink-0", isSuccess ? "text-emerald-600 dark:text-emerald-400 portal:text-success-light" : "text-rose-600 dark:text-rose-400 portal:text-danger-light")} />
+    <Icon size={20} aria-hidden="true" className={clsx("mt-0.5 shrink-0", isSuccess ? "text-emerald-600 dark:text-emerald-400 portal:text-success-text" : "text-rose-600 dark:text-rose-400 portal:text-danger-text")} />
     <p className="flex-1 leading-5">{toast.message}</p>
     <div className={clsx("flex items-center border-l pl-3", isSuccess ? "border-emerald-200 dark:border-emerald-400/20" : "border-rose-200 dark:border-rose-400/20")}>
-      <button type="button" aria-label="Cerrar notificación" className="rounded-lg portal:rounded-none p-1 opacity-70 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" onClick={() => onDismiss(toast.id)}>
+      <button type="button" aria-label="Cerrar notificación" className="rounded-lg p-1 opacity-70 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" onClick={() => onDismiss(toast.id)}>
         <X size={16} />
       </button>
     </div>

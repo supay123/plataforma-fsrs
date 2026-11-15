@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Eyebrow } from "../../components/ui";
+import { PracticeMascot } from "../sessions/PracticeMascot";
 import type { XpAward } from "../../types/contracts";
 import { buildLevelSegments, streakLabel } from "./xp";
 import { prefersReducedMotion, useCountUp } from "./use-count-up";
@@ -43,21 +44,22 @@ export function XpResult({ award, onContinue }: { award: XpAward; onContinue: ()
   const levelsGained = award.level - award.level_before;
   const need = award.thresholds[award.thresholds.length - 1]!;
   return <Card glow className="mx-auto mt-4 max-w-xl text-center sm:mt-10 sm:p-8">
-    <Eyebrow>Práctica terminada</Eyebrow>
-    <p className="mt-4 font-display text-5xl tabular-nums text-primary-light" aria-label={`${award.xp_gained} xp ganados`}>+{total} xp</p>
+    <PracticeMascot event={done && levelsGained > 0 ? "levelUp" : "finish"} size={96} className="mb-4" />
+    <Eyebrow className="justify-center">Práctica terminada</Eyebrow>
+    <p className="type-display mt-4 text-5xl tabular-nums text-primary-text" aria-label={`${award.xp_gained} xp ganados`}>+{total} xp</p>
     {award.breakdown.streak_bonuses.length > 0 && <ul className="mt-3 flex flex-wrap justify-center gap-2 text-xs text-fg-muted">
-      {award.breakdown.streak_bonuses.map((bonus) => <li key={bonus.streak} className="border border-line-strong px-2 py-1">
-        {streakLabel(bonus.streak)}: <span className="font-semibold text-primary-light">+{bonus.xp} xp</span>
+      {award.breakdown.streak_bonuses.map((bonus) => <li key={bonus.streak} className="rounded-lg bg-sunken px-2 py-1">
+        {streakLabel(bonus.streak)}: <span className="font-semibold text-primary-text">+{bonus.xp} xp</span>
       </li>)}
     </ul>}
     <div className="mt-8 flex items-baseline justify-between text-left">
-      <p className="text-fg-muted">Nivel <span key={view.pulse} className="inline-block font-display text-3xl text-primary-pale motion-safe:animate-pop">{view.level}</span></p>
+      <p className="text-fg-muted">Nivel <span key={view.pulse} className="type-display inline-block text-3xl text-fg motion-safe:animate-pop">{view.level}</span></p>
       {done && <p className="text-sm tabular-nums text-fg-muted">{award.xp} / {need} xp</p>}
     </div>
-    <div role="progressbar" aria-label="Progreso de nivel" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(view.fill * 100)} className="mt-2 h-3 w-full bg-track">
-      <div className={`h-full bg-gradient-to-r from-primary to-primary-light ${view.animate ? "transition-[width] duration-[800ms] ease-out motion-reduce:transition-none" : ""}`} style={{ width: `${view.fill * 100}%` }} />
+    <div role="progressbar" aria-label="Progreso de nivel" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(view.fill * 100)} className="mt-2 h-3 w-full overflow-hidden rounded-full bg-sunken">
+      <div className={`h-full rounded-full bg-primary ${view.animate ? "transition-[width] duration-[800ms] ease-out motion-reduce:transition-none" : ""}`} style={{ width: `${view.fill * 100}%` }} />
     </div>
-    <p className="mt-3 min-h-5 text-sm text-primary-light" aria-live="polite">
+    <p className="mt-3 min-h-5 text-sm text-primary-text" aria-live="polite">
       {done && levelsGained > 0 && (levelsGained === 1 ? "¡Subiste de nivel!" : `¡Subiste ${levelsGained} niveles!`)}
     </p>
     <div className="mt-6 flex justify-center">

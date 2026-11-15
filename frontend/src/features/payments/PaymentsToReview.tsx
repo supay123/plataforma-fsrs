@@ -5,6 +5,7 @@ import { useToast } from "../../components/ui/use-toast";
 import { findPlan, formatSoles } from "../../config/business";
 import { normalizeError } from "../../lib/api/errors";
 import { formatDate } from "../../lib/dates";
+import { MascotAdvice } from "../mascot/MascotAdvice";
 import { listPaymentsToReview, resolvePayment } from "./api";
 
 const queryKey = ["payments-to-review"];
@@ -27,14 +28,19 @@ export function PaymentsToReview() {
   }, [payments.error, toast]);
 
   if (!payments.data?.length) return null;
+  const unusualAmounts = payments.data.filter((payment) => payment.amount !== findPlan(payment.plan).priceSoles).length;
   return <Card>
     <h2 className="font-bold">Pagos por revisar</h2>
-    <p className="mt-1 text-sm text-fg-muted">Estos pagos se confirmaron, pero ya no existía el registro ni la cuenta. Activa la cuenta a mano o devuelve el dinero desde el panel de Mercado Pago.</p>
-    <ul className="mt-4 grid gap-3">{payments.data.map((payment) => <li key={payment.id} className="border border-line p-3 text-sm">
+    <MascotAdvice className="mt-3" size={48} event="wrong" tone="warning">
+      {payments.data.length === 1 ? "Hay 1 pago" : `Hay ${payments.data.length} pagos`} que requiere{payments.data.length === 1 ? "" : "n"} tu atención.
+      {unusualAmounts > 0 && ` ${unusualAmounts === 1 ? "Uno tiene" : `${unusualAmounts} tienen`} un monto distinto al del plan: revísalo${unusualAmounts === 1 ? "" : "s"} primero.`}
+    </MascotAdvice>
+    <p className="mt-3 text-sm text-fg-muted">Estos pagos se confirmaron, pero ya no existía el registro ni la cuenta. Activa la cuenta a mano o devuelve el dinero desde el panel de Mercado Pago.</p>
+    <ul className="mt-4 grid gap-3">{payments.data.map((payment) => <li key={payment.id} className="rounded-xl border-2 border-line p-3 text-sm">
       <p className="flex flex-wrap items-center justify-between gap-2"><strong>{payment.email ?? "Sin correo"}</strong>{!payment.livemode && <Badge>Prueba</Badge>}</p>
       <p className="text-fg-muted">{findPlan(payment.plan).name} · {formatSoles(payment.amount)} · {formatDate(payment.paid_at)}</p>
       <p className="break-all text-xs text-fg-muted">{payment.provider === "kuti" ? "Cobro en Kuti" : "Pago en Mercado Pago"}: {payment.provider_payment_id ?? "sin número"}</p>
-      <Button variant="secondary" className="mt-2" disabled={resolve.isPending} onClick={() => resolve.mutate(payment.id, { onError: async (reason) => toast.error((await normalizeError(reason)).message) })}>Marcar como resuelto</Button>
+      <Button size="sm" variant="secondary" className="mt-2" disabled={resolve.isPending} onClick={() => resolve.mutate(payment.id, { onError: async (reason) => toast.error((await normalizeError(reason)).message) })}>Marcar como resuelto</Button>
     </li>)}</ul>
   </Card>;
 }

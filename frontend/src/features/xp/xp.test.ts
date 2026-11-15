@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { XpRules } from "../../types/contracts";
-import { answerXp, buildLevelSegments, streakLabel, trailingStreak } from "./xp";
+import { answerXp, buildLevelSegments, streakLabel, trailingStreak, xpForLevel } from "./xp";
 
 const rules: XpRules = { xp_per_correct: 75, streak_3_bonus: 15, streak_7_bonus: 42, streak_20_bonus: 137, level: 0, xp: 0, xp_to_next: 100 };
 
@@ -34,5 +34,11 @@ describe("buildLevelSegments", () => {
       { level: 0, from: 0.9, to: 1, levelUp: true },
       { level: 1, from: 0, to: 65 / 120, levelUp: false },
     ]);
+  });
+});
+
+describe("xpForLevel", () => {
+  it("coincide con la fórmula de la BD con los valores por defecto", () => {
+    expect([1, 2, 3].map((level) => xpForLevel(level, 100, 0.2))).toEqual([100, 120, 145]);
   });
 });

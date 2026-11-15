@@ -2,6 +2,7 @@ export const TABLES = {
   assessmentSessionQuestions: "assessment_session_questions",
   assessmentSessions: "assessment_sessions",
   auditLogs: "audit_logs",
+  collegeThemes: "college_themes",
   collegeXpSettings: "college_xp_settings",
   colleges: "colleges",
   courseEnrollments: "course_enrollments",
