@@ -60,6 +60,14 @@ const translatedMessages: Record<string, string> = {
   complaint_not_sent: "No pudimos enviar tu hoja de reclamación. Inténtalo de nuevo en unos minutos.",
   complaint_number_failed: "No pudimos registrar tu hoja de reclamación. Inténtalo de nuevo en unos minutos.",
   attachments_too_large: "Los archivos adjuntos superan el tamaño permitido. Quita alguno e inténtalo de nuevo.",
+  lead_ip_limit: "Se hicieron demasiados registros desde esta conexión. Inténtalo de nuevo más tarde.",
+  lead_email_limit: "Este correo ya se registró varias veces hoy. Inténtalo de nuevo mañana.",
+  lead_registration_failed: "No pudimos guardar tus datos. Inténtalo de nuevo.",
+  consent_required: "Debes aceptar el uso de tus datos para continuar.",
+  insufficient_active_questions: "Este tema aún no tiene suficientes preguntas. Elige otro.",
+  free_mode_unavailable: "La prueba gratuita no está disponible por ahora. Inténtalo más tarde.",
+  topic_not_found: "No encontramos ese tema. Elige otro.",
+  demo_college_protected: "Esta institución alimenta el modo gratuito del sitio y no se puede eliminar ni cambiar de código.",
   invalid_evidence: "Solo se aceptan imágenes o archivos PDF como evidencia.",
 };
 
@@ -90,6 +98,7 @@ const databaseMessages: Array<{ match: string; message: string }> = [
   { match: "courses_teacher_name_unique_active_ci", message: "Este profesor ya tiene un curso con ese nombre. Usa otro nombre o cambia el nombre del curso existente." },
   { match: "at most 8 non-archived courses", message: "Un profesor puede tener como máximo 8 cursos. Archiva alguno o elige otro profesor." },
   { match: "teacher and course must belong to the same college", message: "El profesor y el curso deben ser del mismo colegio." },
+  { match: "demo_college_protected", message: "Esta institución alimenta el modo gratuito del sitio y no se puede eliminar ni cambiar de código." },
   { match: "at most 25 non-archived topics", message: "Un curso puede tener como máximo 25 temas." },
   { match: "at most 50 non-archived questions", message: "Un tema puede tener como máximo 50 preguntas." },
 ];

@@ -128,7 +128,8 @@ function unavailable(): AppError {
   return new AppError(503, "email_unavailable", "Email could not be sent.");
 }
 
-async function accessToken(): Promise<string> {
+/** Token de acceso de la cuenta de Google de Chancón; lo usan Gmail y Google Sheets. */
+export async function googleAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
     return cachedToken.value;
   }
@@ -178,7 +179,7 @@ async function accessToken(): Promise<string> {
 }
 
 export async function sendWithGmail(message: MimeMessage): Promise<void> {
-  const token = await accessToken();
+  const token = await googleAccessToken();
   const mime = buildMimeMessage(message, crypto.randomUUID());
   const upload = Boolean(message.attachments?.length);
   let response: Response;

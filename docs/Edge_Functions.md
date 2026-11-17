@@ -6,7 +6,7 @@ error handling, CSV, XLSX, session serialization, and FSRS scheduling live in
 
 Endpoints accept `POST` unless noted (`GET public/colleges`, `GET public/teachers`). Except for the
 public ones (`login-with-code`, `recover-password`, `complaints`,
-`public`, and `registration`), callers must send a valid user access token in
+`public`, `free-mode`, and `registration`), callers must send a valid user access token in
 `Authorization: Bearer <token>`. Public endpoints require the project's
 publishable key. A function can expose several endpoints as sub-paths
 (`/functions/v1/<function>/<path>`), dispatched by `_shared/router.ts`. Service-role credentials are never
@@ -57,6 +57,7 @@ pnpm exec supabase gen types --local --schema public \
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
 | `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to; `GET /public/theme` returns the colors of an institution (`?inst=<college code>`, `theme: null` when it has none); `GET /public/payment-config` returns the Mercado Pago `public_key` the browser needs to turn the Yape phone and approval code into a token (`503 payments_unavailable` while `MERCADOPAGO_PUBLIC_KEY` is not set). |
+| `free-mode` | Public | Free mode of the home page. Questions come from the protected demo college (code `CHANCON-DEMO`), never from real colleges. `GET /free-mode/catalog` lists groups → courses → topics for the three cascading selectors (only topics with at least 10 active questions). `GET /free-mode/questions?topic_id=` returns 10 random active questions with `correct_option` and `explanation`, with no session, FSRS or xp. `POST /free-mode/leads` stores the person who tried it in `leads` (always) and appends a row to a Google Sheet (best effort). Duplicates are not checked. |
 | `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` charges the chosen plan with Yape through Mercado Pago; `GET /registration/payment` reports its status and activates the account once Mercado Pago approves it. No account exists until the first payment is confirmed. |
 | `mercadopago` | Mercado Pago signature | `POST /mercadopago/webhook` receives Mercado Pago **Order** notifications (`type: order`), verifies `x-signature` (HMAC-SHA256 of `id:<data.id in lowercase>;request-id:<x-request-id>;ts:<ts>;`) with the secret stored in Vault as `mercadopago_webhook_secret`, fetches the order (`GET /v1/orders/{id}`) and applies it. Called by Mercado Pago, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
@@ -114,6 +115,31 @@ pnpm exec supabase gen types --local --schema public \
   each one `null` or `{ primary, secondary, base, blocks }` (`#rrggbb`). Emailed
   links (invitation, password reset) carry `&instId=<college code>` so the browser
   loads these colors before sign-in.
+- `GET free-mode/catalog`: no body. Responds with `groups`: `[{ id, name,
+  courses: [{ id, name, topics: [{ id, name }] }] }]` (`id` of a group is the
+  demo teacher's). `503 free_mode_unavailable` if the demo college is missing.
+- `GET free-mode/questions?topic_id=<uuid>`: responds with `topic` (`id`,
+  `name`) and `questions`: 10 random active questions (`id`, `statement`,
+  `option_a`..`option_d`, `correct_option`, `explanation`). `404 topic_not_found`
+  if the topic is not an active topic of the demo college, `409
+  insufficient_active_questions` if it has fewer than 10.
+- `POST free-mode/leads`: `given_names`, `family_names`, `email`, `phone`
+  (Peruvian mobile, same rules as the sign-up; stored without `+51`),
+  `accepted_data_policy: true` (consent, Ley N.° 29733; `400 consent_required`)
+  and `website` (honeypot: a hidden field that must be empty; if filled the
+  endpoint answers `201 { ok: true }` without saving anything). Responds `201
+  { ok: true }`. Limits through `edge_register_lead`: 5 per IP hash per hour
+  (`429 lead_ip_limit`) and 3 per email per day (`429 lead_email_limit`).
+  The lead is always saved in `public.leads`; afterwards the row `[date (Lima),
+  names, surnames, email, +51 WhatsApp]` is appended to the first sheet of the
+  Google Sheet whose ID is the Vault secret `leads_sheet_id`
+  (`values:append`, `RAW`), authenticating as the same Google account as Gmail
+  (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`; the refresh
+  token must include the scope `https://www.googleapis.com/auth/spreadsheets`).
+  The sheet step is tolerant: without the secret or if Google fails, the
+  response is still OK and `leads.sheet_synced_at` stays `null`.
+- `POST admin-delete-college`: `409 demo_college_protected` for the demo
+  college, checked before any user is deleted.
 - `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`,
   `college_id`, `college_name`): active teachers of an active college with at
   least one non-archived course. The sign-up form, the admin invitation form
@@ -257,7 +283,8 @@ pnpm exec supabase gen types --local --schema public \
 
   Secrets: `EMAIL_FROM` and `EMAIL_DELIVERY`:
   `gmail` (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`;
-  scope `gmail.send` only), `resend` (`RESEND_API_KEY`), or, locally only,
+  scope `gmail.send`; to also fill the free-mode leads sheet the token needs
+  `https://www.googleapis.com/auth/spreadsheets` too), `resend` (`RESEND_API_KEY`), or, locally only,
   `log`. See `supabase/functions/.env.example`.
 
 The XLSX importer reads the first worksheet, has a 5 MB limit, and expects:

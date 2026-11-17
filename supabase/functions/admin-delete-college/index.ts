@@ -3,6 +3,7 @@ import { withAppSupabase } from "../_shared/server.ts";
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
+import { isDemoCollegeCode } from "../_shared/free-mode.ts";
 import { uuid } from "../_shared/validation.ts";
 import type { DeleteCollegeBody } from "./interfaces.ts";
 
@@ -32,6 +33,16 @@ export default {
         }
         if (!college) {
           throw new AppError(404, "college_not_found", "College not found.");
+        }
+
+        // Antes de borrar usuarios: la base también lo impide, pero para entonces
+        // ya se habrían eliminado sus cuentas.
+        if (isDemoCollegeCode(college.code)) {
+          throw new AppError(
+            409,
+            "demo_college_protected",
+            "The demo college feeds the free mode and cannot be deleted.",
+          );
         }
 
         const userIds: string[] = [];

@@ -25,6 +25,7 @@ function_dirs=(
   invitations
   student-invitation
   mercadopago
+  free-mode
 )
 
 for function_dir in "${function_dirs[@]}"; do

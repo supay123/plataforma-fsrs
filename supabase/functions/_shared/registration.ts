@@ -98,6 +98,11 @@ export function identityDocumentNumber(
   return normalized;
 }
 
+/** Nombre o apellido de una persona, con las mismas reglas del registro. */
+export function parsePersonName(value: unknown, field: string): string {
+  return name(value, field);
+}
+
 export function normalizePhone(value: unknown): string {
   // Se acepta con o sin el código de país (+51) y se guarda sin él.
   const normalized = text(value, "phone", 30).replace(/[\s()-]/g, "")
