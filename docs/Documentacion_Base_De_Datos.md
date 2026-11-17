@@ -1199,6 +1199,19 @@ claves foráneas son `ON DELETE CASCADE`. Misma RLS que `student_medals`.
 `jsonb` con el resultado de las medallas de la sesión (null hasta calcularse). Hace
 idempotente `POST /medals/calculate`.
 
+### public.student_activity_days
+
+Racha de días activos. Un registro por estudiante y día calendario de `America/Lima`
+(clave `(student_id, activity_date)`, `student_id` → `profiles` con `ON DELETE CASCADE`).
+Un día cuenta como activo cuando el estudiante completa al menos una sesión. La racha no se
+guarda: se calcula al consultar (`GET /achievements/streak`). RLS: el estudiante lee la suya,
+el admin todas y el profesor las de sus estudiantes; solo se escribe con `service_role`.
+
+`public.record_student_activity(p_student_id uuid, p_activity_at timestamptz default now())`
+(solo `service_role`) registra el día de Lima de `p_activity_at`; es idempotente y devuelve el
+día. La llama `practice-session/submit` al cerrar la sesión y es la que Modo Ruta debe llamar
+al completar una lección.
+
 ### Funciones de medallas
 
 - `public.medal_ends_are_valid(p_ends, p_count, p_max)` y `public.medal_for_stars(p_stars, p_ends)`: auxiliares inmutables.

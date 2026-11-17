@@ -26,6 +26,7 @@ function_dirs=(
   student-invitation
   mercadopago
   medals
+  achievements
 )
 
 for function_dir in "${function_dirs[@]}"; do

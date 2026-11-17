@@ -54,6 +54,7 @@ pnpm exec supabase gen types --local --schema public \
 | `questions` | Admin, teacher | Lists a topic's current questions (`GET /questions?topic_id=...`), archives one (`DELETE /questions?id=...`) or all of them (`DELETE /questions/topic?topic_id=...`). Archived questions no longer appear in new sessions but their historical results are kept. A teacher is restricted to their own courses. |
 | `practice-session` | Student | `POST /start` atomically resumes the student's in-progress session for a topic or creates one with up to 20 due-first/new questions, and returns them with an AES-GCM encrypted answer key so the browser corrects instantly. `POST /submit` saves every pending answer at once, applies FSRS (`Again`/`Good`) with the answer key from the database, and closes the session, awarding the xp earned. `GET /xp-rules` returns the college xp amounts and the student level. Repeated submission is safe. |
 | `medals` | Admin, teacher and student (see routes) | Medals and stars. `GET /settings` returns the college medal configuration (admin passes `?college_id=`; teacher and student get their own college; defaults when there is no row). `PUT /settings` (admin) updates or creates it. `GET /me` returns the student current medal and stars. `GET /topic-stars` returns the student best stars per topic. `POST /calculate` applies the stars of a completed session (grade computed on the server from the stored session; idempotent). Settings and student medal rows are created by database triggers, so there are no create endpoints. |
+| `achievements` | Student | "Mis logros". `GET /streak` returns the day streak (days active in a row up to today; still alive if only today is missing), best streak and recent active days. `GET /last-grades` returns the grade of the last completed normal-mode session. Medal and level reuse `GET /medals/me` and `GET /practice-session/xp-rules`. |
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
@@ -97,6 +98,15 @@ pnpm exec supabase gen types --local --schema public \
   question exactly once: `session_question_id`, `selected_option` `A`–`D`,
   `response_time_ms`; at most 20). Responds with the session summary; `409
   incomplete_submission` if an answer is missing or extra.
+- `achievements` (student, JSON):
+  - `GET /achievements/streak` responds
+    `{ current_streak, best_streak, active_today, last_active_date|null, today, recent_active_days: string[] }`.
+    Days are `YYYY-MM-DD` in `America/Lima`; `recent_active_days` covers the last 30 days. A day is
+    active when the student completes a session (recorded by `practice-session/submit` through
+    `record_student_activity`, idempotent; a failure there does not break the submission).
+  - `GET /achievements/last-grades` responds
+    `{ last_session: { session_id, completed_at, topic_name|null, grade } | null, last_route_lesson: null }`.
+    `grade` is 0-20 (same formula as medals). `last_route_lesson` is reserved for Modo Ruta.
 - `medals` (all responses are JSON):
   - `GET /medals/settings[?college_id=]` (admin, teacher, student) responds
     `{ college_id, is_default, enabled, star_range_ends: number[12], grade_range_ends: number[6], medals: [{ code, name, min_stars, max_stars|null }], grade_ranges: [{ stars, min_grade, max_grade }] }`.
