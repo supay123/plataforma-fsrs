@@ -22,7 +22,7 @@ export function LeadModal({ onCancel, onRegistered }: { onCancel: () => void; on
   });
 
   return <ModalForm title="Identifícate para ver tu resultado completo" confirmLabel="Continuar" pendingLabel="Guardando…" pending={save.isPending} onCancel={onCancel} onSubmit={() => void handleSubmit((values) => save.mutate(values))()}>
-    <p className="text-sm text-slate-600 dark:text-slate-300">Déjanos tus datos y te mostramos los planes. Solo los usaremos para contactarte.</p>
+    <p className="text-sm text-slate-600 dark:text-slate-300">Déjanos tus datos y te mostramos los planes. Solo los usaremos para contactarte sobre nuestros planes.</p>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Nombres" error={errors.given_names?.message}><Input autoComplete="given-name" {...register("given_names")} /></Field>
       <Field label="Apellidos" error={errors.family_names?.message}><Input autoComplete="family-name" {...register("family_names")} /></Field>
@@ -36,7 +36,7 @@ export function LeadModal({ onCancel, onRegistered }: { onCancel: () => void; on
     <div>
       <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
         <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-emerald-500" {...register("accepted_data_policy")} />
-        <span>Acepto que Chancón use mis datos personales para contactarme, según la <Link to="/privacidad" target="_blank" className="font-semibold underline underline-offset-2">Política de privacidad</Link> (Ley N.° 29733).</span>
+        <span>Autorizo a Chancón a tratar mis nombres, apellidos, correo y WhatsApp para contactarme por correo electrónico o WhatsApp y ofrecerme sus planes. Puedo retirar este consentimiento cuando quiera. Más información en la <Link to="/privacidad" target="_blank" className="font-semibold underline underline-offset-2">Política de privacidad</Link> (Ley N.° 29733).</span>
       </label>
       {errors.accepted_data_policy && <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">{errors.accepted_data_policy.message}</p>}
     </div>

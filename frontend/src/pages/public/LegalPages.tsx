@@ -4,7 +4,7 @@ import { PublicPage } from "../../components/layout/PublicLayout";
 import { BUSINESS, PLANS, PRICE_CHANGE_NOTICE_DAYS, SEMESTER_PLAN, planPriceLabel } from "../../config/business";
 import { EXPIRED_REVIEW_DAYS, RENEWAL_NOTICE_DAYS } from "../../lib/student-access";
 
-const UPDATED_AT = "26 de octubre de 2026";
+const UPDATED_AT = "17 de noviembre de 2026";
 
 function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   return <PublicPage>
@@ -70,12 +70,13 @@ export function TermsPage() {
 
 export function PrivacyPage() {
   return <LegalPage title="Política de privacidad">
-    <p>Esta política explica cómo {owner} (en adelante, «{BUSINESS.brand}») trata tus datos personales, conforme a la Ley N.° 29733, Ley de Protección de Datos Personales, y su reglamento.</p>
+    <p>Esta política explica cómo {owner} (en adelante, «{BUSINESS.brand}») trata tus datos personales, conforme a la Ley N.° 29733, Ley de Protección de Datos Personales, y su reglamento (Decreto Supremo N.° 016-2024-JUS).</p>
     <h2>1. Datos que tratamos</h2>
     <ul>
       <li><strong>Identificación y contacto:</strong> nombres, apellidos, correo electrónico, teléfono, tipo y número de documento de identidad, colegio y código de usuario.</li>
       <li><strong>Uso académico:</strong> cursos asignados, respuestas, resultados, tiempos de respuesta y progreso.</li>
       <li><strong>Pagos:</strong> los procesa Mercado Pago con Yape. Tu celular y tu código de aprobación se envían directamente a Mercado Pago; no los guardamos. Solo recibimos la información necesaria para identificar el pago, como el plan, la fecha, el monto, el resultado y el número de operación. Nunca recibimos las claves de tus aplicaciones de pago.</li>
+      <li><strong>Prueba gratuita:</strong> si pruebas el modo gratuito del sitio y decides dejarnos tus datos, tratamos tus nombres, apellidos, correo electrónico y número de WhatsApp. Solo los pedimos si lo decides tú y marcas de forma expresa la casilla de consentimiento; no es necesario para usar la prueba.</li>
       <li><strong>Reclamos:</strong> los datos que registres en el Libro de reclamaciones, que se envían a nuestro correo electrónico.</li>
     </ul>
     <h2>2. Para qué los usamos</h2>
@@ -85,12 +86,14 @@ export function PrivacyPage() {
       <li>Procesar los pagos de tu plan y avisarte cuando esté por vencer.</li>
       <li>Atender consultas, reclamos y quejas.</li>
       <li>Mantener la seguridad de la plataforma y mejorarla.</li>
+      <li>Si te registraste en la prueba gratuita y diste tu consentimiento, contactarte por correo electrónico o WhatsApp para ofrecerte los planes de {BUSINESS.brand}. Puedes retirar ese consentimiento en cualquier momento.</li>
     </ul>
     <p>No vendemos ni alquilamos tus datos personales.</p>
     <h2>3. Con quién los compartimos</h2>
     <ul>
       <li>Los profesores y la institución a la que perteneces pueden ver tus resultados y progreso en los cursos que te asignan.</li>
       <li>Proveedores que nos ayudan a operar el servicio: Mercado Pago (pagos), Supabase (base de datos y autenticación), Netlify (alojamiento web) y Google (envío de correos mediante Gmail, incluidas las hojas del Libro de reclamaciones). Algunos de ellos almacenan la información en servidores fuera del Perú, con medidas de seguridad adecuadas.</li>
+      <li>Los datos de la prueba gratuita (nombres, apellidos, correo y WhatsApp) se guardan en una hoja de cálculo de Google (Google Sheets) de la cuenta de {BUSINESS.brand}; no los guardamos en la base de datos de la plataforma ni los compartimos con otros fines.</li>
       <li>Autoridades competentes, cuando la ley lo exija.</li>
     </ul>
     <h2>4. Menores de edad</h2>
@@ -100,6 +103,7 @@ export function PrivacyPage() {
       <li>Si te registras y no completas el pago, eliminamos tus datos a las 24 horas. Si generaste un cobro, esperamos además 24 horas desde ese cobro, por si el pago se confirma tarde.</li>
       <li>Mientras tu plan esté vigente, conservamos tus datos y tu progreso.</li>
       <li>Si tu plan lleva más de {EXPIRED_REVIEW_DAYS} días vencido sin renovarse, podemos eliminar tu cuenta, tu progreso y tus datos personales. Si eso ocurre y vuelves, empiezas con una cuenta nueva.</li>
+      <li>Los datos de la prueba gratuita los conservamos hasta que solicites su eliminación o dejemos de usarlos para contactarte.</li>
     </ul>
     <p>Además, conservamos la información necesaria para cumplir obligaciones legales. Los reclamos se conservan por al menos dos años, como exige la normativa de protección al consumidor.</p>
     <h2>6. Seguridad</h2>
@@ -107,7 +111,7 @@ export function PrivacyPage() {
     <h2>7. Almacenamiento en tu navegador</h2>
     <p>Usamos el almacenamiento local de tu navegador solo para mantener tu sesión iniciada y guardar avances de práctica. No usamos cookies publicitarias.</p>
     <h2>8. Tus derechos</h2>
-    <p>Puedes ejercer tus derechos de acceso, rectificación, cancelación y oposición comunicándote con nosotros <Contact />. Si consideras que no fueron atendidos, puedes acudir a la Autoridad Nacional de Protección de Datos Personales.</p>
+    <p>Puedes ejercer tus derechos de acceso, rectificación, cancelación y oposición comunicándote con nosotros <Contact />. También puedes retirar tu consentimiento para que te contactemos con fines comerciales, o pedir que eliminemos tus datos de la prueba gratuita, por esos mismos medios. Si consideras que no fueron atendidos, puedes acudir a la Autoridad Nacional de Protección de Datos Personales.</p>
     <h2>9. Cambios en esta política</h2>
     <p>Publicaremos cualquier cambio en esta página con su fecha de actualización.</p>
   </LegalPage>;
