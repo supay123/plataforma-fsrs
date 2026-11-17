@@ -8,7 +8,7 @@ import { listStudentCourses } from "../../features/courses/api";
 import { dashboardAdvice } from "../../features/mascot/dashboard-advice";
 import { MascotAdvice } from "../../features/mascot/MascotAdvice";
 import { countDueReviews, courseProgress } from "../../features/progress/api";
-import { averageCourseScore, formatPercentage } from "../../features/progress/metrics";
+import { averageCourseScore, formatPercentage, percentageToGrade } from "../../features/progress/metrics";
 import { normalizeSearch } from "../../lib/text";
 
 interface CourseRow { id: string; name: string; description: string | null; percentage: number | null; sessions: number }
@@ -33,7 +33,7 @@ function GradeCard({ totalScore, rows }: { totalScore: number | null; rows: Cour
       <strong className="type-display block text-5xl leading-none tabular-nums md:text-6xl">{totalScore === null ? "—" : `${formatPercentage(totalScore)}%`}</strong>
       {totalScore !== null && <p className="text-right">
         <span className="text-xs text-fg-muted">Nota</span><br />
-        <span className="type-heading text-3xl tabular-nums">{Number((totalScore / 5).toFixed(1))}<span className="type-body text-base text-fg-faint"> / 20</span></span>
+        <span className="type-heading text-3xl tabular-nums">{percentageToGrade(totalScore)}<span className="type-body text-base text-fg-faint"> / 20</span></span>
       </p>}
     </div>
     {totalScore !== null && <div className="mt-5"><ProgressBar value={totalScore} label="Acierto total" /></div>}
@@ -41,7 +41,7 @@ function GradeCard({ totalScore, rows }: { totalScore: number | null; rows: Cour
     {best && weakest && best !== weakest && <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 text-sm">
       {([["Más fuerte", best], ["Por reforzar", weakest]] as const).map(([label, row]) => <div key={label} className="min-w-0">
         <dt className="text-xs text-fg-faint">{label}</dt>
-        <dd className="flex justify-between gap-2 text-fg-muted"><span className="truncate">{row.name}</span><span className="tabular-nums text-fg">{Number((row.percentage! / 5).toFixed(1))}</span></dd>
+        <dd className="flex justify-between gap-2 text-fg-muted"><span className="truncate">{row.name}</span><span className="tabular-nums text-fg">{percentageToGrade(row.percentage!)}</span></dd>
       </div>)}
     </dl>}
   </Card>;

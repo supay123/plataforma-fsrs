@@ -28,6 +28,7 @@ function_dirs=(
   mercadopago
   medals
   free-mode
+  achievements
 )
 
 for function_dir in "${function_dirs[@]}"; do

@@ -244,6 +244,19 @@ export async function submitPractice(
   if (awardError || !award) {
     throw new AppError(500, "xp_award_failed", awardError?.message ?? "Unable to award xp.");
   }
+  // Contar el día como activo es secundario: si falla, el cierre de la sesión
+  // no debe romperse.
+  const { error: activityError } = await context.supabaseAdmin.rpc(
+    RPCS.recordStudentActivity,
+    { p_student_id: student.id },
+  );
+  if (activityError) {
+    console.error(JSON.stringify({
+      event: "student_activity.failed",
+      request_id: requestId,
+      message: activityError.message,
+    }));
+  }
   return json({
     session: result,
     xp: { ...(award as Record<string, Json>), breakdown: xp },

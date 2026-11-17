@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, PanelLeftClose, Route as RouteIcon, Settings, Users, X } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, PanelLeftClose, Route as RouteIcon, Settings, Trophy, Users, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -18,7 +18,7 @@ type NavItem = { to: string; label: string; icon: typeof Users };
 const links: Record<AppRole, NavItem[]> = {
   admin: [{ to: "/admin/usuarios", label: "Usuarios", icon: Users }, { to: "/admin/cursos", label: "Cursos", icon: BookOpen }, { to: "/admin/colegios", label: "Colegios", icon: Building2 }, { to: "/admin/asignaciones", label: "Asignaciones", icon: ListChecks }, { to: "/admin/ruta", label: "Modo ruta", icon: RouteIcon }],
   teacher: [{ to: "/profesor/cursos", label: "Cursos", icon: BookOpen }, { to: "/profesor/estudiantes", label: "Estudiantes", icon: Users }, { to: "/profesor/ruta", label: "Modo ruta", icon: RouteIcon }],
-  student: [{ to: "/estudiante", label: "Mi aprendizaje", icon: GraduationCap }, { to: "/estudiante/ruta", label: "Modo ruta", icon: RouteIcon }],
+  student: [{ to: "/estudiante", label: "Mi aprendizaje", icon: GraduationCap }, { to: "/estudiante/logros", label: "Mis logros", icon: Trophy }, { to: "/estudiante/ruta", label: "Modo ruta", icon: RouteIcon }],
 };
 const settingsPath: Record<AppRole, string> = { admin: "/admin/configuracion", teacher: "/profesor/configuracion", student: "/estudiante/configuracion" };
 const homePath: Record<AppRole, string> = { admin: "/admin/usuarios", teacher: "/profesor/cursos", student: "/estudiante" };

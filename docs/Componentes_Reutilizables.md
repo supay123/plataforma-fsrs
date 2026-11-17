@@ -489,6 +489,16 @@ profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
   del menú ya no se marca cuando otra más específica de la misma raíz (p. ej.
   `/estudiante/ruta` dentro de `/estudiante`) coincide.
 
+## Mis logros (`features/achievements/` y `pages/student/AchievementsPage.tsx`)
+
+- `StudentAchievementsPage`: ruta `/estudiante/logros` (ítem "Mis logros" del menú). Cuatro tarjetas
+  independientes, cada una con su `Skeleton` y su toast de error: Nota (promedio general como en
+  "Mi aprendizaje", más la última sesión), Medalla (oculta si el colegio las desactivó; explica rangos con
+  `MedalRulesBody`), Racha y Nivel (`practice-session/xp-rules`).
+- `api.ts`: `getStreak`, `getLastGrades` (Edge Function `achievements`).
+- `achievements.ts`: `xpMissingForNextLevel`, `levelProgress`, `daysLabel`.
+- `percentageToGrade` (`features/progress/metrics.ts`): porcentaje de acierto a nota sobre 20.
+
 ## Utilidades (`lib/`)
 
 | Utilidad | Archivo | Descripción |
