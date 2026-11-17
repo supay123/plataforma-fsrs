@@ -68,6 +68,9 @@ const translatedMessages: Record<string, string> = {
   free_mode_unavailable: "La prueba gratuita no está disponible por ahora. Inténtalo más tarde.",
   topic_not_found: "No encontramos ese tema. Elige otro.",
   demo_college_protected: "Esta institución alimenta el modo gratuito del sitio y no se puede eliminar ni cambiar de código.",
+  ranking_disabled: "El ranking no está activado en tu institución.",
+  ranking_category_disabled: "Esta categoría del ranking no está disponible.",
+  ranking_cache_not_found: "El ranking venció. Actualízalo para verlo de nuevo.",
   invalid_evidence: "Solo se aceptan imágenes o archivos PDF como evidencia.",
 };
 

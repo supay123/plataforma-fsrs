@@ -56,6 +56,7 @@ pnpm exec supabase gen types --local --schema public \
 | `medals` | Admin, teacher and student (see routes) | Medals and stars. `GET /settings` returns the college medal configuration (admin passes `?college_id=`; teacher and student get their own college; defaults when there is no row). `PUT /settings` (admin) updates or creates it. `GET /me` returns the student current medal and stars. `GET /topic-stars` returns the student best stars per topic. `POST /calculate` applies the stars of a completed session (grade computed on the server from the stored session; idempotent). Settings and student medal rows are created by database triggers, so there are no create endpoints. |
 | `route-mode` | Admin, teacher, student | Route mode (topics with lessons unlocked in order with >= 80% score). Management by admin or the owning teacher: `POST /route-mode/topics` (`name`, `description?`, `teacher_id` required only for admin), `PUT /route-mode/topics?id=` , `DELETE /route-mode/topics?id=`, `POST /route-mode/lessons` (step 1: `topic_id`, `title`, `content_text`), `PUT /route-mode/lessons?id=`, `DELETE /route-mode/lessons?id=`, `PUT /route-mode/lessons/questions?id=` (step 2: exactly 5 `questions` with `statement`, `option_a`-`option_d`, `correct_option`, optional `explanation`; upserts by position and marks the lesson ready). Reads, each role sees its own: `GET /route-mode/topics[?teacher_id=]` and `GET /route-mode/lessons?topic_id=` (students get only ready lessons with `status` `locked`/`available`/`completed` and `best_percent`) and `GET /route-mode/lessons/content?id=` (text and questions; students get it only if the lesson is unlocked and never receive `correct_option` or `explanation`; `403 lesson_locked` otherwise). Student: `GET /route-mode/progress` (topics, lessons and unlocks) and `POST /route-mode/attempts` (`lesson_id`, `answers` of `question_id` + `selected_option`): the backend grades with the database key, stores the attempt, awards xp only for questions answered correctly for the first time (`route_question_xp_awards`, `xp_per_correct` of the college, no streak bonus, no medal stars) and answers with `correct_count`, `score_percent`, `passed`, `xp`, `next_lesson_id` and the `review`; `403 lesson_locked` if the previous lesson is not passed. Route questions are separate from `questions` and never feed FSRS. |
 | `achievements` | Student | "Mis logros". `GET /streak` returns the day streak (days active in a row up to today; still alive if only today is missing), best streak and recent active days. `GET /last-grades` returns the grade of the last completed normal-mode session. Medal and level reuse `GET /medals/me` and `GET /practice-session/xp-rules`. |
+| `ranking` | Admin, teacher and student (see routes) | Ranking by college and group (teacher). `GET /settings` returns the college ranking configuration (admin passes `?college_id=`; teacher and student get their own; defaults to disabled when there is no row). `PUT /settings` (admin) updates or creates it. `PUT /cache` (student, teacher) creates or replaces the caller cache for one ranking type. `GET /cache` (student, teacher) reads a page of the caller cache. The settings row is created by a database trigger, so there is no create endpoint. |
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
@@ -128,6 +129,32 @@ pnpm exec supabase gen types --local --schema public \
     `grade` is `correct_count / total_questions * 20` rounded to 2 decimals; `stars_delta` is the
     change actually applied (after the floor at 0). Repeating the call returns the same result.
     Medal codes: `postulante_1..3`, `pre_universitario_1..3`, `candidato_1..3`, `pre_ingresante_1..3`, `ingresante`.
+- `ranking` (all responses are JSON). Types: `NIVEL`, `MEDALLAS`, `NOTA`. Group = students actively
+  enrolled in the courses of the caller's teacher (a teacher sees their own students; a student with
+  several teachers competes with all of their students), same college. Names are public as
+  `Name F. F.` (given names plus family-name initials).
+  - `GET /ranking/settings[?college_id=]` (admin, teacher, student) responds
+    `{ college_id, is_default, enabled, categories: RankingType[], available_categories: RankingType[], visible }`.
+    `available_categories` is empty when disabled and drops `MEDALLAS` when the college has medals off;
+    `visible` is `available_categories.length > 0`. Defaults: `enabled: false`, all categories.
+  - `PUT /ranking/settings` (admin): `{ college_id, enabled?, categories? }` (non-empty, no repeats);
+    omitted fields keep their value; creates the row when missing. `404 college_not_found`.
+  - `PUT /ranking/cache` (student, teacher): `{ type }`. Computes the whole ranking of the group and
+    upserts one `cache_ranking` row per (user, type) with `expires_at = now + 1 hour`; also purges expired
+    rows. Responds `{ type, total_participants, generated_at, expires_at }`. `403 ranking_disabled` /
+    `ranking_category_disabled` when the college has it off.
+  - `GET /ranking/cache?type=&page=&page_size=` (student, teacher): `page` from 1, `page_size` default 30
+    (max 100). Each call renews `expires_at` to now + 1 hour (sliding). Responds
+    `{ type, page, page_size, total_pages, total_participants, my_position|null, items: [{ position, display_name, is_me, level?, xp?, stars?, medal?: { code, name }, grade?, completed_sessions? }], generated_at, expires_at }`.
+    `my_position` is `null` for teachers and for students without a place (NOTA excludes students with no
+    completed session). A page beyond the last returns empty `items`. Missing or expired cache (an expired row
+    is deleted on the spot): `404 ranking_cache_not_found`; the client must call `PUT /ranking/cache` and retry.
+  - Ordering (descending): NIVEL = level, xp; MEDALLAS = stars; NOTA = average of the per-course
+    `course_correct_percentage` (same figure as "Mi aprendizaje"). Ties: whoever reached it first
+    (`updated_at`, or last completed session for NOTA), then user id. Positions are unique (1, 2, 3...).
+  - Cleanup: lazy on read, opportunistic inside `PUT /cache`, and the `purge-expired-ranking-cache`
+    pg_cron job (every 15 minutes, `select public.edge_purge_expired_ranking_cache()`). If pg_cron is not
+    available in an environment, schedule that function with any external scheduler.
 - `get-session-review`: `session_id`.
 - `export-data`: optional `college_id`, `teacher_id`, `course_id`,
   `student_id`, and `topic_id` filters.

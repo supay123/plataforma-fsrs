@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +7,8 @@ import { PortalLayout } from "./PortalLayout";
 import { useLeaveWarning, usePortalFocus, type LeaveWarning } from "./portal-mode";
 
 const logout = vi.hoisted(() => vi.fn());
+const getRankingSettings = vi.hoisted(() => vi.fn());
+vi.mock("../../features/ranking/api", async (original) => ({ ...(await original<typeof import("../../features/ranking/api")>()), getRankingSettings }));
 vi.mock("../../features/auth/AuthProvider", () => ({
   useAuth: () => ({ profile: { full_name: "Ana Quispe", user_code: "ANA", role: "student" }, logout }),
 }));
@@ -18,16 +21,18 @@ function Practice() {
 }
 
 function renderPortal(path: string) {
-  render(<ModalProvider><MemoryRouter initialEntries={[path]}>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><ModalProvider><MemoryRouter initialEntries={[path]}>
     <Routes>
       <Route path="/estudiante" element={<PortalLayout role="student" />}>
         <Route index element={<p>Inicio</p>} />
         <Route path="cursos/:courseId" element={<p>Curso</p>} />
         <Route path="temas/:topicId/sesion" element={<Practice />} />
+        <Route path="ranking" element={<p>Clasificación</p>} />
         <Route path="configuracion" element={<p>Ajustes</p>} />
       </Route>
     </Routes>
-  </MemoryRouter></ModalProvider>);
+  </MemoryRouter></ModalProvider></QueryClientProvider>);
 }
 
 // El menú lateral (escritorio) y la barra inferior (móvil) existen a la vez; el CSS oculta uno según el ancho.
@@ -38,9 +43,10 @@ const link = (name: string) => sidebar().getByRole("link", { name });
 describe("PortalLayout", () => {
   beforeEach(() => {
     const store = new Map<string, string>();
+    getRankingSettings.mockResolvedValue({ visible: false });
     vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) });
   });
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); logout.mockReset(); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); logout.mockReset(); getRankingSettings.mockReset(); });
 
   it("highlights Mi aprendizaje by default and on its inner pages", () => {
     renderPortal("/estudiante");
@@ -128,5 +134,17 @@ describe("PortalLayout", () => {
     fireEvent.click(sidebar().getByRole("button", { name: "Salir" }));
     expect(logout).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("muestra Ranking solo si la institución lo activó y lo marca sin marcar Mi aprendizaje", async () => {
+    renderPortal("/estudiante");
+    await sidebar().findByRole("link", { name: "Configuración" });
+    await vi.waitFor(() => expect(getRankingSettings).toHaveBeenCalled());
+    expect(sidebar().queryByRole("link", { name: "Ranking" })).not.toBeInTheDocument();
+    cleanup();
+    getRankingSettings.mockResolvedValue({ visible: true });
+    renderPortal("/estudiante/ranking");
+    expect(await sidebar().findByRole("link", { name: "Ranking" })).toHaveClass("bg-primary-soft");
+    expect(link("Mi aprendizaje")).not.toHaveClass("bg-primary-soft");
   });
 });

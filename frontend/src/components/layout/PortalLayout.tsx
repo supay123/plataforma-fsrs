@@ -1,8 +1,9 @@
 import clsx from "clsx";
-import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, PanelLeftClose, Route as RouteIcon, Settings, Trophy, Users, X } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, Medal, PanelLeftClose, Route as RouteIcon, Settings, Trophy, Users, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { useRankingSettings } from "../../features/ranking/use-ranking-visible";
 import { PlanExpiryBanner } from "../../features/payments/PlanExpiryBanner";
 import { preloadMascot } from "../../features/sessions/preload-mascot";
 import { roleLabel } from "../../features/users/api";
@@ -21,6 +22,7 @@ const links: Record<AppRole, NavItem[]> = {
   student: [{ to: "/estudiante", label: "Mi aprendizaje", icon: GraduationCap }, { to: "/estudiante/logros", label: "Mis logros", icon: Trophy }, { to: "/estudiante/ruta", label: "Modo ruta", icon: RouteIcon }],
 };
 const settingsPath: Record<AppRole, string> = { admin: "/admin/configuracion", teacher: "/profesor/configuracion", student: "/estudiante/configuracion" };
+const rankingPath: Record<AppRole, string> = { admin: "", teacher: "/profesor/ranking", student: "/estudiante/ranking" };
 const homePath: Record<AppRole, string> = { admin: "/admin/usuarios", teacher: "/profesor/cursos", student: "/estudiante" };
 const STORAGE_KEY = "portal-menu-collapsed";
 
@@ -76,6 +78,8 @@ export function PortalLayout({ role }: { role: AppRole }) {
   }), []);
   const compactDesktop = focus ? !focusExpanded : collapsed;
   const pathname = useLocation().pathname;
+  // El ranking solo aparece si la institución lo activó con al menos una categoría.
+  const ranking = useRankingSettings(role !== "admin");
   const toggle = (value: boolean) => {
     if (focus) { setFocusExpanded(!value); return; }
     setCollapsed(value);
@@ -92,7 +96,8 @@ export function PortalLayout({ role }: { role: AppRole }) {
     leave(() => navigate(to));
   };
 
-  const sections: NavItem[] = [...links[role], { to: settingsPath[role], label: "Configuración", icon: Settings }];
+  const rankingItem: NavItem[] = ranking.data?.visible ? [{ to: rankingPath[role], label: "Ranking", icon: Medal }] : [];
+  const sections: NavItem[] = [...links[role], ...rankingItem, { to: settingsPath[role], label: "Configuración", icon: Settings }];
   // Una sección está activa en su ruta, salvo que otra sección más específica (p. ej. Modo ruta o
   // Configuración dentro de "/estudiante", la raíz de Mi aprendizaje) también coincida: entonces solo se marca esa.
   const isActive = (item: NavItem, active: boolean) => active && !sections.some((other) => other.to !== item.to && other.to.startsWith(`${item.to}/`) && pathname.startsWith(other.to));

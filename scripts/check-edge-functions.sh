@@ -29,6 +29,7 @@ function_dirs=(
   medals
   free-mode
   achievements
+  ranking
 )
 
 for function_dir in "${function_dirs[@]}"; do
