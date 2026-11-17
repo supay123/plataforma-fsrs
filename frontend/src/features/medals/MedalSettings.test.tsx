@@ -39,7 +39,7 @@ describe("MedalSettings", () => {
     await user.clear(first);
     await user.type(first, "3");
     await user.click(screen.getByRole("button", { name: "Guardar medallas" }));
-    expect(await screen.findByText(/toda la institución Colegio Uno/)).toBeInTheDocument();
+    expect(await screen.findByText(/todos los estudiantes de la institución Colegio Uno/)).toBeInTheDocument();
     expect(mocks.saveMedalSettings).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(mocks.saveMedalSettings).toHaveBeenCalledWith("c1", { ...DEFAULT_MEDAL_RULES, star_range_ends: [3, ...DEFAULT_MEDAL_RULES.star_range_ends.slice(1)] }));

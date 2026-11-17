@@ -87,9 +87,9 @@ function Editor({ collegeId, collegeName, saved }: { collegeId: string; collegeN
     <div className="mt-6 flex flex-wrap gap-3">
       <Button disabled={save.isPending || hasErrors} onClick={() => modal.warning({
         title: "Guardar medallas",
-        body: <p>Este cambio afectará a <strong>toda la institución {collegeName}</strong>: {enabled
-          ? "las medallas y estrellas de todos sus estudiantes se calcularán con estos rangos desde la próxima sesión."
-          : "se dejarán de mostrar y calcular las medallas para todos sus estudiantes."} Las estrellas que ya llevan no se modifican.</p>,
+        body: <p>Este cambio afecta a <strong>todos los estudiantes de la institución {collegeName}</strong>: {enabled
+          ? "con los nuevos rangos de estrellas cambia la medalla que se les muestra, y con los de nota cambian las estrellas que ganan o pierden desde la próxima sesión."
+          : "se dejarán de mostrar y calcular las medallas para todos ellos."} Las estrellas que ya tienen <strong>no se modifican</strong>.</p>,
         confirmLabel: "Guardar", onConfirm: () => save.mutateAsync(),
       })}>Guardar medallas</Button>
       <Button variant="secondary" disabled={save.isPending} onClick={() => { setStarTexts(toTexts(DEFAULT_MEDAL_RULES.star_range_ends)); setGradeTexts(toTexts(DEFAULT_MEDAL_RULES.grade_range_ends)); }}>
