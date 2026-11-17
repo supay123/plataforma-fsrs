@@ -8,8 +8,10 @@ export interface Streak {
 
 export interface LastSessionGrade { session_id: string; completed_at: string; topic_name: string | null; grade: number }
 
-/** GET `achievements/last-grades`. `last_route_lesson` queda en null hasta que exista Modo Ruta. */
-export interface LastGrades { last_session: LastSessionGrade | null; last_route_lesson: null }
+export interface LastRouteLessonGrade { attempt_id: string; completed_at: string; lesson_title: string | null; grade: number }
+
+/** GET `achievements/last-grades`: nota (0 a 20) de la última sesión del modo normal y del último intento del Modo Ruta. */
+export interface LastGrades { last_session: LastSessionGrade | null; last_route_lesson: LastRouteLessonGrade | null }
 
 export const getStreak = () => invokeFunction<Streak, Record<string, never>>("achievements/streak", {}, { method: "GET" });
 export const getLastGrades = () => invokeFunction<LastGrades, Record<string, never>>("achievements/last-grades", {}, { method: "GET" });

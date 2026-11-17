@@ -7,7 +7,8 @@ import type { EdgeContext } from "../_shared/types.ts";
 /**
  * Nota (0 a 20) de la última sesión completada del modo normal. El promedio
  * general no se calcula aquí: sale del progreso por curso, igual que en "Mi
- * aprendizaje". `last_route_lesson` queda en null hasta que exista Modo Ruta.
+ * aprendizaje". `last_route_lesson` es lo mismo para el último intento de una
+ * lección del Modo Ruta.
  */
 export async function getLastGrades(
   _request: Request,
@@ -25,7 +26,21 @@ export async function getLastGrades(
     .maybeSingle();
   if (error) throw new AppError(500, "last_grades_failed", error.message);
 
+  const { data: routeAttempt, error: routeError } = await context.supabaseAdmin
+    .from(TABLES.routeLessonAttempts)
+    .select("id,created_at,total_questions,correct_count,route_lessons(title)")
+    .eq("student_id", student.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (routeError) {
+    throw new AppError(500, "last_grades_failed", routeError.message);
+  }
+
   const topic = Array.isArray(data?.topics) ? data.topics[0] : data?.topics;
+  const lesson = Array.isArray(routeAttempt?.route_lessons)
+    ? routeAttempt.route_lessons[0]
+    : routeAttempt?.route_lessons;
   return json({
     last_session: data
       ? {
@@ -35,6 +50,16 @@ export async function getLastGrades(
         grade: sessionGrade(data.correct_count, data.total_questions),
       }
       : null,
-    last_route_lesson: null,
+    last_route_lesson: routeAttempt
+      ? {
+        attempt_id: routeAttempt.id,
+        completed_at: routeAttempt.created_at,
+        lesson_title: lesson?.title ?? null,
+        grade: sessionGrade(
+          routeAttempt.correct_count,
+          routeAttempt.total_questions,
+        ),
+      }
+      : null,
   });
 }

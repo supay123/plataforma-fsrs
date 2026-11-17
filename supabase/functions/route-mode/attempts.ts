@@ -56,6 +56,18 @@ export async function submitAttempt(
     );
   }
 
+  // Contar el día como activo es secundario: si falla, el intento ya quedó guardado.
+  const { error: activityError } = await context.supabaseAdmin.rpc(
+    RPCS.recordStudentActivity,
+    { p_student_id: student.id },
+  );
+  if (activityError) {
+    console.error(JSON.stringify({
+      event: "student_activity.failed",
+      message: activityError.message,
+    }));
+  }
+
   const selectedById = new Map(
     answers.map((answer) => [answer.question_id, answer.selected_option]),
   );

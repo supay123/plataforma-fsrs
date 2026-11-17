@@ -28,7 +28,7 @@ describe("StudentAchievementsPage", () => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.listStudentCourses.mockResolvedValue([{ id: "a" }, { id: "b" }]);
     mocks.courseProgress.mockResolvedValue([{ course_id: "a", course_correct_percentage: 80 }, { course_id: "b", course_correct_percentage: 60 }]);
-    mocks.getLastGrades.mockResolvedValue({ last_session: { session_id: "s", completed_at: "2026-11-15T10:00:00Z", topic_name: "Álgebra", grade: 15.5 }, last_route_lesson: null });
+    mocks.getLastGrades.mockResolvedValue({ last_session: { session_id: "s", completed_at: "2026-11-15T10:00:00Z", topic_name: "Álgebra", grade: 15.5 }, last_route_lesson: { attempt_id: "a", completed_at: "2026-11-16T09:00:00Z", lesson_title: "Fracciones", grade: 18 } });
     mocks.getStreak.mockResolvedValue({ current_streak: 4, best_streak: 9, active_today: false, last_active_date: "2026-11-15", today: "2026-11-16", recent_active_days: [] });
     mocks.getXpRules.mockResolvedValue({ level: 3, xp: 40, xp_to_next: 100, xp_per_correct: 75, streak_3_bonus: 15, streak_7_bonus: 42, streak_20_bonus: 137 });
     mocks.getMyMedal.mockResolvedValue({ enabled: true, stars: 4, medal: range("postulante_2", "Postulante 2", 3, 5), next_medal: range("postulante_3", "Postulante 3", 6, 8), stars_to_next: 2 });
@@ -39,6 +39,7 @@ describe("StudentAchievementsPage", () => {
     renderPage();
     expect(await screen.findByLabelText("Promedio general")).toHaveTextContent("14 / 20");
     expect(await screen.findByText(/Última sesión \(Álgebra\)/)).toHaveTextContent("15.5");
+    expect(screen.getByText(/Última lección del modo ruta \(Fracciones\)/)).toHaveTextContent("18");
     expect(await screen.findByText("Postulante 2", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText(/estrellas para/)).toHaveTextContent("faltan 2 estrellas para Postulante 3");
     expect(await screen.findByLabelText("Racha actual: 4 días")).toBeInTheDocument();

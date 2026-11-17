@@ -51,6 +51,7 @@ function GradeCard() {
   });
   const average = averageCourseScore(percentages);
   const lastSession = lastGrades.data?.last_session;
+  const lastRouteLesson = lastGrades.data?.last_route_lesson;
   return <AchievementCard icon={<TrendingUp aria-hidden size={18} />} title="Nota">
     <p className="text-xs text-fg-muted">Promedio general</p>
     <strong className="type-display block text-5xl leading-none tabular-nums" aria-label="Promedio general">
@@ -62,6 +63,9 @@ function GradeCard() {
         ? <>Última sesión{lastSession.topic_name ? ` (${lastSession.topic_name})` : ""}: <strong className="tabular-nums text-fg">{lastSession.grade}</strong> / 20</>
         : "Aún no completas ninguna sesión."}
     </p>
+    {lastRouteLesson && <p className="mt-1 text-sm text-fg-muted">
+      Última lección del modo ruta{lastRouteLesson.lesson_title ? ` (${lastRouteLesson.lesson_title})` : ""}: <strong className="tabular-nums text-fg">{lastRouteLesson.grade}</strong> / 20
+    </p>}
   </AchievementCard>;
 }
 
