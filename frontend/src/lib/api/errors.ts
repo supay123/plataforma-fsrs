@@ -62,6 +62,8 @@ const translatedMessages: Record<string, string> = {
   attachments_too_large: "Los archivos adjuntos superan el tamaño permitido. Quita alguno e inténtalo de nuevo.",
   lead_ip_limit: "Se hicieron demasiados registros desde esta conexión. Inténtalo de nuevo más tarde.",
   lead_email_limit: "Este correo ya se registró varias veces hoy. Inténtalo de nuevo mañana.",
+  leads_unavailable: "No pudimos registrar tus datos en este momento. Inténtalo de nuevo en unos minutos.",
+  demo_teacher_protected: "Este profesor es el dueño de las preguntas del modo gratuito y no se puede eliminar.",
   lead_registration_failed: "No pudimos guardar tus datos. Inténtalo de nuevo.",
   consent_required: "Debes aceptar el uso de tus datos para continuar.",
   insufficient_active_questions: "Este tema aún no tiene suficientes preguntas. Elige otro.",
@@ -102,6 +104,7 @@ const databaseMessages: Array<{ match: string; message: string }> = [
   { match: "at most 8 non-archived courses", message: "Un profesor puede tener como máximo 8 cursos. Archiva alguno o elige otro profesor." },
   { match: "teacher and course must belong to the same college", message: "El profesor y el curso deben ser del mismo colegio." },
   { match: "demo_college_protected", message: "Esta institución alimenta el modo gratuito del sitio y no se puede eliminar ni cambiar de código." },
+  { match: "demo_teacher_protected", message: "Este profesor es el dueño de las preguntas del modo gratuito y no se puede eliminar." },
   { match: "at most 25 non-archived topics", message: "Un curso puede tener como máximo 25 temas." },
   { match: "at most 50 non-archived questions", message: "Un tema puede tener como máximo 50 preguntas." },
 ];

@@ -1308,7 +1308,8 @@ primera vez que se responde bien se otorga xp; los reintentos no lo repiten.
 
 La migración `20261116020000_free_mode` siembra la institución `CHANCON-DEMO`
 ("Chancón – Modo gratuito") con una cuenta de profesor sin contraseña
-(`chancon-demo-profesor`, "Grupo de prueba Chancón"), el curso "Matemática
+(`chancon-demo-profesor`, "Grupo de prueba Chancón", con id fijo
+`5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01`), el curso "Matemática
 básica" y el tema "Operaciones y fracciones" con 12 preguntas activas. De ahí
 salen las preguntas del modo gratuito (Edge Function `free-mode`), para no
 exponer bancos de colegios reales. El código está reservado: los triggers
@@ -1316,29 +1317,28 @@ exponer bancos de colegios reales. El código está reservado: los triggers
 (BEFORE UPDATE OF code), con `private.protect_demo_college()`, lanzan
 `demo_college_protected` si se intenta borrarla o cambiar su código. Las
 funciones `edge_registration_colleges()` y `edge_registration_teachers()` la
-excluyen para que no se ofrezca en el registro de estudiantes.
+excluyen para que no se ofrezca en el registro de estudiantes. El profesor demo
+también está protegido: el trigger `profiles_protect_demo_teacher` (BEFORE
+DELETE en `public.profiles`, con `private.protect_demo_teacher()`) lanza
+`demo_teacher_protected` aunque el borrado venga en cascada desde `auth.users`.
+Ambos siguen visibles para el administrador.
 
-### public.leads
+### public.lead_rate_limits
 
-Personas que probaron el modo gratuito y dejaron sus datos.
+Intentos de registro de interesados del modo gratuito, solo para limitar la frecuencia. **Los interesados no se guardan en la base de datos**: la Edge Function `free-mode` los agrega a un Google Sheet.
 
 | Columna | Tipo | Nulo | Valor por defecto | Descripción |
 |---|---|---:|---|---|
 | `id` | `uuid` | No | `gen_random_uuid()` | Identificador principal. |
-| `given_names`, `family_names` | `text` | No | — | Nombres y apellidos. |
-| `email` | `text` | No | — | Correo en minúsculas. No es único: no se verifican duplicados. |
-| `phone` | `text` | No | — | Celular de Perú de 9 dígitos, sin `+51`. |
-| `data_consent_at` | `timestamptz` | No | `now()` | Momento del consentimiento de datos (Ley N.° 29733). |
-| `ip_hash` | `text` | No | — | SHA-256 de la IP, solo para los límites de frecuencia. |
-| `sheet_synced_at` | `timestamptz` | Sí | — | Cuándo se agregó al Google Sheet; `null` si no se pudo. |
-| `created_at` | `timestamptz` | No | `now()` | Fecha de registro. |
+| `ip_hash` | `text` | No | — | SHA-256 de la IP (nunca en claro). |
+| `email_hash` | `text` | No | — | SHA-256 del correo en minúsculas (nunca en claro). |
+| `created_at` | `timestamptz` | No | `now()` | Momento del intento. |
 
-RLS activa y sin políticas; `anon` y `authenticated` sin permisos: solo
-`service_role` (la Edge Function `free-mode`) lee y escribe.
+RLS activa y sin políticas; `anon` y `authenticated` sin permisos: solo `service_role`. Se limpia sola: el RPC borra las filas de más de 24 h al ejecutarse y un job de `pg_cron` (`purge-lead-rate-limits`, cada hora) hace lo mismo.
 
 ### Funciones relacionadas
 
 `SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
 
-- `public.edge_register_lead(p_ip_hash, p_given_names, p_family_names, p_email, p_phone)`: guarda el lead con bloqueo consultivo y falla con `lead_ip_limit` (5 por IP cada hora) o `lead_email_limit` (3 por correo cada día).
-- `public.edge_leads_sheet_id()`: lee de Vault el secreto `leads_sheet_id` (ID del Google Sheet); `null` si no existe. Se crea con `select vault.create_secret('<ID>', 'leads_sheet_id');`.
+- `public.edge_check_lead_rate_limit(p_ip_hash, p_email_hash)`: con bloqueo consultivo comprueba los límites y registra el intento en `lead_rate_limits`; falla con `lead_ip_limit` (5 por IP cada hora) o `lead_email_limit` (3 por correo cada día).
+- `public.edge_leads_sheet_id()`: lee de Vault el secreto `leads_sheet_id` (ID del Google Sheet); `null` si no existe (el registro responde entonces `503 leads_unavailable`). Se crea con `select vault.create_secret('<ID>', 'leads_sheet_id');`.

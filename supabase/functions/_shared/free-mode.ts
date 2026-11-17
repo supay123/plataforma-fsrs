@@ -3,6 +3,8 @@ import { normalizePhone, parseEmail, parsePersonName } from "./registration.ts";
 
 /** Código reservado de la institución demo que alimenta el modo gratuito. */
 export const DEMO_COLLEGE_CODE = "CHANCON-DEMO";
+/** Id fijo del profesor demo sembrado en la migración; no puede borrarse. */
+export const DEMO_TEACHER_ID = "5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01";
 export const FREE_MODE_QUESTION_COUNT = 10;
 
 export function isDemoCollegeCode(code: string): boolean {

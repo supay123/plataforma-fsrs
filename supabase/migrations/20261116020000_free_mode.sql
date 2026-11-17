@@ -1,5 +1,6 @@
 -- Modo Gratuito: institución demo protegida, banco de preguntas de prueba y
--- registro de interesados (leads).
+-- límite de frecuencia para el registro de interesados (leads). Los leads no se
+-- guardan en la base: solo van a un Google Sheet.
 --
 -- Las preguntas del modo gratuito salen de una institución propia (código
 -- reservado CHANCON-DEMO) para no exponer los bancos de colegios reales. Esa
@@ -41,6 +42,31 @@ create trigger colleges_protect_demo_code
   for each row execute function private.protect_demo_college();
 
 -- ---------------------------------------------------------------------------
+-- Protección del profesor demo: dueño del banco de pruebas. Si se borrara, el
+-- modo gratuito se quedaría sin grupo. El trigger sobre profiles también frena
+-- el borrado en cascada desde auth.users. El id debe coincidir con DEMO_TEACHER_ID
+-- de _shared/free-mode.ts.
+-- ---------------------------------------------------------------------------
+create function private.protect_demo_teacher()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if old.id = '5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01'::uuid then
+    raise exception 'demo_teacher_protected'
+      using errcode = 'P0001',
+        detail = 'The demo teacher owns the free mode question bank and cannot be deleted.';
+  end if;
+  return old;
+end;
+$$;
+
+create trigger profiles_protect_demo_teacher
+  before delete on public.profiles
+  for each row execute function private.protect_demo_teacher();
+
+-- ---------------------------------------------------------------------------
 -- Siembra: institución demo con un grupo, un curso y un tema de ejemplo
 -- ---------------------------------------------------------------------------
 insert into public.colleges (code, name, description)
@@ -62,12 +88,9 @@ begin
   from public.colleges
   where lower(btrim(code)) = 'chancon-demo';
 
-  select id into demo_teacher_id
-  from public.profiles
-  where lower(btrim(user_code)) = 'chancon-demo-profesor';
+  demo_teacher_id := '5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01';
 
-  if demo_teacher_id is null then
-    demo_teacher_id := gen_random_uuid();
+  if not exists (select 1 from public.profiles where id = demo_teacher_id) then
     -- Mismo formato de correo opaco que usa admin-create-user. Sin contraseña:
     -- nadie inicia sesión con esta cuenta, solo es dueña del banco de pruebas.
     insert into auth.users (
@@ -199,90 +222,87 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- Interesados (leads) del modo gratuito
+-- Límite de frecuencia del registro de interesados
 -- ---------------------------------------------------------------------------
--- Solo la Edge Function `free-mode` escribe aquí, con service_role. Sin
--- políticas y sin permisos para anon/authenticated: RLS cerrada. No se
--- verifican duplicados a propósito; el límite por correo solo frena el abuso.
-create table public.leads (
+-- Los interesados NO se guardan en la base (crecerían sin control): la Edge
+-- Function `free-mode` los agrega a un Google Sheet. Aquí solo quedan hashes
+-- SHA-256 de IP y correo para limitar el abuso, y se borran a las 24 horas.
+-- Sin políticas y sin permisos para anon/authenticated: solo service_role.
+create table public.lead_rate_limits (
   id uuid primary key default gen_random_uuid(),
-  given_names text not null,
-  family_names text not null,
-  email text not null,
-  phone text not null,
-  data_consent_at timestamptz not null default now(),
   ip_hash text not null,
-  -- null mientras la fila no llega al Google Sheet (hoja sin configurar o Google caído).
-  sheet_synced_at timestamptz,
-  created_at timestamptz not null default now(),
-  constraint leads_given_names_not_blank check (btrim(given_names) <> ''),
-  constraint leads_family_names_not_blank check (btrim(family_names) <> ''),
-  constraint leads_email_not_blank check (btrim(email) <> ''),
-  constraint leads_phone_not_blank check (btrim(phone) <> '')
+  email_hash text not null,
+  created_at timestamptz not null default now()
 );
 
-comment on table public.leads is
-  'People who tried the free mode and left their contact data (Ley 29733 consent recorded in data_consent_at). Written only by the free-mode Edge Function; the ip is stored as a hash.';
+comment on table public.lead_rate_limits is
+  'Attempts to register a free-mode lead, kept only as SHA-256 hashes of the ip and email to rate limit. Rows older than 24 hours are purged.';
 
-create index leads_ip_hash_created_at_idx on public.leads (ip_hash, created_at);
-create index leads_email_created_at_idx on public.leads (lower(email), created_at);
+create index lead_rate_limits_ip_hash_created_at_idx
+  on public.lead_rate_limits (ip_hash, created_at);
+create index lead_rate_limits_email_hash_created_at_idx
+  on public.lead_rate_limits (email_hash, created_at);
 
-alter table public.leads enable row level security;
-revoke all on table public.leads from public, anon, authenticated;
-grant select, insert, update, delete on table public.leads to service_role;
+alter table public.lead_rate_limits enable row level security;
+revoke all on table public.lead_rate_limits from public, anon, authenticated;
+grant select, insert, update, delete on table public.lead_rate_limits to service_role;
 
--- Guarda el interesado aplicando los límites de frecuencia: 5 por IP cada hora
--- y 3 por correo cada día. Falla con 'lead_ip_limit' o 'lead_email_limit'.
-create function public.edge_register_lead(
+-- Comprueba los límites (5 por IP cada hora, 3 por correo cada día) y registra
+-- el intento. Falla con 'lead_ip_limit' o 'lead_email_limit'.
+create function public.edge_check_lead_rate_limit(
   p_ip_hash text,
-  p_given_names text,
-  p_family_names text,
-  p_email text,
-  p_phone text
+  p_email_hash text
 )
-returns uuid
+returns void
 language plpgsql
 volatile
 security definer
 set search_path = ''
 as $$
-declare
-  new_id uuid;
 begin
   -- Dos envíos simultáneos no pueden saltarse el límite.
   perform pg_advisory_xact_lock(hashtext('lead_ip:' || p_ip_hash));
-  perform pg_advisory_xact_lock(hashtext('lead_email:' || lower(p_email)));
+  perform pg_advisory_xact_lock(hashtext('lead_email:' || p_email_hash));
+
+  delete from public.lead_rate_limits where created_at < now() - interval '24 hours';
 
   if (
-    select count(*) from public.leads l
+    select count(*) from public.lead_rate_limits l
     where l.ip_hash = p_ip_hash and l.created_at > now() - interval '1 hour'
   ) >= 5 then
     raise exception 'lead_ip_limit';
   end if;
 
   if (
-    select count(*) from public.leads l
-    where lower(l.email) = lower(p_email) and l.created_at > now() - interval '1 day'
+    select count(*) from public.lead_rate_limits l
+    where l.email_hash = p_email_hash and l.created_at > now() - interval '1 day'
   ) >= 3 then
     raise exception 'lead_email_limit';
   end if;
 
-  insert into public.leads (given_names, family_names, email, phone, ip_hash)
-  values (p_given_names, p_family_names, lower(p_email), p_phone, p_ip_hash)
-  returning id into new_id;
-  return new_id;
+  insert into public.lead_rate_limits (ip_hash, email_hash)
+  values (p_ip_hash, p_email_hash);
 end;
 $$;
 
-revoke all on function public.edge_register_lead(text, text, text, text, text)
+revoke all on function public.edge_check_lead_rate_limit(text, text)
   from public, anon, authenticated;
-grant execute on function public.edge_register_lead(text, text, text, text, text)
+grant execute on function public.edge_check_lead_rate_limit(text, text)
   to service_role;
+
+create extension if not exists pg_cron with schema pg_catalog;
+grant usage on schema cron to postgres;
+
+select cron.schedule(
+  'purge-lead-rate-limits',
+  '37 * * * *',
+  $$delete from public.lead_rate_limits where created_at < now() - interval '24 hours'$$
+);
 
 -- ID del Google Sheet donde se agregan los interesados. Se guarda cifrado en
 -- Vault desde el editor SQL, sin variables de entorno:
 --   select vault.create_secret('<ID de la hoja>', 'leads_sheet_id');
--- Sin el secreto devuelve null y los interesados solo quedan en la tabla leads.
+-- Sin el secreto devuelve null y el registro responde 503 leads_unavailable.
 create function public.edge_leads_sheet_id()
 returns text
 language sql

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { AppError } from "../errors.ts";
 import {
   buildCatalog,
+  DEMO_TEACHER_ID,
   isDemoCollegeCode,
   leadSheetRow,
   parseLeadRequest,
@@ -119,4 +120,14 @@ Deno.test("sheet row lists date in Lima time, names, email and WhatsApp", () => 
     "ana@example.com",
     "+51987654321",
   ]);
+});
+
+Deno.test("demo teacher id matches the one seeded and protected by the migration", async () => {
+  const migration = await Deno.readTextFile(
+    new URL(
+      "../../../migrations/20261116020000_free_mode.sql",
+      import.meta.url,
+    ),
+  );
+  assert.equal(migration.split(DEMO_TEACHER_ID).length - 1, 2);
 });

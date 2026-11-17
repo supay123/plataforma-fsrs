@@ -80,4 +80,34 @@ describe("FreeModePage", () => {
     expect(await screen.findByText("Tarjetas de planes")).toBeInTheDocument();
     expect(screen.getByText("¡Gracias, Ana!")).toBeInTheDocument();
   });
+
+  it("shows the server error in a toast and lets the person retry when leads are unavailable", async () => {
+    const user = userEvent.setup();
+    mocks.registerFreeModeLead.mockRejectedValueOnce(new Error("No pudimos registrar tus datos en este momento. Inténtalo de nuevo en unos minutos."));
+    renderPage();
+    await user.selectOptions(await screen.findByLabelText("Grupo (profesor)"), "g1");
+    await user.selectOptions(screen.getByLabelText("Curso"), "c1");
+    await user.selectOptions(screen.getByLabelText("Tema"), "t1");
+    await user.click(screen.getByRole("button", { name: "Comenzar" }));
+    for (const nextLabel of ["Siguiente", "Ver mi resultado"]) {
+      await user.click(await screen.findByRole("button", { name: /^A/ }));
+      await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
+      await user.click(screen.getByRole("button", { name: nextLabel }));
+    }
+    await user.click(await screen.findByRole("button", { name: "Pulsa para identificarte" }));
+    await user.type(screen.getByLabelText(/^Nombres/), "Ana");
+    await user.type(screen.getByLabelText(/^Apellidos/), "Pérez");
+    await user.type(screen.getByLabelText(/^Correo electrónico/), "ana@example.com");
+    await user.type(screen.getByLabelText(/^WhatsApp/), "987654321");
+    await user.click(screen.getByRole("checkbox", { name: /contactarme por correo electrónico o WhatsApp/ }));
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(await screen.findByText(/No pudimos registrar tus datos en este momento/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continuar" })).toBeEnabled();
+    expect(screen.queryByText("Tarjetas de planes")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(await screen.findByText("Tarjetas de planes")).toBeInTheDocument();
+    expect(mocks.registerFreeModeLead).toHaveBeenCalledTimes(2);
+  });
 });

@@ -61,7 +61,7 @@ pnpm exec supabase gen types --local --schema public \
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
 | `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to; `GET /public/theme` returns the colors of an institution (`?inst=<college code>`, `theme: null` when it has none); `GET /public/payment-config` returns the Mercado Pago `public_key` the browser needs to turn the Yape phone and approval code into a token (`503 payments_unavailable` while `MERCADOPAGO_PUBLIC_KEY` is not set). |
-| `free-mode` | Public | Free mode of the home page. Questions come from the protected demo college (code `CHANCON-DEMO`), never from real colleges. `GET /free-mode/catalog` lists groups → courses → topics for the three cascading selectors (only topics with at least 10 active questions). `GET /free-mode/questions?topic_id=` returns 10 random active questions with `correct_option` and `explanation`, with no session, FSRS or xp. `POST /free-mode/leads` stores the person who tried it in `leads` (always) and appends a row to a Google Sheet (best effort). Duplicates are not checked. |
+| `free-mode` | Public | Free mode of the home page. Questions come from the protected demo college (code `CHANCON-DEMO`), never from real colleges. `GET /free-mode/catalog` lists groups → courses → topics for the three cascading selectors (only topics with at least 10 active questions). `GET /free-mode/questions?topic_id=` returns 10 random active questions with `correct_option` and `explanation`, with no session, FSRS or xp. `POST /free-mode/leads` appends the person who tried it to a Google Sheet; leads are NOT stored in the database (only hashed rate-limit attempts, in `lead_rate_limits`). Duplicates are not checked. |
 | `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` charges the chosen plan with Yape through Mercado Pago; `GET /registration/payment` reports its status and activates the account once Mercado Pago approves it. No account exists until the first payment is confirmed. |
 | `mercadopago` | Mercado Pago signature | `POST /mercadopago/webhook` receives Mercado Pago **Order** notifications (`type: order`), verifies `x-signature` (HMAC-SHA256 of `id:<data.id in lowercase>;request-id:<x-request-id>;ts:<ts>;`) with the secret stored in Vault as `mercadopago_webhook_secret`, fetches the order (`GET /v1/orders/{id}`) and applies it. Called by Mercado Pago, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
@@ -186,16 +186,18 @@ pnpm exec supabase gen types --local --schema public \
   `accepted_data_policy: true` (consent, Ley N.° 29733; `400 consent_required`)
   and `website` (honeypot: a hidden field that must be empty; if filled the
   endpoint answers `201 { ok: true }` without saving anything). Responds `201
-  { ok: true }`. Limits through `edge_register_lead`: 5 per IP hash per hour
-  (`429 lead_ip_limit`) and 3 per email per day (`429 lead_email_limit`).
-  The lead is always saved in `public.leads`; afterwards the row `[date (Lima),
-  names, surnames, email, +51 WhatsApp]` is appended to the first sheet of the
+  { ok: true }`. Limits through `edge_check_lead_rate_limit`: 5 per IP hash per hour
+  (`429 lead_ip_limit`) and 3 per email hash per day (`429 lead_email_limit`).
+  The lead is never saved in the database: the row `[date (Lima), names,
+  surnames, email, +51 WhatsApp]` is appended to the first sheet of the
   Google Sheet whose ID is the Vault secret `leads_sheet_id`
   (`values:append`, `RAW`), authenticating as the same Google account as Gmail
   (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`; the refresh
   token must include the scope `https://www.googleapis.com/auth/spreadsheets`).
-  The sheet step is tolerant: without the secret or if Google fails, the
-  response is still OK and `leads.sheet_synced_at` stays `null`.
+  Without the secret or if Google fails the endpoint answers `503
+  leads_unavailable` and the lead is saved nowhere, so the person can retry.
+- `POST admin-delete-user`: `409 demo_teacher_protected` for the demo teacher
+  (owner of the free mode question bank), checked before anything is deleted.
 - `POST admin-delete-college`: `409 demo_college_protected` for the demo
   college, checked before any user is deleted.
 - `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`,

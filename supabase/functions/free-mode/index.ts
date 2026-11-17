@@ -9,7 +9,7 @@ import { registerLead } from "./register-lead.ts";
 // Modo gratuito del home, sin sesión. Las preguntas salen de la institución demo:
 //   GET  /free-mode/catalog     grupos → cursos → temas para los selectores
 //   GET  /free-mode/questions   10 preguntas al azar con su respuesta (?topic_id=)
-//   POST /free-mode/leads       guarda al interesado y lo agrega al Google Sheet
+//   POST /free-mode/leads       agrega al interesado al Google Sheet (no se guarda en la BD)
 export default {
   fetch: withAppSupabase(
     { auth: "publishable" },

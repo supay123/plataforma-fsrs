@@ -1,4 +1,4 @@
-import { RPCS, TABLES } from "../_shared/database.constants.ts";
+import { RPCS } from "../_shared/database.constants.ts";
 import { clientIp } from "../_shared/complaints.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
 import { leadSheetRow, parseLeadRequest } from "../_shared/free-mode.ts";
@@ -18,35 +18,11 @@ async function sha256(value: string): Promise<string> {
 }
 
 /**
- * Agrega el lead al Google Sheet. Es un extra tolerante: sin hoja configurada
- * o con Google caído, el lead ya está en la tabla `leads` y la respuesta es OK
- * (la fila queda con sheet_synced_at en null para poder reenviarla).
- */
-async function syncToSheet(
-  context: EdgeContext,
-  leadId: string,
-  row: string[],
-): Promise<void> {
-  try {
-    const { data: sheetId } = await context.supabaseAdmin.rpc(
-      RPCS.leadsSheetId,
-    );
-    if (!sheetId) return;
-    await appendSheetRow(sheetId, row);
-    await context.supabaseAdmin
-      .from(TABLES.leads)
-      .update({ sheet_synced_at: new Date().toISOString() })
-      .eq("id", leadId);
-  } catch (error) {
-    console.error("Lead could not be added to the Google Sheet", error);
-  }
-}
-
-/**
  * POST /free-mode/leads
- * Guarda a quien probó el modo gratuito. No verifica duplicados. Límites: 5 por
- * IP cada hora y 3 por correo cada día. Con el campo trampa lleno responde OK
- * sin guardar.
+ * El lead no se guarda en la base: solo se agrega al Google Sheet. Límites: 5
+ * por IP cada hora y 3 por correo cada día (solo hashes). Con el campo trampa
+ * lleno responde OK sin hacer nada. Sin hoja configurada o con Google caído
+ * responde 503 leads_unavailable.
  */
 export async function registerLead(
   request: Request,
@@ -56,14 +32,11 @@ export async function registerLead(
   if (parsed.kind === "honeypot") return json({ ok: true }, 201);
 
   const { lead } = parsed;
-  const { data: leadId, error } = await context.supabaseAdmin.rpc(
-    RPCS.registerLead,
+  const { error } = await context.supabaseAdmin.rpc(
+    RPCS.checkLeadRateLimit,
     {
       p_ip_hash: await sha256(clientIp(request)),
-      p_given_names: lead.given_names,
-      p_family_names: lead.family_names,
-      p_email: lead.email,
-      p_phone: lead.phone,
+      p_email_hash: await sha256(lead.email),
     },
   );
   if (error?.message === "lead_ip_limit") {
@@ -80,14 +53,27 @@ export async function registerLead(
       "This email was already registered several times today.",
     );
   }
-  if (error || !leadId) {
+  if (error) {
     throw new AppError(
       500,
       "lead_registration_failed",
-      "The registration could not be saved.",
+      "The registration could not be processed.",
     );
   }
 
-  await syncToSheet(context, leadId, leadSheetRow(lead, new Date()));
+  try {
+    const { data: sheetId } = await context.supabaseAdmin.rpc(
+      RPCS.leadsSheetId,
+    );
+    if (!sheetId) throw new Error("The leads_sheet_id secret is not set");
+    await appendSheetRow(sheetId, leadSheetRow(lead, new Date()));
+  } catch (cause) {
+    console.error("Lead could not be added to the Google Sheet", cause);
+    throw new AppError(
+      503,
+      "leads_unavailable",
+      "The registration is not available right now.",
+    );
+  }
   return json({ ok: true }, 201);
 }
