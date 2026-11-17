@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, PanelLeftClose, Settings, Users, X } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, PanelLeftClose, Route as RouteIcon, Settings, Users, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -16,9 +16,9 @@ import { PortalModeContext, type LeaveWarning, type PortalModeApi } from "./port
 type NavItem = { to: string; label: string; icon: typeof Users };
 
 const links: Record<AppRole, NavItem[]> = {
-  admin: [{ to: "/admin/usuarios", label: "Usuarios", icon: Users }, { to: "/admin/cursos", label: "Cursos", icon: BookOpen }, { to: "/admin/colegios", label: "Colegios", icon: Building2 }, { to: "/admin/asignaciones", label: "Asignaciones", icon: ListChecks }],
-  teacher: [{ to: "/profesor/cursos", label: "Cursos", icon: BookOpen }, { to: "/profesor/estudiantes", label: "Estudiantes", icon: Users }],
-  student: [{ to: "/estudiante", label: "Mi aprendizaje", icon: GraduationCap }],
+  admin: [{ to: "/admin/usuarios", label: "Usuarios", icon: Users }, { to: "/admin/cursos", label: "Cursos", icon: BookOpen }, { to: "/admin/colegios", label: "Colegios", icon: Building2 }, { to: "/admin/asignaciones", label: "Asignaciones", icon: ListChecks }, { to: "/admin/ruta", label: "Modo ruta", icon: RouteIcon }],
+  teacher: [{ to: "/profesor/cursos", label: "Cursos", icon: BookOpen }, { to: "/profesor/estudiantes", label: "Estudiantes", icon: Users }, { to: "/profesor/ruta", label: "Modo ruta", icon: RouteIcon }],
+  student: [{ to: "/estudiante", label: "Mi aprendizaje", icon: GraduationCap }, { to: "/estudiante/ruta", label: "Modo ruta", icon: RouteIcon }],
 };
 const settingsPath: Record<AppRole, string> = { admin: "/admin/configuracion", teacher: "/profesor/configuracion", student: "/estudiante/configuracion" };
 const homePath: Record<AppRole, string> = { admin: "/admin/usuarios", teacher: "/profesor/cursos", student: "/estudiante" };
@@ -75,9 +75,7 @@ export function PortalLayout({ role }: { role: AppRole }) {
     setLeaveWarning,
   }), []);
   const compactDesktop = focus ? !focusExpanded : collapsed;
-  // "/estudiante" (Mi aprendizaje) también coincide con "/estudiante/configuracion":
-  // en Configuración solo se marca Configuración.
-  const inSettings = useLocation().pathname.startsWith(settingsPath[role]);
+  const pathname = useLocation().pathname;
   const toggle = (value: boolean) => {
     if (focus) { setFocusExpanded(!value); return; }
     setCollapsed(value);
@@ -95,8 +93,9 @@ export function PortalLayout({ role }: { role: AppRole }) {
   };
 
   const sections: NavItem[] = [...links[role], { to: settingsPath[role], label: "Configuración", icon: Settings }];
-  // Una sección está activa en su ruta; Mi aprendizaje (la raíz del estudiante) no cuenta dentro de Configuración.
-  const isActive = (item: NavItem, active: boolean) => active && (item.to === settingsPath[role] || !inSettings);
+  // Una sección está activa en su ruta, salvo que otra sección más específica (p. ej. Modo ruta o
+  // Configuración dentro de "/estudiante", la raíz de Mi aprendizaje) también coincida: entonces solo se marca esa.
+  const isActive = (item: NavItem, active: boolean) => active && !sections.some((other) => other.to !== item.to && other.to.startsWith(`${item.to}/`) && pathname.startsWith(other.to));
 
   const renderItem = (item: NavItem, compact: boolean) => <NavLink key={item.to} to={item.to} title={compact ? item.label : undefined} onClick={go(item.to)}
     className={({ isActive: active }) => clsx(

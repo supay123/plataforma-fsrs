@@ -452,6 +452,23 @@ profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
   solo si el colegio tiene medallas activadas.
 - `api.ts`: `getMedalSettings`, `saveMedalSettings`, `getMyMedal`, `getTopicStars`, `calculateMedal` (Edge Function `medals`).
 
+## Modo ruta (`features/route-mode/`)
+
+- `LessonText` (`LessonText.tsx`): texto de una lección. Respeta los saltos de
+  línea (`whitespace-pre-wrap`) y renderiza las fórmulas con `MathText` (KaTeX,
+  `$...$` y `$$...$$`). Úsalo para cualquier texto largo escrito por el profesor.
+- `RouteManagement` (`RouteManagement.tsx`): gestión de temas y lecciones para
+  admin y profesor (el admin elige antes el profesor). `LessonEditor` crea o
+  edita una lección en dos pasos: texto y 5 preguntas.
+- `api.ts`: llamadas a `route-mode` y claves de caché de TanStack Query.
+- Páginas del estudiante: `pages/student/RoutePage.tsx` (mapa de temas con
+  lecciones bloqueadas, disponibles y completadas) y `RouteLessonPage.tsx`
+  (texto, 5 preguntas y resultado). Los errores se avisan con toast y las cargas
+  usan `Skeleton`.
+- `PortalLayout`: el enlace "Modo ruta" está en los tres portales; una sección
+  del menú ya no se marca cuando otra más específica de la misma raíz (p. ej.
+  `/estudiante/ruta` dentro de `/estudiante`) coincide.
+
 ## Utilidades (`lib/`)
 
 | Utilidad | Archivo | Descripción |

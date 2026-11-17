@@ -14,6 +14,7 @@ const TermsPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({
 const PrivacyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const RefundPolicyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.RefundPolicyPage })));
 const ComplaintsBookPage = lazy(() => import("../pages/public/ComplaintsBookPage").then((m) => ({ default: m.ComplaintsBookPage })));
+const AdminRoutePage = lazy(() => import("../pages/admin/RoutePage").then((m) => ({ default: m.RoutePage })));
 const AdminCoursesPage = lazy(() => import("../pages/admin/CoursesPage").then((m) => ({ default: m.CoursesPage })));
 const CollegesPage = lazy(() => import("../pages/admin/CollegesPage").then((m) => ({ default: m.CollegesPage })));
 const AssignmentsPage = lazy(() => import("../pages/admin/AssignmentsPage").then((m) => ({ default: m.AssignmentsPage })));
@@ -26,6 +27,9 @@ const StudentCoursePage = lazy(() => import("../pages/student/CoursePage").then(
 const StudentDashboardPage = lazy(() => import("../pages/student/DashboardPage").then((m) => ({ default: m.StudentDashboardPage })));
 const RenewPage = lazy(() => import("../pages/student/RenewPage").then((m) => ({ default: m.RenewPage })));
 const SessionPage = lazy(() => import("../pages/student/SessionPage").then((m) => ({ default: m.SessionPage })));
+const TeacherRoutePage = lazy(() => import("../pages/teacher/RoutePage").then((m) => ({ default: m.RoutePage })));
+const StudentRoutePage = lazy(() => import("../pages/student/RoutePage").then((m) => ({ default: m.RoutePage })));
+const StudentRouteLessonPage = lazy(() => import("../pages/student/RouteLessonPage").then((m) => ({ default: m.RouteLessonPage })));
 const CoursesPage = lazy(() => import("../pages/teacher/CoursesPage").then((m) => ({ default: m.CoursesPage })));
 const ImportPage = lazy(() => import("../pages/teacher/ImportPage").then((m) => ({ default: m.ImportPage })));
 const StudentResultsPage = lazy(() => import("../pages/teacher/StudentResultsPage").then((m) => ({ default: m.StudentResultsPage })));
@@ -48,13 +52,13 @@ export function AppRouter() {
     <Route path="/estudiante/invitacion" element={<InvitationPage />} />
     <Route path="/estudiante/renovar" element={<RoleGuard role="student" allowExpired><RenewPage /></RoleGuard>} />
     <Route path="/admin" element={<RoleGuard role="admin"><PortalLayout role="admin" /></RoleGuard>}>
-      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="cursos" element={<AdminCoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
+      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="cursos" element={<AdminCoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="ruta" element={<AdminRoutePage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="/profesor" element={<RoleGuard role="teacher"><PortalLayout role="teacher" /></RoleGuard>}>
-      <Route index element={<Navigate to="cursos" replace />} /><Route path="cursos" element={<CoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="estudiantes" element={<StudentsPage />} /><Route path="estudiantes/:studentId/resultados" element={<StudentResultsPage />} /><Route path="sesiones/:sessionId" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
+      <Route index element={<Navigate to="cursos" replace />} /><Route path="cursos" element={<CoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="estudiantes" element={<StudentsPage />} /><Route path="ruta" element={<TeacherRoutePage />} /><Route path="estudiantes/:studentId/resultados" element={<StudentResultsPage />} /><Route path="sesiones/:sessionId" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="/estudiante" element={<RoleGuard role="student"><PortalLayout role="student" /></RoleGuard>}>
-      <Route index element={<StudentDashboardPage />} /><Route path="cursos/:courseId" element={<StudentCoursePage />} /><Route path="temas/:topicId/sesion" element={<SessionPage />} /><Route path="sesiones/:sessionId/revision" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
+      <Route index element={<StudentDashboardPage />} /><Route path="cursos/:courseId" element={<StudentCoursePage />} /><Route path="ruta" element={<StudentRoutePage />} /><Route path="ruta/lecciones/:lessonId" element={<StudentRouteLessonPage />} /><Route path="temas/:topicId/sesion" element={<SessionPage />} /><Route path="sesiones/:sessionId/revision" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes></Suspense>;
