@@ -1269,3 +1269,44 @@ primera vez que se responde bien se otorga xp; los reintentos no lo repiten.
   `on conflict do nothing` (seguro ante envíos simultáneos), guarda el intento,
   suma el xp a `student_levels` y devuelve el resultado con el mismo formato de
   xp que `edge_award_session_xp`. No hay bonos de racha ni estrellas de medalla.
+
+## Modo gratuito
+
+### Institución demo (`public.colleges`)
+
+La migración `20261116020000_free_mode` siembra la institución `CHANCON-DEMO`
+("Chancón – Modo gratuito") con una cuenta de profesor sin contraseña
+(`chancon-demo-profesor`, "Grupo de prueba Chancón"), el curso "Matemática
+básica" y el tema "Operaciones y fracciones" con 12 preguntas activas. De ahí
+salen las preguntas del modo gratuito (Edge Function `free-mode`), para no
+exponer bancos de colegios reales. El código está reservado: los triggers
+`colleges_protect_demo_delete` (BEFORE DELETE) y `colleges_protect_demo_code`
+(BEFORE UPDATE OF code), con `private.protect_demo_college()`, lanzan
+`demo_college_protected` si se intenta borrarla o cambiar su código. Las
+funciones `edge_registration_colleges()` y `edge_registration_teachers()` la
+excluyen para que no se ofrezca en el registro de estudiantes.
+
+### public.leads
+
+Personas que probaron el modo gratuito y dejaron sus datos.
+
+| Columna | Tipo | Nulo | Valor por defecto | Descripción |
+|---|---|---:|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Identificador principal. |
+| `given_names`, `family_names` | `text` | No | — | Nombres y apellidos. |
+| `email` | `text` | No | — | Correo en minúsculas. No es único: no se verifican duplicados. |
+| `phone` | `text` | No | — | Celular de Perú de 9 dígitos, sin `+51`. |
+| `data_consent_at` | `timestamptz` | No | `now()` | Momento del consentimiento de datos (Ley N.° 29733). |
+| `ip_hash` | `text` | No | — | SHA-256 de la IP, solo para los límites de frecuencia. |
+| `sheet_synced_at` | `timestamptz` | Sí | — | Cuándo se agregó al Google Sheet; `null` si no se pudo. |
+| `created_at` | `timestamptz` | No | `now()` | Fecha de registro. |
+
+RLS activa y sin políticas; `anon` y `authenticated` sin permisos: solo
+`service_role` (la Edge Function `free-mode`) lee y escribe.
+
+### Funciones relacionadas
+
+`SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
+
+- `public.edge_register_lead(p_ip_hash, p_given_names, p_family_names, p_email, p_phone)`: guarda el lead con bloqueo consultivo y falla con `lead_ip_limit` (5 por IP cada hora) o `lead_email_limit` (3 por correo cada día).
+- `public.edge_leads_sheet_id()`: lee de Vault el secreto `leads_sheet_id` (ID del Google Sheet); `null` si no existe. Se crea con `select vault.create_secret('<ID>', 'leads_sheet_id');`.

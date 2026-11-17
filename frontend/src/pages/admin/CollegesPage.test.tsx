@@ -41,4 +41,17 @@ describe("CollegesPage", () => {
 
     await waitFor(() => expect(mocks.deleteCollege.mock.calls[0]?.[0]).toBe("college-1"));
   });
+
+  it("explains why the demo college cannot be deleted instead of asking to confirm", async () => {
+    const user = userEvent.setup();
+    mocks.listColleges.mockResolvedValue([{ id: "demo", code: "CHANCON-DEMO", name: "Chancón – Modo gratuito", description: null, is_active: true }]);
+    renderPage();
+
+    await screen.findByText("Protegido");
+    await user.click(screen.getByRole("button", { name: "Eliminar" }));
+
+    expect(screen.getByRole("dialog", { name: "Esta institución no se puede eliminar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Eliminar definitivamente" })).not.toBeInTheDocument();
+    expect(mocks.deleteCollege).not.toHaveBeenCalled();
+  });
 });

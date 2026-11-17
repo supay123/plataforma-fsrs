@@ -399,6 +399,26 @@ y envía el token de Yape.
 Los planes y precios están en `config/business.ts` (`PLANS`, `findPlan`,
 `planPriceLabel`) y deben coincidir con `supabase/functions/_shared/plans.ts`.
 
+## Modo gratuito (`features/free-mode/`)
+
+Prueba pública de 10 preguntas del home (ruta `/gratis`, `pages/public/FreeModePage.tsx`),
+sin sesión, FSRS ni xp. Sigue el estilo de las páginas públicas (`PublicPage`, `slate`/`emerald`
+fijos); la página activa la clase `dark` en su contenedor para que los componentes compartidos
+(`Select`, `Field`, `Input`, `ModalForm`, `Button`) usen sus variantes oscuras.
+
+| Archivo | Qué ofrece |
+| --- | --- |
+| `api.ts` | `getFreeModeCatalog`, `getFreeModeQuestions(topicId)` y `registerFreeModeLead`, más los tipos del catálogo, las preguntas y el lead. |
+| `FreeQuestionRunner.tsx` | La dinámica de la práctica del estudiante (elegir, confirmar, corrección y explicación al instante, racha y mascota) con las respuestas correctas que ya trae cada pregunta. Devuelve las respuestas con `onFinish`. |
+| `FreeResult.tsx` | Aciertos y errores, lista de preguntas y el botón «Pulsa para identificarte». |
+| `LeadModal.tsx` | `ModalForm` de registro: nombres, apellidos, correo, WhatsApp, consentimiento de datos y campo trampa oculto (`website`). Los errores del servidor salen en toast. |
+| `lead-fields.ts` | Esquema zod del lead; reutiliza los campos de `features/registration/fields.ts`. |
+
+Tras registrarse se muestran los planes con `PlanCards`. Las cargas usan `Skeleton` (con
+`bg-white/10!` para que se vea sobre el fondo oscuro). El botón «Comenzar gratis» del home es
+`FreeButton` en `pages/HomePage.tsx`. En el admin de colegios, `features/colleges/demo.ts`
+(`isDemoCollege`) marca la institución demo como protegida.
+
 ## Cursos (`features/courses/`)
 
 La lista de cursos es un solo componente compartido por el profesor y el

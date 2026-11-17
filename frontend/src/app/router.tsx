@@ -8,6 +8,7 @@ import { RoleGuard } from "./guards";
 // Referencias visuales de estilo: solo en desarrollo (no se incluyen en producción)
 const ChanconStylePage = import.meta.env.DEV ? lazy(() => import("../pages/style-guide/ChanconStylePage").then((m) => ({ default: m.ChanconStylePage }))) : null;
 const SignUpPage = lazy(() => import("../pages/public/SignUpPage").then((m) => ({ default: m.SignUpPage })));
+const FreeModePage = lazy(() => import("../pages/public/FreeModePage").then((m) => ({ default: m.FreeModePage })));
 const InvitationPage = lazy(() => import("../pages/public/InvitationPage").then((m) => ({ default: m.InvitationPage })));
 const ResetPasswordPage = lazy(() => import("../pages/public/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
 const TermsPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
@@ -40,6 +41,7 @@ export function AppRouter() {
   return <Suspense fallback={<div className="mx-auto max-w-6xl p-8"><PageSkeleton /></div>}><Routes>
     <Route path="/" element={<HomePage />} />
     {ChanconStylePage && <Route path="/textura/chancon" element={<ChanconStylePage />} />}
+    <Route path="/gratis" element={<FreeModePage />} />
     <Route path="/terminos" element={<TermsPage />} />
     <Route path="/privacidad" element={<PrivacyPage />} />
     <Route path="/reembolsos" element={<RefundPolicyPage />} />

@@ -112,7 +112,9 @@ function Header() {
         <Link to="/estudiante/login" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold transition hover:border-emerald-400 hover:bg-slate-900">
           <LogIn size={16} aria-hidden className="hidden sm:block" />Iniciar sesión
         </Link>
-        <StartButton compact />
+        <FreeButton />
+        {/* En celular el header solo tiene sitio para dos botones; "Empieza ahora" sigue en el cuerpo. */}
+        <StartButton compact className="hidden sm:inline-flex" />
       </nav>
     </div>
   </header>;
@@ -232,15 +234,23 @@ function IntroVideo({ onEnded }: { onEnded: () => void }) {
 }
 
 /** Llamada principal: lleva a la sección de planes. */
-function StartButton({ compact = false }: { compact?: boolean }) {
+function StartButton({ compact = false, className }: { compact?: boolean; className?: string }) {
   // Verde sólido con texto oscuro para diferenciarlo del resto de botones.
   return <button type="button" onClick={() => scrollToSection("planes")} className={clsx(
     "group inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 font-semibold text-slate-950 transition duration-300 hover:bg-emerald-400 hover:shadow-lg hover:shadow-emerald-500/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300",
     compact ? "min-h-10 px-4 text-sm sm:px-5" : "min-h-14 px-8 text-lg",
+    className,
   )}>
     Empieza ahora
     <ArrowRight size={16} aria-hidden className={clsx("transition group-hover:translate-x-0.5", compact && "hidden sm:block")} />
   </button>;
+}
+
+/** Lleva a la prueba gratuita de 10 preguntas. */
+function FreeButton() {
+  return <Link to="/gratis" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/60 px-4 text-sm font-semibold text-emerald-300 transition duration-300 hover:border-emerald-300 hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 sm:px-5">
+    Comenzar gratis
+  </Link>;
 }
 
 export function HomePage() {
@@ -281,8 +291,9 @@ export function HomePage() {
           <p className="mt-4 text-sm text-slate-400 sm:mt-7">
             Empieza con <strong className="text-base font-bold text-emerald-300">{formatSoles(PLAN.priceSoles)} al mes</strong> · menos de {formatSoles(dailyCap)} al día
           </p>
-          <div className={clsx("mt-4 flex justify-center sm:mt-3", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
+          <div className={clsx("mt-4 flex flex-wrap justify-center gap-2 sm:mt-3", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
             <StartButton compact />
+            <FreeButton />
           </div>
         </Reveal>
       </div>
