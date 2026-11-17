@@ -3,7 +3,6 @@ import { withAppSupabase } from "../_shared/server.ts";
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, handle, json, readJson } from "../_shared/errors.ts";
-import { DEMO_TEACHER_ID } from "../_shared/free-mode.ts";
 import { uuid } from "../_shared/validation.ts";
 import type { DeleteUserBody } from "./interfaces.ts";
 
@@ -15,14 +14,6 @@ export default {
         const admin = await requireProfile(context, ["admin"]);
         const body = await readJson<DeleteUserBody>(request);
         const userId = uuid(body.user_id, "user_id");
-
-        if (userId === DEMO_TEACHER_ID) {
-          throw new AppError(
-            409,
-            "demo_teacher_protected",
-            "The demo teacher owns the free mode question bank and cannot be deleted.",
-          );
-        }
 
         const { data: target, error: targetError } = await context.supabaseAdmin
           .from(TABLES.profiles)

@@ -5,7 +5,6 @@ import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select } from "..
 import { PageSkeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { listColleges } from "../../features/colleges/api";
-import { isDemoTeacher } from "../../features/colleges/demo";
 import { InviteStudentForm } from "../../features/invitations/InviteStudentForm";
 import { PendingInvitations } from "../../features/invitations/PendingInvitations";
 import { PaymentsToReview } from "../../features/payments/PaymentsToReview";
@@ -99,7 +98,7 @@ export function UsersPage() {
         <div className="table-wrap mt-4"><table>
           <thead><tr><th>Usuario</th><th>Rol</th><th>Colegio</th><th>Acceso</th><th /></tr></thead>
           <tbody>{visible?.map((user) => <tr key={user.id}>
-            <td><strong>{user.full_name}</strong>{isDemoTeacher(user.id) && <> <Badge>Protegido</Badge></>}<br /><span className="text-xs text-fg-muted">{user.user_code}</span></td>
+            <td><strong>{user.full_name}</strong><br /><span className="text-xs text-fg-muted">{user.user_code}</span></td>
             <td>{roleLabel(user.role)}</td>
             <td>{colleges.data?.find((college) => college.id === user.college_id)?.name ?? "—"}</td>
             <td>{accessBadge(user)}{expiredLabel(user) && <span className="mt-1 block text-xs text-fg-muted">{expiredLabel(user)}</span>}</td>
@@ -118,10 +117,7 @@ export function UsersPage() {
               }) : toggle.mutate({ id: user.id, active: true })}>
                 {user.is_active ? "Desactivar" : "Activar"}
               </Button>
-              <Button size="sm" variant="danger" disabled={remove.isPending} onClick={() => isDemoTeacher(user.id) ? modal.info({
-                title: "Este usuario no se puede eliminar",
-                body: <p>{user.full_name} es el profesor del <strong>modo gratuito</strong>: es el dueño de las preguntas que ve quien prueba Chancón desde el inicio del sitio. Si se eliminara, el modo gratuito se quedaría sin grupo. Por eso está protegido. Sí puedes editar sus cursos, temas y preguntas.</p>,
-              }) : modal.delete({
+              <Button size="sm" variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
                 title: "Eliminar usuario",
                 mascot: "wrong",
                 confirmLabel: "Eliminar definitivamente",

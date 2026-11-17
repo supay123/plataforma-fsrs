@@ -1317,11 +1317,8 @@ exponer bancos de colegios reales. El código está reservado: los triggers
 (BEFORE UPDATE OF code), con `private.protect_demo_college()`, lanzan
 `demo_college_protected` si se intenta borrarla o cambiar su código. Las
 funciones `edge_registration_colleges()` y `edge_registration_teachers()` la
-excluyen para que no se ofrezca en el registro de estudiantes. El profesor demo
-también está protegido: el trigger `profiles_protect_demo_teacher` (BEFORE
-DELETE en `public.profiles`, con `private.protect_demo_teacher()`) lanza
-`demo_teacher_protected` aunque el borrado venga en cascada desde `auth.users`.
-Ambos siguen visibles para el administrador.
+excluyen para que no se ofrezca en el registro de estudiantes. Sigue
+visible para el administrador.
 
 ### public.lead_rate_limits
 

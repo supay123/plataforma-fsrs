@@ -90,21 +90,6 @@ describe("UsersPage", () => {
     await waitFor(() => expect(mocks.deleteUser.mock.calls[0]?.[0]).toBe("teacher-1"));
   });
 
-  it("explains why the demo teacher cannot be deleted instead of asking to confirm", async () => {
-    const user = userEvent.setup();
-    mocks.listUsers.mockResolvedValue([
-      { id: "5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01", college_id: "college-1", role: "teacher", user_code: "chancon-demo-profesor", full_name: "Grupo de prueba Chancón", is_active: true },
-    ]);
-    renderPage();
-
-    await screen.findByText("Protegido");
-    await user.click(screen.getByRole("button", { name: "Eliminar" }));
-
-    expect(screen.getByRole("dialog", { name: "Este usuario no se puede eliminar" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Eliminar definitivamente" })).not.toBeInTheDocument();
-    expect(mocks.deleteUser).not.toHaveBeenCalled();
-  });
-
   it("shows students with an expired plan as expired instead of active", async () => {
     mocks.listUsers.mockResolvedValue([
       { id: "student-1", college_id: "college-2", role: "student", user_code: "ALUMNA-1", full_name: "Ana Torres", is_active: true, access_valid_from: "2020-01-01", access_valid_until: "2020-01-31" },

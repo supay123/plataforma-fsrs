@@ -42,31 +42,6 @@ create trigger colleges_protect_demo_code
   for each row execute function private.protect_demo_college();
 
 -- ---------------------------------------------------------------------------
--- Protección del profesor demo: dueño del banco de pruebas. Si se borrara, el
--- modo gratuito se quedaría sin grupo. El trigger sobre profiles también frena
--- el borrado en cascada desde auth.users. El id debe coincidir con DEMO_TEACHER_ID
--- de _shared/free-mode.ts.
--- ---------------------------------------------------------------------------
-create function private.protect_demo_teacher()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-begin
-  if old.id = '5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01'::uuid then
-    raise exception 'demo_teacher_protected'
-      using errcode = 'P0001',
-        detail = 'The demo teacher owns the free mode question bank and cannot be deleted.';
-  end if;
-  return old;
-end;
-$$;
-
-create trigger profiles_protect_demo_teacher
-  before delete on public.profiles
-  for each row execute function private.protect_demo_teacher();
-
--- ---------------------------------------------------------------------------
 -- Siembra: institución demo con un grupo, un curso y un tema de ejemplo
 -- ---------------------------------------------------------------------------
 insert into public.colleges (code, name, description)
