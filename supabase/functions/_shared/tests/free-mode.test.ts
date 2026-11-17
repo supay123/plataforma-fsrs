@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { AppError } from "../errors.ts";
 import {
   buildCatalog,
-  DEMO_TEACHER_ID,
   isDemoCollegeCode,
+  leadLogLine,
   leadSheetRow,
   parseLeadRequest,
   pickRandom,
 } from "../free-mode.ts";
+import { GoogleSheetsError } from "../google-sheets.ts";
 
 const validLead = {
   given_names: "María José",
@@ -122,12 +123,26 @@ Deno.test("sheet row lists date in Lima time, names, email and WhatsApp", () => 
   ]);
 });
 
-Deno.test("demo teacher id matches the one seeded and protected by the migration", async () => {
-  const migration = await Deno.readTextFile(
-    new URL(
-      "../../../migrations/20261116020000_free_mode.sql",
-      import.meta.url,
+Deno.test("lead log line carries event, request id, status and message only", () => {
+  const line = JSON.parse(leadLogLine(
+    "free_mode.lead_sheet_failed",
+    "req-1",
+    new GoogleSheetsError(
+      403,
+      "Request had insufficient authentication scopes.",
     ),
+  ));
+  assert.deepEqual(line, {
+    event: "free_mode.lead_sheet_failed",
+    request_id: "req-1",
+    status: 403,
+    message: "Request had insufficient authentication scopes.",
+  });
+});
+
+Deno.test("lead log line without a cause has no status or message", () => {
+  assert.deepEqual(
+    JSON.parse(leadLogLine("free_mode.lead_sheet_not_configured", "req-2")),
+    { event: "free_mode.lead_sheet_not_configured", request_id: "req-2" },
   );
-  assert.equal(migration.split(DEMO_TEACHER_ID).length - 1, 2);
 });

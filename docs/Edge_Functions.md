@@ -196,8 +196,13 @@ pnpm exec supabase gen types --local --schema public \
   token must include the scope `https://www.googleapis.com/auth/spreadsheets`).
   Without the secret or if Google fails the endpoint answers `503
   leads_unavailable` and the lead is saved nowhere, so the person can retry.
-- `POST admin-delete-user`: `409 demo_teacher_protected` for the demo teacher
-  (owner of the free mode question bank), checked before anything is deleted.
+  Failures are logged as JSON lines (`event`, `request_id`, and when known
+  `status` and `message`; never the person's name, email, WhatsApp or IP).
+  View them in Supabase Dashboard → Edge Functions → free-mode → Logs:
+  `free_mode.lead_sheet_not_configured` (no `leads_sheet_id` secret),
+  `free_mode.lead_sheet_failed` (Google or token error, e.g. `status` 403 for a
+  missing scope) and `free_mode.lead_registration_failed` (the rate-limit
+  check failed unexpectedly).
 - `POST admin-delete-college`: `409 demo_college_protected` for the demo
   college, checked before any user is deleted.
 - `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`,

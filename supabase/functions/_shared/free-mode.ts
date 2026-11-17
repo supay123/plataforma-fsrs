@@ -3,8 +3,6 @@ import { normalizePhone, parseEmail, parsePersonName } from "./registration.ts";
 
 /** Código reservado de la institución demo que alimenta el modo gratuito. */
 export const DEMO_COLLEGE_CODE = "CHANCON-DEMO";
-/** Id fijo del profesor demo sembrado en la migración; no puede borrarse. */
-export const DEMO_TEACHER_ID = "5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01";
 export const FREE_MODE_QUESTION_COUNT = 10;
 
 export function isDemoCollegeCode(code: string): boolean {
@@ -127,4 +125,37 @@ export function leadSheetRow(lead: LeadInput, createdAt: Date): string[] {
     lead.email,
     `+51${lead.phone}`,
   ];
+}
+
+export type LeadLogEvent =
+  | "free_mode.lead_sheet_not_configured"
+  | "free_mode.lead_sheet_failed"
+  | "free_mode.lead_registration_failed";
+
+/**
+ * Línea de log del registro de leads. Solo lleva el evento, el id de la
+ * petición y el motivo técnico: nunca datos del interesado (nombre, correo,
+ * WhatsApp ni IP).
+ */
+export function leadLogLine(
+  event: LeadLogEvent,
+  requestId: string,
+  cause?: unknown,
+): string {
+  const status = typeof cause === "object" && cause !== null &&
+      "status" in cause && typeof cause.status === "number"
+    ? cause.status
+    : undefined;
+  const message = cause instanceof Error
+    ? cause.message
+    : typeof cause === "object" && cause !== null && "message" in cause &&
+        typeof cause.message === "string"
+    ? cause.message
+    : undefined;
+  return JSON.stringify({
+    event,
+    request_id: requestId,
+    ...(status === undefined ? {} : { status }),
+    ...(message === undefined ? {} : { message }),
+  });
 }

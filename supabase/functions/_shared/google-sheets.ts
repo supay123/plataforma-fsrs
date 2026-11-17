@@ -2,6 +2,22 @@ import { googleAccessToken } from "./gmail.ts";
 
 const SHEETS_URL = "https://sheets.googleapis.com/v4/spreadsheets";
 
+export class GoogleSheetsError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "GoogleSheetsError";
+  }
+}
+
+/** Solo el mensaje de Google (p. ej. "insufficient authentication scopes"); nunca el cuerpo completo. */
+async function googleErrorMessage(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null) as
+    | { error?: { message?: unknown } }
+    | null;
+  const message = body?.error?.message;
+  return typeof message === "string" ? message : response.statusText;
+}
+
 /**
  * Agrega una fila al final de la primera hoja del documento. Usa la misma
  * cuenta de Google que envía los correos (su refresh token debe incluir el
@@ -26,9 +42,9 @@ export async function appendSheetRow(
     body: JSON.stringify({ values: [row] }),
   });
   if (!response.ok) {
-    throw new Error(
-      `Google Sheets rejected the row (${response.status}): ${await response
-        .text().catch(() => "")}`,
+    throw new GoogleSheetsError(
+      response.status,
+      await googleErrorMessage(response),
     );
   }
 }

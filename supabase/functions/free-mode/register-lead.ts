@@ -1,7 +1,11 @@
 import { RPCS } from "../_shared/database.constants.ts";
 import { clientIp } from "../_shared/complaints.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
-import { leadSheetRow, parseLeadRequest } from "../_shared/free-mode.ts";
+import {
+  leadLogLine,
+  leadSheetRow,
+  parseLeadRequest,
+} from "../_shared/free-mode.ts";
 import { appendSheetRow } from "../_shared/google-sheets.ts";
 import type { EdgeContext } from "../_shared/types.ts";
 import type { RegisterLeadBody } from "./interfaces.ts";
@@ -32,6 +36,8 @@ export async function registerLead(
   if (parsed.kind === "honeypot") return json({ ok: true }, 201);
 
   const { lead } = parsed;
+  const requestId = request.headers.get("x-client-request-id") ??
+    crypto.randomUUID();
   const { error } = await context.supabaseAdmin.rpc(
     RPCS.checkLeadRateLimit,
     {
@@ -54,6 +60,9 @@ export async function registerLead(
     );
   }
   if (error) {
+    console.error(
+      leadLogLine("free_mode.lead_registration_failed", requestId, error),
+    );
     throw new AppError(
       500,
       "lead_registration_failed",
@@ -62,13 +71,25 @@ export async function registerLead(
   }
 
   try {
-    const { data: sheetId } = await context.supabaseAdmin.rpc(
-      RPCS.leadsSheetId,
-    );
-    if (!sheetId) throw new Error("The leads_sheet_id secret is not set");
+    const { data: sheetId, error: sheetIdError } = await context.supabaseAdmin
+      .rpc(RPCS.leadsSheetId);
+    if (sheetIdError) throw sheetIdError;
+    if (!sheetId) {
+      console.error(
+        leadLogLine("free_mode.lead_sheet_not_configured", requestId),
+      );
+      throw new AppError(
+        503,
+        "leads_unavailable",
+        "The registration is not available right now.",
+      );
+    }
     await appendSheetRow(sheetId, leadSheetRow(lead, new Date()));
   } catch (cause) {
-    console.error("Lead could not be added to the Google Sheet", cause);
+    if (cause instanceof AppError && cause.code === "leads_unavailable") {
+      throw cause;
+    }
+    console.error(leadLogLine("free_mode.lead_sheet_failed", requestId, cause));
     throw new AppError(
       503,
       "leads_unavailable",
