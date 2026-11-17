@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Eyebrow } from "../../components/ui";
 import { PracticeMascot } from "../sessions/PracticeMascot";
+import { MedalResult } from "../medals/MedalResult";
+import type { MedalAward } from "../medals/api";
 import type { XpAward } from "../../types/contracts";
 import { buildLevelSegments, streakLabel } from "./xp";
 import { prefersReducedMotion, useCountUp } from "./use-count-up";
@@ -9,8 +11,8 @@ const START_DELAY_MS = 900;
 const FILL_MS = 800;
 const LEVEL_UP_MS = 900;
 
-/** Pantalla de fin de sesión: xp ganado que crece y barra que sube nivel por nivel. */
-export function XpResult({ award, onContinue }: { award: XpAward; onContinue: () => void }) {
+/** Pantalla de fin de sesión: xp ganado que crece y barra que sube nivel por nivel, más la medalla si el colegio las tiene. */
+export function XpResult({ award, medal, onContinue }: { award: XpAward; medal?: MedalAward | null; onContinue: () => void }) {
   const segments = useMemo(() => buildLevelSegments(award), [award]);
   const total = useCountUp(award.xp_gained);
   const reduced = prefersReducedMotion();
@@ -62,6 +64,7 @@ export function XpResult({ award, onContinue }: { award: XpAward; onContinue: ()
     <p className="mt-3 min-h-5 text-sm text-primary-text" aria-live="polite">
       {done && levelsGained > 0 && (levelsGained === 1 ? "¡Subiste de nivel!" : `¡Subiste ${levelsGained} niveles!`)}
     </p>
+    <MedalResult award={medal} />
     <div className="mt-6 flex justify-center">
       <Button onClick={onContinue}>Ver revisión</Button>
     </div>

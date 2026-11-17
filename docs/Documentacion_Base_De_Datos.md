@@ -1162,6 +1162,53 @@ solo el admin lee y escribe; la lectura pública sin sesión la hace la Edge Fun
 RLS: el estudiante lee su fila y el admin todas; solo se escribe con
 `service_role`.
 
+### public.college_medal_settings
+
+Configuración de medallas de un colegio, 1 a 1 con `colleges` (`college_id` es la
+clave y `ON DELETE CASCADE`). Campos: `enabled` (por defecto `true`),
+`star_range_ends` (fin de cada uno de los 12 primeros rangos de estrellas:
+Postulante 1-3, Pre-Universitario 1-3, Candidato 1-3, Pre-Ingresante 1-3; por defecto
+`{2,5,8,13,18,23,32,41,50,67,84,101}`) y `grade_range_ends` (fin de las notas que dan
+-3, -2, -1, 0, +1 y +2 estrellas; por defecto `{2,5,8,9,13,17}`). Solo se guarda el
+umbral final: el inicio de cada rango es el fin del anterior + 1, Postulante 1 empieza
+en 0, **Ingresante** empieza en el último fin + 1, el rango de -3 empieza en 0 y el de
++3 termina en 20. Las constraints (`public.medal_ends_are_valid`) exigen enteros
+estrictamente crecientes y no negativos, y que el último fin de notas sea como máximo 19.
+Las notas con decimales caen en el rango de su parte entera. La fila se crea con el
+colegio (trigger `colleges_create_medal_settings`) y la migración activó las medallas en
+los colegios existentes. RLS: el admin lee y escribe; profesor y estudiante leen la de su
+colegio. La API (`medals`) devuelve los valores por defecto si no hay fila y la crea al
+modificar.
+
+### public.student_medals
+
+Medalla actual del estudiante, 1 a 1 con `profiles` (`student_id`, `ON DELETE CASCADE`):
+`stars` (>= 0, nunca negativo) y `medal` (`postulante_1` ... `ingresante`). Se crea con el
+estudiante (trigger `profiles_create_student_medal`) y por la migración con 0 estrellas.
+RLS: el estudiante lee la suya, el admin todas y el profesor las de sus estudiantes; solo
+se escribe con `service_role`.
+
+### public.student_topic_stars
+
+Mejor marca de estrellas por estudiante y tema de la práctica normal: clave
+`(student_id, topic_id)`, `best_stars` (0-3) y `completed` (true al llegar a 3). Ambas
+claves foráneas son `ON DELETE CASCADE`. Misma RLS que `student_medals`.
+
+### public.assessment_sessions.medal_award
+
+`jsonb` con el resultado de las medallas de la sesión (null hasta calcularse). Hace
+idempotente `POST /medals/calculate`.
+
+### Funciones de medallas
+
+- `public.medal_ends_are_valid(p_ends, p_count, p_max)` y `public.medal_for_stars(p_stars, p_ends)`: auxiliares inmutables.
+- `public.edge_apply_session_medal(p_student_id, p_session_id, p_grade, p_stars_for_grade)`
+  (`SECURITY DEFINER`, solo `service_role`): aplica las reglas por tema en una transacción.
+  Estrellas negativas siempre restan (mínimo 0 en total); tema sin completar suma solo la
+  diferencia con su mejor marca; tema completado solo suma +1 con un resultado de +3.
+  Es idempotente por sesión y devuelve `{ enabled: false }` sin tocar nada si el colegio
+  las desactivó.
+
 ### public.assessment_sessions.xp_award
 
 `jsonb` con el resultado de otorgar el xp de la sesión (null hasta que se

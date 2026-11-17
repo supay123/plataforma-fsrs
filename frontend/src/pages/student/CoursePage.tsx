@@ -5,6 +5,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Card, PageHeader, ProgressBar } from "../../components/ui";
 import { Skeleton } from "../../components/ui/skeleton";
 import { listStudentCourses, listTopics } from "../../features/courses/api";
+import { getTopicStars } from "../../features/medals/api";
+import { MedalRulesHelp } from "../../features/medals/MedalRulesHelp";
+import { StarSlots } from "../../features/medals/StarSlots";
 import { MascotAdvice } from "../../features/mascot/MascotAdvice";
 import { topicAccess, topicProgress } from "../../features/progress/api";
 import { prefersReducedMotion } from "../../features/sessions/mascot-support";
@@ -27,6 +30,8 @@ export function StudentCoursePage() {
   const topics = useQuery({ queryKey: ["topics", courseId], queryFn: () => listTopics(courseId) });
   const access = useQuery({ queryKey: ["topic-access", courseId], queryFn: () => topicAccess(courseId) });
   const progress = useQuery({ queryKey: ["topic-progress"], queryFn: () => topicProgress() });
+  // Las estrellas son un adorno: si fallan o el colegio no tiene medallas, los temas se ven sin ellas.
+  const stars = useQuery({ queryKey: ["topic-stars"], queryFn: getTopicStars, retry: false });
   const navigate = useNavigate();
   const [pickedTopic, setPickedTopic] = useState<{ name: string; count: number } | null>(null);
   const navigationTimer = useRef<number>(undefined);
@@ -44,6 +49,7 @@ export function StudentCoursePage() {
   return <div className="grid grid-cols-1 gap-6">
     <Link to="/estudiante" className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-fg-muted transition hover:text-fg"><ChevronLeft size={16} />Mi aprendizaje</Link>
     <PageHeader className="mb-0! portal:mb-0!" title={courses.data?.find((c) => c.id === courseId)?.name ?? "Curso"} description="Temas, materiales y sesiones disponibles." />
+    {stars.data?.enabled && <div className="-mt-2 flex items-center gap-2 text-sm text-fg-muted"><span>Cada tema da hasta 3 estrellas.</span><MedalRulesHelp /></div>}
     <MascotAdvice event={pickedTopic ? "correct" : active.length ? "rest" : "sleep"} eventKey={pickedTopic?.count}>
       {pickedTopic ? `¡Vamos con «${pickedTopic.name}»!` : active.length ? "Elige un tema para practicar. Los marcados como «Nuevo» todavía no los has practicado." : "Este curso aún no tiene temas disponibles. Vuelve pronto."}
     </MascotAdvice>
@@ -58,6 +64,7 @@ export function StudentCoursePage() {
             : result ? <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-on-primary" role="img" aria-label="Practicado"><Check size={16} strokeWidth={3} /></span>
             : <span className="rounded-lg bg-primary-soft px-2 py-1 text-xs font-semibold text-primary-text">Nuevo</span>}
         </div>
+        {stars.data?.enabled && <StarSlots best={stars.data.topics.find((row) => row.topic_id === topic.id)?.best_stars ?? 0} />}
         <h2 className="type-heading mt-auto text-lg leading-snug">
           {blocked ? topic.name : <Link to={`/estudiante/temas/${topic.id}/sesion`} aria-label={`${result ? "Continuar práctica" : "Iniciar práctica"}: ${topic.name}`} onClick={(event) => pickTopic(event, topic)} className="after:absolute after:inset-0 after:rounded-2xl">{topic.name}</Link>}
         </h2>

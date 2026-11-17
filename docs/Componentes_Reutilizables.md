@@ -438,6 +438,20 @@ profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
   barra).
 - `useCountUp(target)` y `prefersReducedMotion()` (`use-count-up.ts`).
 
+## Medallas (`features/medals/`)
+
+- `MedalSettings` (`MedalSettings.tsx`): pestaña "Medallas" de Configuración del admin. Interruptor
+  activar/desactivar y, si está activado, editores del fin de cada rango de estrellas y de notas
+  (validados con Zod en `medals.ts`; el inicio se deriva del fin del anterior). Guarda tras un modal de aviso.
+- `MedalResult` (`MedalResult.tsx`): medalla actual y estrellas ganadas o perdidas; va dentro de `XpResult`
+  (prop `medal`) y no se muestra si el colegio las desactivó.
+- `StarSlots` (`StarSlots.tsx`): hueco de 3 estrellas (`best` llenas, el resto vacías); se usa junto a cada tema.
+- `MedalRulesHelp` (`MedalRulesHelp.tsx`): icono SVG "?" con tooltip que abre un modal informativo con la regla
+  de estrellas por tema. `MedalRulesBody` es el texto de esa regla.
+- `MedalRuleNote` (`MedalRuleNote.tsx`): la misma regla en la pantalla de carga de la práctica (junto a la mascota),
+  solo si el colegio tiene medallas activadas.
+- `api.ts`: `getMedalSettings`, `saveMedalSettings`, `getMyMedal`, `getTopicStars`, `calculateMedal` (Edge Function `medals`).
+
 ## Utilidades (`lib/`)
 
 | Utilidad | Archivo | Descripción |

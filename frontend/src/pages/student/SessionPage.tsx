@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePortalFocus, useLeaveWarning, type LeaveWarning } from "../../components/layout/portal-mode";
@@ -6,6 +6,8 @@ import { Flame } from "lucide-react";
 import { Alert, Button, Card, Eyebrow, ProgressBar } from "../../components/ui";
 import { decryptAnswerKey } from "../../features/sessions/answer-key";
 import { getXpRules, startPractice, submitPractice } from "../../features/sessions/api";
+import { calculateMedal, type MedalAward } from "../../features/medals/api";
+import { MedalRuleNote } from "../../features/medals/MedalRuleNote";
 import { LoadingProgress } from "../../features/sessions/LoadingProgress";
 import type { LoadStage } from "../../features/sessions/loading-progress";
 import { MascotTips } from "../../features/sessions/MascotTips";
@@ -90,18 +92,20 @@ function PracticeLoading({ stage, stageSince, startedAt, done, onRetry }: { stag
     </div>
     <LoadingProgress stage={stage} stageSince={stageSince} startedAt={startedAt} done={done} onRetry={onRetry} />
     <MascotTips />
+    <MedalRuleNote />
   </div>;
 }
 
 export function SessionPage() {
   const { topicId = "" } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [practice, setPractice] = useState<Practice | null>(null);
   // La práctica ya está lista, pero la primera pregunta espera a que se vea la barra completa.
   const [revealed, setRevealed] = useState(false);
   const [answers, setAnswers] = useState<Record<string, LocalAnswer>>({});
   const [index, setIndex] = useState(0);
-  const [award, setAward] = useState<{ sessionId: string; xp: XpAward } | null>(null);
+  const [award, setAward] = useState<{ sessionId: string; xp: XpAward; medal: MedalAward | null } | null>(null);
   const [selected, setSelected] = useState<AnswerOption | null>(null);
   const sleeping = useInactivity(INACTIVITY_BEFORE_SLEEP_MS, practice !== null && award === null);
   const [startedAt, setStartedAt] = useState(0);
@@ -149,9 +153,16 @@ export function SessionPage() {
   }, [topicId, begin]);
 
   const submit = useMutation({
-    mutationFn: (session: { id: string; answers: SessionAnswer[] }) => submitPractice(session.id, session.answers),
+    mutationFn: async (session: { id: string; answers: SessionAnswer[] }) => {
+      const data = await submitPractice(session.id, session.answers);
+      // Las medallas son un adorno del cierre: si fallan, se muestra el xp igual. Es idempotente en el servidor.
+      const medal = data.xp ? await calculateMedal(session.id).catch(() => null) : null;
+      return { ...data, medal };
+    },
     onSuccess: (data, session) => {
-      if (data.xp) setAward({ sessionId: session.id, xp: data.xp });
+      void queryClient.invalidateQueries({ queryKey: ["topic-stars"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-medal"] });
+      if (data.xp) setAward({ sessionId: session.id, xp: data.xp, medal: data.medal });
       else navigate(`/estudiante/sesiones/${session.id}/revision`, { replace: true });
     },
   });
@@ -179,7 +190,7 @@ export function SessionPage() {
   );
 
   if (award) {
-    return <XpResult award={award.xp} onContinue={() => navigate(`/estudiante/sesiones/${award.sessionId}/revision`, { replace: true })} />;
+    return <XpResult award={award.xp} medal={award.medal} onContinue={() => navigate(`/estudiante/sesiones/${award.sessionId}/revision`, { replace: true })} />;
   }
   if (start.error) {
     return <div className="mx-auto mt-10 grid max-w-md gap-4">

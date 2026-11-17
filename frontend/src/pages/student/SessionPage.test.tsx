@@ -3,6 +3,7 @@ import { cleanup, configure, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ModalProvider } from "../../components/ui/modal";
 import type { AnswerKeyEntry, PracticePayload } from "../../types/contracts";
 import { SessionPage } from "./SessionPage";
 
@@ -14,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   submitPractice: vi.fn(),
   decryptAnswerKey: vi.fn(),
   getXpRules: vi.fn(),
+  calculateMedal: vi.fn(),
+  getMyMedal: vi.fn(),
 }));
 
 vi.mock("../../features/sessions/api", () => ({
@@ -21,6 +24,7 @@ vi.mock("../../features/sessions/api", () => ({
   submitPractice: mocks.submitPractice,
   getXpRules: mocks.getXpRules,
 }));
+vi.mock("../../features/medals/api", () => ({ calculateMedal: mocks.calculateMedal, getMyMedal: mocks.getMyMedal }));
 // El cifrado real se prueba en answer-key.test.ts.
 vi.mock("../../features/sessions/answer-key", () => ({ decryptAnswerKey: mocks.decryptAnswerKey }));
 
@@ -67,12 +71,14 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
+      <ModalProvider>
       <MemoryRouter initialEntries={["/estudiante/temas/topic-1/sesion"]}>
         <Routes>
           <Route path="/estudiante/temas/:topicId/sesion" element={<SessionPage />} />
           <Route path="/estudiante/sesiones/:sessionId/revision" element={<div>Revisión</div>} />
         </Routes>
       </MemoryRouter>
+      </ModalProvider>
     </QueryClientProvider>,
   );
 }
@@ -84,6 +90,8 @@ describe("SessionPage", () => {
     mocks.startPractice.mockReset().mockResolvedValue(payload());
     mocks.decryptAnswerKey.mockReset().mockResolvedValue(keyFor());
     mocks.submitPractice.mockReset().mockResolvedValue({ session: {} });
+    mocks.calculateMedal.mockReset().mockResolvedValue({ enabled: false });
+    mocks.getMyMedal.mockReset().mockResolvedValue({ enabled: false });
     mocks.getXpRules.mockReset().mockResolvedValue({
       xp_per_correct: 75, streak_3_bonus: 15, streak_7_bonus: 42, streak_20_bonus: 137, level: 0, xp: 0, xp_to_next: 100,
     });
@@ -189,6 +197,36 @@ describe("SessionPage", () => {
     await user.click(screen.getByRole("button", { name: "Ver revisión" }));
     expect(await screen.findByText("Revisión")).toBeInTheDocument();
   }, 15000);
+
+  it("shows the medal and the stars earned next to the xp when the college has medals", async () => {
+    const user = userEvent.setup();
+    mocks.startPractice.mockResolvedValue(payload(1));
+    mocks.decryptAnswerKey.mockResolvedValue(keyFor(1));
+    mocks.submitPractice.mockResolvedValue({
+      session: {},
+      xp: { xp_gained: 75, level_before: 0, xp_before: 0, level: 0, xp: 75, thresholds: [100], breakdown: { total: 75, correct_xp: 75, streak_bonuses: [] } },
+    });
+    mocks.calculateMedal.mockResolvedValue({
+      enabled: true, grade: 20, stars_for_grade: 3, stars_delta: 3, stars_before: 2, stars: 5, medal_before: "postulante_1", medal: "postulante_2",
+      topic_id: "topic-1", topic_best_stars: 3, topic_completed: true,
+    });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
+    await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar examen" }));
+    expect(await screen.findByText("Postulante 2")).toBeInTheDocument();
+    expect(mocks.calculateMedal).toHaveBeenCalledWith("session-1");
+    expect(screen.getByText(/Ganaste 3 estrellas/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "3 de 3 estrellas" })).toBeInTheDocument();
+  }, 15000);
+
+  it("explains the star rule on the loading screen only when medals are enabled", async () => {
+    mocks.getMyMedal.mockResolvedValue({ enabled: true, stars: 0, medal: {}, next_medal: null, stars_to_next: null });
+    mocks.decryptAnswerKey.mockReturnValue(new Promise(() => undefined));
+    renderPage();
+    expect(await screen.findByText("Estrellas por tema")).toBeInTheDocument();
+    expect(screen.getByText(/solo ganas \+1 estrella con un resultado de \+3/)).toBeInTheDocument();
+  });
 
   it("resumes on the first pending question and only submits pending ones", async () => {
     const user = userEvent.setup();
