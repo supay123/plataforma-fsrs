@@ -1174,3 +1174,51 @@ otorga). Hace idempotente el cierre.
 - `public.edge_college_xp_rules(p_college_id)`: reglas del colegio; crea la fila por defecto si no existe.
 - `public.edge_student_xp_state(p_student_id)`: montos del colegio más nivel, xp y `xp_to_next` del estudiante.
 - `public.edge_award_session_xp(p_student_id, p_session_id, p_xp)`: suma el xp, sube los niveles que correspondan y guarda el resultado en la sesión una sola vez.
+
+## Modo ruta
+
+Temas con lecciones que el estudiante desbloquea en orden. Las preguntas son
+propias de este modo (no son las de `questions`) y no alimentan FSRS. Toda
+lectura de contenido y escritura pasa por la Edge Function `route-mode`
+(`service_role`); las políticas RLS solo cubren lecturas directas.
+
+### public.route_topics
+
+`college_id`, `teacher_id` (el grupo dueño), `name`, `description` y `position`
+(1, 2, 3...: se muestra como "Tema N"). RLS de lectura: admin, el profesor dueño
+y los estudiantes matriculados en cursos de ese profesor.
+
+### public.route_lessons
+
+`topic_id`, `position`, `title`, `content_text` (texto con saltos de línea y
+KaTeX) e `is_ready` (true al guardar las 5 preguntas; solo entonces la ven los
+estudiantes). RLS de lectura: admin y el profesor dueño. Los estudiantes no
+tienen política: el contenido solo se sirve por la Edge Function, que valida el
+bloqueo.
+
+### public.route_questions
+
+Exactamente 5 por lección (`position` 1 a 5, único por lección): `statement`,
+`option_a` a `option_d`, `correct_option` y `explanation`. RLS de lectura: admin
+y el profesor dueño (los estudiantes nunca leen la respuesta correcta).
+
+### public.route_lesson_attempts
+
+Cada intento: `student_id`, `lesson_id`, `correct_count`, `total_questions`,
+`score_percent`, `passed` (`score_percent >= 80`), `answers` y `xp_gained`. Una
+lección se completa cuando algún intento tiene `passed`; la siguiente se
+desbloquea entonces (dentro de la fila de temas y lecciones de cada profesor).
+RLS: el estudiante lee los suyos, el admin todos y el profesor los de sus temas.
+
+### public.route_question_xp_awards
+
+Clave `(student_id, question_id)`: pregunta que ya dio xp al estudiante. Solo la
+primera vez que se responde bien se otorga xp; los reintentos no lo repiten.
+
+### Función relacionada
+
+- `public.edge_record_route_attempt(p_student_id, p_lesson_id, p_answers, p_correct_question_ids, p_total_questions)`:
+  `SECURITY DEFINER`, solo `service_role`. Registra los premios de xp nuevos con
+  `on conflict do nothing` (seguro ante envíos simultáneos), guarda el intento,
+  suma el xp a `student_levels` y devuelve el resultado con el mismo formato de
+  xp que `edge_award_session_xp`. No hay bonos de racha ni estrellas de medalla.

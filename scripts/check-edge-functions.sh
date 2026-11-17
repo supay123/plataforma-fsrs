@@ -16,6 +16,7 @@ function_dirs=(
   get-session-review
   import-questions
   questions
+  route-mode
   login-with-code
   recover-password
   public

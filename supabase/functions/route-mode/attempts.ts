@@ -1,0 +1,106 @@
+import { requireProfile } from "../_shared/auth.ts";
+import { RPCS, TABLES } from "../_shared/database.constants.ts";
+import type { Json } from "../_shared/database.types.ts";
+import { AppError, json, readJson } from "../_shared/errors.ts";
+import {
+  gradeRouteAttempt,
+  parseRouteAnswers,
+  ROUTE_PASS_PERCENT,
+} from "../_shared/route-mode.ts";
+import type { EdgeContext } from "../_shared/types.ts";
+import { uuid } from "../_shared/validation.ts";
+import type { SubmitAttemptBody } from "./interfaces.ts";
+import { loadStudentRoute, requireUnlockedLesson } from "./student-route.ts";
+
+/**
+ * POST /route-mode/attempts
+ * Califica un intento con la clave de la base de datos, lo guarda, otorga el
+ * xp de las preguntas bien respondidas por primera vez y devuelve el
+ * resultado con la corrección. Una lección bloqueada responde 403.
+ */
+export async function submitAttempt(
+  request: Request,
+  context: EdgeContext,
+): Promise<Response> {
+  const student = await requireProfile(context, ["student"], true);
+  const body = await readJson<SubmitAttemptBody>(request);
+  const lessonId = uuid(body.lesson_id, "lesson_id");
+  const answers = parseRouteAnswers(body.answers);
+  await requireUnlockedLesson(context, student, lessonId);
+
+  const { data: questions, error } = await context.supabaseAdmin
+    .from(TABLES.routeQuestions)
+    .select("id,position,correct_option,explanation")
+    .eq("lesson_id", lessonId)
+    .order("position");
+  if (error) {
+    throw new AppError(500, "route_question_lookup_failed", error.message);
+  }
+
+  const grading = gradeRouteAttempt(questions ?? [], answers);
+  const { data: result, error: recordError } = await context.supabaseAdmin.rpc(
+    RPCS.recordRouteAttempt,
+    {
+      p_student_id: student.id,
+      p_lesson_id: lessonId,
+      p_answers: answers as unknown as Json,
+      p_correct_question_ids: grading.correct_question_ids,
+      p_total_questions: grading.total_questions,
+    },
+  );
+  if (recordError || !result) {
+    throw new AppError(
+      500,
+      "route_attempt_failed",
+      recordError?.message ?? "Unable to record the attempt.",
+    );
+  }
+
+  const selectedById = new Map(
+    answers.map((answer) => [answer.question_id, answer.selected_option]),
+  );
+  const unlocked = await nextLessonId(context, student, lessonId);
+  return json({
+    ...(result as Record<string, Json>),
+    pass_percent: ROUTE_PASS_PERCENT,
+    next_lesson_id: grading.passed ? unlocked : null,
+    review: (questions ?? []).map((question) => ({
+      question_id: question.id,
+      selected_option: selectedById.get(question.id),
+      correct_option: question.correct_option.trim(),
+      is_correct: grading.correct_question_ids.includes(question.id),
+      explanation: question.explanation,
+    })),
+  });
+}
+
+/** Siguiente lección de la fila del profesor, si existe y ya está lista. */
+async function nextLessonId(
+  context: EdgeContext,
+  student: Parameters<typeof loadStudentRoute>[1],
+  lessonId: string,
+): Promise<string | null> {
+  const route = await loadStudentRoute(context, student);
+  const row = route.flatMap((topic) =>
+    topic.lessons.map((lesson) => ({ ...lesson, teacher_id: topic.teacher_id }))
+  );
+  const index = row.findIndex((lesson) => lesson.id === lessonId);
+  const current = row[index];
+  if (!current) return null;
+  const next = row.slice(index + 1).find((lesson) =>
+    lesson.teacher_id === current.teacher_id
+  );
+  return next?.id ?? null;
+}
+
+/** GET /route-mode/progress — temas, lecciones y desbloqueos del estudiante. */
+export async function getProgress(
+  _request: Request,
+  context: EdgeContext,
+): Promise<Response> {
+  const student = await requireProfile(context, ["student"], true);
+  return json({
+    pass_percent: ROUTE_PASS_PERCENT,
+    topics: await loadStudentRoute(context, student),
+  });
+}
