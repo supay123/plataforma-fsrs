@@ -1209,6 +1209,25 @@ idempotente `POST /medals/calculate`.
   Es idempotente por sesión y devuelve `{ enabled: false }` sin tocar nada si el colegio
   las desactivó.
 
+### public.college_ranking_settings
+
+Configuración del ranking de un colegio, 1 a 1 con `colleges` (`college_id`, `ON DELETE CASCADE`):
+`enabled` (por defecto `false`) y `categories` (`ranking_type[]`, al menos una; por defecto
+`{NIVEL,MEDALLAS,NOTA}`). Se crea con el colegio (trigger `colleges_create_ranking_settings`) y la
+migración la creó para los existentes. La API (`ranking`) devuelve los valores por defecto si no hay fila y
+la crea al guardar. RLS como `college_medal_settings`: lectura del admin y del propio colegio; escritura solo admin.
+
+### public.ranking_type y public.cache_ranking
+
+Enum `ranking_type`: `NIVEL`, `MEDALLAS`, `NOTA`. `cache_ranking` guarda el ranking completo del grupo
+de un usuario como snapshot (`entries` jsonb ordenado, con `position` y `user_id`), una fila por
+(`user_id`, `ranking_type`) (clave primaria; `user_id` referencia `profiles` con `ON DELETE CASCADE`). `expires_at`
+vive 1 hora y se renueva en cada consulta. RLS activado sin políticas y sin permisos para `anon` ni
+`authenticated`: solo `service_role` (los endpoints sirven a cada usuario su propia fila).
+`public.edge_purge_expired_ranking_cache()` (`SECURITY DEFINER`, solo `service_role`) borra las vencidas y
+devuelve cuántas; la ejecuta el cron `purge-expired-ranking-cache` cada 15 minutos y el endpoint de
+refresco. Sin pg_cron, programa esa función con otro planificador.
+
 ### public.assessment_sessions.xp_award
 
 `jsonb` con el resultado de otorgar el xp de la sesión (null hasta que se

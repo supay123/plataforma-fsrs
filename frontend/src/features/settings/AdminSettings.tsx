@@ -5,15 +5,16 @@ import { Alert, Card, EmptyState, Field, PageHeader, Select } from "../../compon
 import { PageSkeleton } from "../../components/ui/skeleton";
 import { listColleges } from "../colleges/api";
 import { MedalSettings } from "../medals/MedalSettings";
+import { RankingSettings } from "../ranking/RankingSettings";
 import { ThemeSettings } from "../theme/ThemeSettings";
 import { XpSettings } from "../xp/XpSettings";
 
-const TABS = [["security", "Seguridad"], ["theme", "Colores"], ["xp", "Puntos"], ["medals", "Medallas"]] as const;
+const TABS = [["security", "Seguridad"], ["theme", "Colores"], ["xp", "Puntos"], ["medals", "Medallas"], ["ranking", "Ranking"]] as const;
 type TabId = (typeof TABS)[number][0];
 
 /**
  * Configuración del admin. El selector de institución va sobre las pestañas y es la referencia
- * de las pestañas que guardan valores por institución (Colores, Puntos y Medallas); Seguridad es de la cuenta.
+ * de las pestañas que guardan valores por institución (Colores, Puntos, Medallas y Ranking); Seguridad es de la cuenta.
  */
 export function AdminSettings({ security }: { security: ReactNode }) {
   const colleges = useQuery({ queryKey: ["colleges"], queryFn: listColleges });
@@ -31,7 +32,7 @@ export function AdminSettings({ security }: { security: ReactNode }) {
     <PageHeader title="Configuración" description="Seguridad de tu cuenta y ajustes de cada institución." />
     {college && <Card className="mb-6">
       <div className="max-w-md">
-        <Field label="Institución" hint="Los cambios de Colores, Puntos y Medallas se guardan para esta institución; cada una puede tener los suyos.">
+        <Field label="Institución" hint="Los cambios de Colores, Puntos, Medallas y Ranking se guardan para esta institución; cada una puede tener los suyos.">
           <Select value={college.id} onChange={(event) => setSelected(event.target.value)}>{colleges.data?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>
         </Field>
       </div>
@@ -43,6 +44,7 @@ export function AdminSettings({ security }: { security: ReactNode }) {
     {tab === "security" ? security
       : tab === "theme" ? institutionTab((current) => <ThemeSettings college={current} />)
         : tab === "xp" ? institutionTab((current) => <XpSettings college={current} />)
-          : institutionTab((current) => <MedalSettings college={current} />)}
+          : tab === "medals" ? institutionTab((current) => <MedalSettings college={current} />)
+            : institutionTab((current) => <RankingSettings college={current} />)}
   </>;
 }

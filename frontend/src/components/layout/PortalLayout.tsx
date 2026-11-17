@@ -1,8 +1,9 @@
 import clsx from "clsx";
-import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, PanelLeftClose, Settings, Users, X } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, PanelLeftClose, Settings, Trophy, Users, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { useRankingSettings } from "../../features/ranking/use-ranking-visible";
 import { PlanExpiryBanner } from "../../features/payments/PlanExpiryBanner";
 import { preloadMascot } from "../../features/sessions/preload-mascot";
 import { roleLabel } from "../../features/users/api";
@@ -21,6 +22,7 @@ const links: Record<AppRole, NavItem[]> = {
   student: [{ to: "/estudiante", label: "Mi aprendizaje", icon: GraduationCap }],
 };
 const settingsPath: Record<AppRole, string> = { admin: "/admin/configuracion", teacher: "/profesor/configuracion", student: "/estudiante/configuracion" };
+const rankingPath: Record<AppRole, string> = { admin: "", teacher: "/profesor/ranking", student: "/estudiante/ranking" };
 const homePath: Record<AppRole, string> = { admin: "/admin/usuarios", teacher: "/profesor/cursos", student: "/estudiante" };
 const STORAGE_KEY = "portal-menu-collapsed";
 
@@ -75,9 +77,13 @@ export function PortalLayout({ role }: { role: AppRole }) {
     setLeaveWarning,
   }), []);
   const compactDesktop = focus ? !focusExpanded : collapsed;
-  // "/estudiante" (Mi aprendizaje) también coincide con "/estudiante/configuracion":
-  // en Configuración solo se marca Configuración.
-  const inSettings = useLocation().pathname.startsWith(settingsPath[role]);
+  // "/estudiante" (Mi aprendizaje) también coincide con "/estudiante/configuracion" y "/estudiante/ranking":
+  // en esas secciones solo se marca la propia.
+  const pathname = useLocation().pathname;
+  const inSettings = pathname.startsWith(settingsPath[role]);
+  const inRanking = role !== "admin" && pathname.startsWith(rankingPath[role]);
+  // El ranking solo aparece si la institución lo activó con al menos una categoría.
+  const ranking = useRankingSettings(role !== "admin");
   const toggle = (value: boolean) => {
     if (focus) { setFocusExpanded(!value); return; }
     setCollapsed(value);
@@ -94,9 +100,10 @@ export function PortalLayout({ role }: { role: AppRole }) {
     leave(() => navigate(to));
   };
 
-  const sections: NavItem[] = [...links[role], { to: settingsPath[role], label: "Configuración", icon: Settings }];
+  const rankingItem: NavItem[] = ranking.data?.visible ? [{ to: rankingPath[role], label: "Ranking", icon: Trophy }] : [];
+  const sections: NavItem[] = [...links[role], ...rankingItem, { to: settingsPath[role], label: "Configuración", icon: Settings }];
   // Una sección está activa en su ruta; Mi aprendizaje (la raíz del estudiante) no cuenta dentro de Configuración.
-  const isActive = (item: NavItem, active: boolean) => active && (item.to === settingsPath[role] || !inSettings);
+  const isActive = (item: NavItem, active: boolean) => active && (item.to === settingsPath[role] || item.to === rankingPath[role] || !(inSettings || inRanking));
 
   const renderItem = (item: NavItem, compact: boolean) => <NavLink key={item.to} to={item.to} title={compact ? item.label : undefined} onClick={go(item.to)}
     className={({ isActive: active }) => clsx(

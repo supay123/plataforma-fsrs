@@ -452,6 +452,20 @@ profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
   solo si el colegio tiene medallas activadas.
 - `api.ts`: `getMedalSettings`, `saveMedalSettings`, `getMyMedal`, `getTopicStars`, `calculateMedal` (Edge Function `medals`).
 
+## Ranking (`features/ranking/`)
+
+- `RankingSettings` (`RankingSettings.tsx`): pestaña "Ranking" de Configuración del admin. Interruptor (apagado por
+  defecto) y casillas de las categorías (NIVEL, MEDALLAS, NOTA; al menos una). Guarda tras un modal de aviso.
+- `RankingPage` (`pages/shared/RankingPage.tsx`, prop `role`): sección "Ranking" del estudiante (con su posición) y
+  del profesor (solo la lista). Selector de categoría (por defecto MEDALLAS), "Actualizar ranking", lista paginada de
+  30 con "Ver más" (spinner solo en esa carga, excepción pedida al uso de Skeleton) y, si falla, mensaje con
+  "Volver a intentar".
+- `useRankingFeed` (`use-ranking-feed.ts`): refresca la caché y consulta; ante `ranking_cache_not_found` refresca y
+  reintenta una vez; expone `feed`, `loadMore` y `reload`.
+- `useRankingSettings` (`use-ranking-visible.ts`): configuración del ranking de la institución del usuario; decide si
+  `PortalLayout` muestra el ítem "Ranking".
+- `api.ts`: `getRankingSettings`, `saveRankingSettings`, `refreshRankingCache`, `getRankingPage` (Edge Function `ranking`).
+
 ## Utilidades (`lib/`)
 
 | Utilidad | Archivo | Descripción |

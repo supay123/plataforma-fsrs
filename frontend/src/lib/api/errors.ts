@@ -60,6 +60,9 @@ const translatedMessages: Record<string, string> = {
   complaint_not_sent: "No pudimos enviar tu hoja de reclamación. Inténtalo de nuevo en unos minutos.",
   complaint_number_failed: "No pudimos registrar tu hoja de reclamación. Inténtalo de nuevo en unos minutos.",
   attachments_too_large: "Los archivos adjuntos superan el tamaño permitido. Quita alguno e inténtalo de nuevo.",
+  ranking_disabled: "El ranking no está activado en tu institución.",
+  ranking_category_disabled: "Esta categoría del ranking no está disponible.",
+  ranking_cache_not_found: "El ranking venció. Actualízalo para verlo de nuevo.",
   invalid_evidence: "Solo se aceptan imágenes o archivos PDF como evidencia.",
 };
 
