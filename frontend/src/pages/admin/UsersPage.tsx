@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select } from "../../components/ui";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { listColleges } from "../../features/colleges/api";
 import { InviteStudentForm } from "../../features/invitations/InviteStudentForm";
@@ -77,7 +78,7 @@ export function UsersPage() {
     [users.data, filter, collegeFilter, onlyLongExpired],
   );
 
-  if (users.isLoading) return <Spinner />;
+  if (users.isLoading) return <PageSkeleton rows={6} rowHeight={52} />;
   return <>
     <PageHeader title="Usuarios" description="Profesores, estudiantes y vigencias de acceso." />
     <div className="grid gap-6 xl:grid-cols-[1fr_23rem]">
@@ -97,18 +98,28 @@ export function UsersPage() {
         <div className="table-wrap mt-4"><table>
           <thead><tr><th>Usuario</th><th>Rol</th><th>Colegio</th><th>Acceso</th><th /></tr></thead>
           <tbody>{visible?.map((user) => <tr key={user.id}>
-            <td><strong>{user.full_name}</strong><br /><span className="text-xs text-slate-500">{user.user_code}</span></td>
+            <td><strong>{user.full_name}</strong><br /><span className="text-xs text-fg-muted">{user.user_code}</span></td>
             <td>{roleLabel(user.role)}</td>
             <td>{colleges.data?.find((college) => college.id === user.college_id)?.name ?? "—"}</td>
-            <td>{accessBadge(user)}{expiredLabel(user) && <span className="mt-1 block text-xs text-slate-500">{expiredLabel(user)}</span>}</td>
+            <td>{accessBadge(user)}{expiredLabel(user) && <span className="mt-1 block text-xs text-fg-muted">{expiredLabel(user)}</span>}</td>
             <td className="space-x-2">
-              <Link className="text-sm font-semibold text-indigo-600" to={`/admin/usuarios/${user.id}`}>Editar</Link>
-              {user.role === "teacher" && <Link className="text-sm font-semibold text-indigo-600" to={`/admin/asignaciones?profesor=${user.id}`}>Asignaciones</Link>}
-              <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: user.id, active: !user.is_active })}>
+              <Link className="text-sm font-semibold text-primary-text" to={`/admin/usuarios/${user.id}`}>Editar</Link>
+              {user.role === "teacher" && <Link className="text-sm font-semibold text-primary-text" to={`/admin/asignaciones?profesor=${user.id}`}>Asignaciones</Link>}
+              <Button size="sm" variant="ghost" disabled={toggle.isPending} onClick={() => user.is_active ? modal.warning({
+                title: "Desactivar usuario",
+                mascot: "wrong",
+                confirmLabel: "Desactivar",
+                body: <>
+                  <p><strong>{user.full_name}</strong> ya no podrá iniciar sesión.</p>
+                  {user.role === "teacher" && <p className="mt-2">Antes de desactivarlo, revisa si tiene estudiantes asignados: dejarán de contar con su profesor.</p>}
+                </>,
+                onConfirm: () => toggle.mutateAsync({ id: user.id, active: false }),
+              }) : toggle.mutate({ id: user.id, active: true })}>
                 {user.is_active ? "Desactivar" : "Activar"}
               </Button>
-              <Button variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
+              <Button size="sm" variant="danger" disabled={remove.isPending} onClick={() => modal.delete({
                 title: "Eliminar usuario",
+                mascot: "wrong",
                 confirmLabel: "Eliminar definitivamente",
                 body: <>
                   <p><strong>Esta acción no se puede deshacer.</strong></p>

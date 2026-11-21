@@ -1,6 +1,9 @@
 import { RPCS } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
-import { invalidInvitation } from "../_shared/invitations.ts";
+import {
+  invalidInvitation,
+  releasePendingRegistration,
+} from "../_shared/invitations.ts";
 import { freeUserCode } from "../_shared/registration-activation.ts";
 import {
   parseNewPassword,
@@ -87,6 +90,7 @@ export async function acceptInvitation(
     );
   }
 
+  await releasePendingRegistration(context, invitation.email);
   const { data: inUse, error: inUseError } = await context.supabaseAdmin.rpc(
     RPCS.emailInUse,
     { p_email: invitation.email },

@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModalProvider } from "../../components/ui/modal";
 import { CoursesView } from "./CoursesView";
+import { chooseSelectValue } from "../../components/ui/select-test-helpers";
 
 const mocks = vi.hoisted(() => ({
   archiveCourse: vi.fn(),
@@ -120,7 +121,7 @@ describe("CoursesView como administrador", () => {
     renderView();
     await screen.findByRole("heading", { name: "Ana Profesora" });
 
-    await user.selectOptions(screen.getByLabelText("Profesor"), "teacher-1");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Profesor" }), "teacher-1");
     expect(screen.getByRole("heading", { name: "Ana Profesora" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Beto Profesor" })).not.toBeInTheDocument();
     expect(screen.getByText("2 cursos")).toBeInTheDocument();
@@ -134,8 +135,8 @@ describe("CoursesView como administrador", () => {
     await user.click(screen.getByRole("button", { name: "Nuevo Curso" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText("Colegio del curso"), "college-1");
-    await user.selectOptions(screen.getByLabelText("Profesor del curso"), "teacher-1");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Colegio del curso" }), "college-1");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Profesor del curso" }), "teacher-1");
     await user.type(screen.getByLabelText("Nombre"), "Física");
     await user.type(screen.getByLabelText("Descripción"), "Curso nuevo");
     await user.click(screen.getByRole("button", { name: "Crear curso" }));
@@ -156,8 +157,8 @@ describe("CoursesView como administrador", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Editar" })[0]);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByLabelText("Colegio del curso")).toHaveValue("college-1");
-    expect(screen.getByLabelText("Profesor del curso")).toHaveValue("teacher-1");
+    expect(screen.getByRole("combobox", { name: "Colegio del curso" })).toHaveTextContent("Colegio Norte");
+    expect(screen.getByRole("combobox", { name: "Profesor del curso" })).toHaveTextContent("Ana Profesora");
 
     const name = screen.getByLabelText("Nombre");
     await user.clear(name);
@@ -222,10 +223,11 @@ describe("CoursesView como administrador", () => {
     await user.click(screen.getAllByRole("button", { name: "Mover" })[0]);
 
     const dialog = await screen.findByRole("dialog", { name: "Mover curso" });
-    const select = within(dialog).getByLabelText("Nuevo profesor");
-    expect(within(select).queryByRole("option", { name: "Beto Profesor" })).toBeNull();
-    expect(within(select).queryByRole("option", { name: "Ana Profesora" })).toBeNull();
-    await user.selectOptions(select, "teacher-3");
+    const select = within(dialog).getByRole("combobox", { name: "Nuevo profesor" });
+    const nativeSelect = dialog.querySelector("select")!;
+    expect(within(nativeSelect).queryByText("Beto Profesor")).toBeNull();
+    expect(within(nativeSelect).queryByText("Ana Profesora")).toBeNull();
+    await chooseSelectValue(user, select, "teacher-3");
     await user.click(within(dialog).getByRole("button", { name: "Mover curso" }));
 
     await waitFor(() => expect(mocks.moveCourse.mock.calls[0]?.[0]).toEqual({ courseId: "course-1", teacherId: "teacher-3" }));

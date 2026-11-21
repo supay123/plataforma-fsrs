@@ -42,4 +42,8 @@ Deno.test("reset links point to an allowed frontend origin", () => {
     passwordResetLink("http://localhost:5173", "abc_-123"),
     "http://localhost:5173/estudiante/reset?code=abc_-123",
   );
+  assert.equal(
+    passwordResetLink("http://localhost:5173", "abc_-123", "ABC 1"),
+    "http://localhost:5173/estudiante/reset?code=abc_-123&instId=ABC%201",
+  );
 });

@@ -33,6 +33,8 @@ export function linkWithCode(
   origin: string,
   path: string,
   code: string,
+  instId?: string | null,
 ): string {
-  return `${origin}${path}?code=${encodeURIComponent(code)}`;
+  const inst = instId ? `&instId=${encodeURIComponent(instId)}` : "";
+  return `${origin}${path}?code=${encodeURIComponent(code)}${inst}`;
 }

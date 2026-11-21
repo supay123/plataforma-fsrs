@@ -1,10 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Spinner } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader } from "../../components/ui";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { createTopic, listCourses, listTopics, updateTopic } from "../../features/courses/api";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { MascotHelp } from "../../features/mascot/MascotHelp";
 import { importQuestionsPath } from "../../lib/portal-paths";
+
+const TOPICS_TIPS = [
+  "Los estudiantes practican por tema: cada práctica toma 20 preguntas, así que conviene importar al menos 20 por tema.",
+  "Usa las flechas para ordenar los temas y «Desactivar» para ocultar uno sin borrarlo.",
+  "«Importar» abre la plantilla para cargar preguntas en el tema.",
+  "El enlace de Google Drive es el material de estudio que verá el estudiante.",
+];
 
 const empty = { name: "", material_url: "" };
 
@@ -37,19 +46,22 @@ export function TopicsPage() {
     await updateTopic(current.id, { position: other.position });
     await invalidate();
   };
-  if (query.isLoading) return <Spinner />;
+  if (query.isLoading) return <PageSkeleton />;
   const course = courses.data?.find((item) => item.id === courseId);
   return <>
     <PageHeader title={course?.name ?? "Temas"} description="Orden, material y banco de preguntas." />
+    <MascotHelp className="mb-6" screen="topics" tips={TOPICS_TIPS} advice={query.data?.length
+      ? { event: "rest", tone: "neutral", text: "Revisa que cada tema tenga suficientes preguntas: una práctica pide 20." }
+      : { event: "sleep", tone: "neutral", text: "Este curso aún no tiene temas. Crea el primero con el formulario de la derecha." }} />
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-      <Card>{query.data?.length ? <div className="grid gap-3">{query.data.map((topic, index) => <div key={topic.id} className="flex flex-col justify-between gap-3 rounded-xl border p-4 sm:flex-row sm:items-center">
-        <div><div className="flex gap-2"><strong>{topic.position}. {topic.name}</strong><Badge tone={topic.status === "active" ? "success" : "warning"}>{topic.status}</Badge></div>{topic.material_url && <a className="text-sm text-indigo-600" href={topic.material_url} target="_blank" rel="noreferrer">Abrir material</a>}</div>
+      <Card>{query.data?.length ? <div className="grid gap-3">{query.data.map((topic, index) => <div key={topic.id} className="flex flex-col justify-between gap-3 rounded-2xl border-2 border-line p-4 sm:flex-row sm:items-center">
+        <div><div className="flex gap-2"><strong>{topic.position}. {topic.name}</strong><Badge tone={topic.status === "active" ? "success" : "warning"}>{topic.status}</Badge></div>{topic.material_url && <a className="text-sm text-primary-text" href={topic.material_url} target="_blank" rel="noreferrer">Abrir material</a>}</div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" aria-label={`Subir ${topic.name}`} disabled={index === 0} onClick={() => void move(index, -1)}>↑</Button>
-          <Button variant="ghost" aria-label={`Bajar ${topic.name}`} disabled={index === (query.data?.length ?? 0) - 1} onClick={() => void move(index, 1)}>↓</Button>
-          <Button variant="ghost" onClick={() => { setEditingId(topic.id); setForm({ name: topic.name, material_url: topic.material_url ?? "" }); }}>Editar</Button>
-          <Button variant="ghost" onClick={() => void updateTopic(topic.id, { status: topic.status === "active" ? "inactive" : "active" }).then(invalidate)}>{topic.status === "active" ? "Desactivar" : "Activar"}</Button>
-          <Link to={importQuestionsPath(profile?.role, topic.id)}><Button>Importar</Button></Link>
+          <Button size="sm" variant="ghost" aria-label={`Subir ${topic.name}`} disabled={index === 0} onClick={() => void move(index, -1)}>↑</Button>
+          <Button size="sm" variant="ghost" aria-label={`Bajar ${topic.name}`} disabled={index === (query.data?.length ?? 0) - 1} onClick={() => void move(index, 1)}>↓</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setEditingId(topic.id); setForm({ name: topic.name, material_url: topic.material_url ?? "" }); }}>Editar</Button>
+          <Button size="sm" variant="ghost" onClick={() => void updateTopic(topic.id, { status: topic.status === "active" ? "inactive" : "active" }).then(invalidate)}>{topic.status === "active" ? "Desactivar" : "Activar"}</Button>
+          <Link to={importQuestionsPath(profile?.role, topic.id)}><Button size="sm">Importar</Button></Link>
         </div>
       </div>)}</div> : <EmptyState>No hay temas registrados.</EmptyState>}</Card>
       <Card>

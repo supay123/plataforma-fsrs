@@ -1,11 +1,12 @@
 import clsx from "clsx";
 import { ArrowRight, BookOpen, ChevronDown, ClipboardCheck, Crosshair, Gauge, LogIn, Pause, Play, RotateCcw, RotateCw, Target, Volume2, Zap, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "../components/layout/Logo";
 import { PublicFooter } from "../components/layout/PublicLayout";
 import { BUSINESS, PLAN, formatSoles } from "../config/business";
 import { useAuth } from "../features/auth/AuthProvider";
+import { FreeModeSelector } from "../features/free-mode/FreeModeSelector";
 import { PlanCards } from "../features/payments/PlanCards";
 // El video intenta empezar con sonido; si el navegador lo bloquea, sigue en
 // silencio y "Toca para escuchar" lo reinicia desde 0 con sonido.
@@ -31,7 +32,6 @@ const steps: Array<{ icon: LucideIcon; title: string; text: string }> = [
 const faqs = [
   { question: `¿${BUSINESS.brand} reemplaza a mi academia?`, answer: "No. La teoría la aprendes en tu academia o en tus libros. Aquí compruebas con preguntas si de verdad la dominas y entrenas justo en lo que te falta." },
   { question: "¿Cuánto tiempo al día necesito?", answer: "Con unos 15 minutos al día es suficiente: es lo que toma una sesión de estudio de 20 preguntas. La haces cuando quieras; lo importante es practicar seguido para que tus repasos lleguen a tiempo." },
-  { question: "¿Funciona en el celular? ¿Tengo que instalar algo?", answer: `No necesitas instalar nada. ${BUSINESS.brand} funciona desde el navegador de tu celular, tablet o computadora. Solo necesitas conexión a internet.` },
   { question: "¿Qué es el repaso espaciado?", answer: `Es un método que te vuelve a mostrar cada pregunta justo cuando estás por olvidarla. ${BUSINESS.brand} usa un algoritmo de repetición espaciada para programar tus repasos y te insiste más en las preguntas que fallas, hasta que domines el tema.` },
   { question: "¿Se renueva automáticamente?", answer: "No. No hay débitos ni renovaciones automáticas, así que no necesitas cancelar nada: solo pagas cuando decides seguir." },
   { question: "Soy menor de edad, ¿puedo registrarme?", answer: "Sí, pero la cuenta debe crearla y el plan pagarlo tu padre, madre o apoderado." },
@@ -42,17 +42,17 @@ const faqs = [
 function FaqItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  return <div className={clsx("rounded-2xl border bg-white shadow-sm transition", open ? "border-indigo-200 shadow-md" : "border-slate-200")}>
+  return <div className={clsx("rounded-2xl border bg-slate-950/60 shadow-sm transition", open ? "border-emerald-400/60 shadow-md shadow-black/30" : "border-white/10")}>
     <h3>
       <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}
-        className={clsx("flex w-full items-center justify-between gap-4 p-5 text-left font-semibold transition", open && "text-indigo-700")}>
+        className={clsx("flex w-full items-center justify-between gap-4 p-5 text-left font-semibold transition", open && "text-emerald-300")}>
         {question}
-        <ChevronDown size={20} aria-hidden className={clsx("shrink-0 text-indigo-500 transition-transform duration-300", open && "rotate-180")} />
+        <ChevronDown size={20} aria-hidden className={clsx("shrink-0 text-emerald-400 transition-transform duration-300", open && "rotate-180")} />
       </button>
     </h3>
     {/* La fila pasa de 0fr a 1fr para animar la altura sin medirla. */}
     <div id={id} role="region" className={clsx("grid transition-all duration-300 ease-out motion-reduce:transition-none", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
-      <div className="overflow-hidden" inert={!open}><p className="px-5 pb-5 text-sm leading-6 text-slate-600">{answer}</p></div>
+      <div className="overflow-hidden" inert={!open}><p className="px-5 pb-5 text-sm leading-6 text-slate-300">{answer}</p></div>
     </div>
   </div>;
 }
@@ -109,10 +109,10 @@ function Header() {
       <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Ir al inicio" tabIndex={scrolled ? 0 : -1}
         className={clsx("hidden transition-opacity duration-300 sm:block", scrolled ? "opacity-100" : "pointer-events-none opacity-0")}><Logo className="h-6 sm:h-7" /></button>
       <nav aria-label="Secciones" className="flex w-full items-center justify-end gap-2 whitespace-nowrap sm:w-auto">
-        <Link to="/estudiante/login" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold transition hover:border-indigo-400 hover:bg-slate-900">
+        <Link to="/estudiante/login" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold transition hover:border-emerald-400 hover:bg-slate-900">
           <LogIn size={16} aria-hidden className="hidden sm:block" />Iniciar sesión
         </Link>
-        <StartButton compact />
+        <StartButton compact className="hidden sm:inline-flex" />
       </nav>
     </div>
   </header>;
@@ -192,11 +192,11 @@ function IntroVideo({ onEnded }: { onEnded: () => void }) {
     afterControl();
   };
 
-  const controlClass = "relative grid place-items-center rounded-full bg-slate-950/75 text-white shadow-lg transition hover:bg-violet-600";
+  const controlClass = "relative grid place-items-center rounded-full bg-slate-950/75 text-white shadow-lg transition hover:bg-emerald-600";
 
   return <div className="relative">
-    <div aria-hidden className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-indigo-600/40 via-transparent to-emerald-500/30 blur-2xl" />
-    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900 shadow-2xl shadow-indigo-950/60"
+    <div aria-hidden className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-emerald-600/25 via-transparent to-slate-600/25 blur-2xl" />
+    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900 shadow-2xl shadow-black/60"
       onPointerEnter={(event) => { if (event.pointerType === "mouse") { hovering.current = true; showControls(); } }}
       onPointerLeave={(event) => { if (event.pointerType === "mouse") { hovering.current = false; hideControlsLater(0); } }}>
       <video ref={video} className="absolute inset-0 h-full w-full object-cover" src={VIDEO_URL} poster={POSTER_URL} aria-label={`Conoce ${BUSINESS.brand}`}
@@ -222,7 +222,7 @@ function IntroVideo({ onEnded }: { onEnded: () => void }) {
         </div>
       </>}
       {muted && <button type="button" onClick={unmute} className="group absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/45 text-white transition hover:bg-slate-950/30">
-        <span className="grid h-16 w-16 place-items-center rounded-full bg-violet-600 shadow-xl shadow-violet-900/60 transition group-hover:scale-110 motion-safe:animate-pulse sm:h-20 sm:w-20">
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-emerald-600 shadow-xl shadow-emerald-950/60 transition group-hover:scale-110 motion-safe:animate-pulse sm:h-20 sm:w-20">
           <Volume2 aria-hidden className="h-8 w-8 sm:h-10 sm:w-10" />
         </span>
         <span className="text-2xl font-extrabold drop-shadow-lg sm:text-3xl">Toca para escuchar</span>
@@ -232,19 +232,31 @@ function IntroVideo({ onEnded }: { onEnded: () => void }) {
 }
 
 /** Llamada principal: lleva a la sección de planes. */
-function StartButton({ compact = false }: { compact?: boolean }) {
-  // Morado sólido y forma de píldora para diferenciarlo del resto de botones.
+function StartButton({ compact = false, className }: { compact?: boolean; className?: string }) {
+  // Verde sólido con texto oscuro para diferenciarlo del resto de botones.
   return <button type="button" onClick={() => scrollToSection("planes")} className={clsx(
-    "group inline-flex items-center justify-center gap-2 rounded-full bg-violet-600 font-bold text-white transition duration-300 hover:-translate-y-0.5 hover:bg-violet-500 hover:shadow-lg hover:shadow-violet-500/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400",
-    compact ? "min-h-10 px-4 text-sm sm:px-5" : "min-h-14 px-8 text-lg hover:shadow-xl",
+    "group inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 font-semibold text-slate-950 transition duration-300 hover:bg-emerald-400 hover:shadow-lg hover:shadow-emerald-500/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300",
+    compact ? "min-h-10 px-4 text-sm sm:px-5" : "min-h-14 px-8 text-lg",
+    className,
   )}>
     Empieza ahora
     <ArrowRight size={16} aria-hidden className={clsx("transition group-hover:translate-x-0.5", compact && "hidden sm:block")} />
   </button>;
 }
 
+/** Baja al slide de la prueba gratuita de 10 preguntas. */
+function FreeButton() {
+  return <button type="button" onClick={() => scrollToSection("gratis")} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/60 px-4 text-sm font-semibold text-emerald-300 transition duration-300 hover:border-emerald-300 hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 sm:px-5">
+    Probar gratis
+  </button>;
+}
+
 export function HomePage() {
   const { profile, loading } = useAuth();
+  const navigate = useNavigate();
+  const { hash } = useLocation();
+  // Al volver a `/#gratis`, React Router no desplaza solo hasta la sección.
+  useEffect(() => { if (hash) document.getElementById(hash.slice(1))?.scrollIntoView(); }, [hash, loading]);
   // Se activa cada vez que termina el video para animar el botón principal.
   const [popStart, setPopStart] = useState(false);
   if (!loading && profile) return <Navigate to={profile.role === "teacher" ? "/profesor" : `/${profile.role === "student" ? "estudiante" : "admin"}`} replace />;
@@ -256,13 +268,13 @@ export function HomePage() {
     <main className="relative z-10 bg-slate-950 shadow-xl shadow-black/40">
     <section className="relative flex min-h-[calc(100svh-4rem)] flex-col items-center px-4 pb-4 sm:pb-10">
       <div aria-hidden className="bg-grid absolute inset-0" />
-      <Glow className="-left-32 top-10 h-96 w-96 bg-indigo-600/30" />
-      <Glow className="-right-24 bottom-0 h-80 w-80 bg-emerald-500/20 [animation-delay:-4s]" />
+      <Glow className="-left-32 top-10 h-96 w-96 bg-emerald-600/15" />
+      <Glow className="-right-24 bottom-0 h-80 w-80 bg-emerald-500/10 [animation-delay:-4s]" />
       <Reveal className="relative flex flex-col items-center text-center sm:pt-8">
         <Logo className="h-8 sm:h-20" />
         {/* En celular el título es más pequeño y no fuerza el salto de línea. */}
-        <h1 className="mt-3 max-w-7xl text-2xl font-extrabold tracking-tight sm:mt-4 sm:text-5xl">
-          No estudies TODO. <span className="bg-gradient-to-r from-indigo-300 to-emerald-300 bg-clip-text text-transparent">Estudia lo que no sabes</span>
+        <h1 className="mt-3 max-w-7xl type-heading text-2xl sm:mt-4 sm:text-5xl">
+          No estudies TODO. <span className="bg-gradient-to-r from-emerald-200 to-emerald-400 bg-clip-text text-transparent">Estudia lo que no sabes</span>
           <br className="hidden sm:inline" /> e INGRESA a la UNSAAC
         </h1>
       </Reveal>
@@ -281,27 +293,28 @@ export function HomePage() {
           <p className="mt-4 text-sm text-slate-400 sm:mt-7">
             Empieza con <strong className="text-base font-bold text-emerald-300">{formatSoles(PLAN.priceSoles)} al mes</strong> · menos de {formatSoles(dailyCap)} al día
           </p>
-          <div className={clsx("mt-4 flex justify-center sm:mt-3", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
+          <div className={clsx("mt-4 flex flex-wrap justify-center gap-2 sm:mt-3", popStart && "motion-safe:animate-pop")} onAnimationEnd={() => setPopStart(false)}>
             <StartButton compact />
+            <FreeButton />
           </div>
         </Reveal>
       </div>
     </section>
 
-    {/* Las secciones alternan fondo oscuro, blanco, índigo y claro para que se distinga dónde empieza cada una. */}
-    <section id="pasos" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-white px-4 py-16 text-center text-slate-900">
-      <Glow className="left-1/2 top-1/3 h-64 w-[36rem] -translate-x-1/2 bg-indigo-100/70" />
+    {/* Las secciones alternan fondo oscuro y claro para que se distinga dónde empieza cada una. */}
+    <section id="pasos" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-slate-50 px-4 py-16 text-center text-slate-900">
+      <Glow className="left-1/2 top-1/3 h-64 w-[36rem] -translate-x-1/2 bg-emerald-100/70" />
       <div className="relative mx-auto max-w-5xl">
         <Reveal>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-indigo-600">Cómo funciona</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">3 pasos para ingresar con {BUSINESS.brand.toUpperCase()}</h2>
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Cómo funciona</p>
+          <h2 className="mt-3 type-heading text-3xl sm:text-4xl">3 pasos para ingresar con {BUSINESS.brand.toUpperCase()}</h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-600">{BUSINESS.brand} no reemplaza a tu academia: la teoría la aprendes allí o en tus libros, y aquí compruebas con preguntas si de verdad la dominas.</p>
         </Reveal>
         <ol className="mt-12 grid gap-6 md:grid-cols-3">
           {steps.map(({ icon: Icon, title, text }, index) => <Reveal as="li" key={title} delay={index * 120}>
-            <div className="group flex h-full flex-col items-center rounded-3xl border border-indigo-100 bg-indigo-50/60 p-8 transition duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:bg-white hover:shadow-xl hover:shadow-indigo-200/60">
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-300/60 transition group-hover:bg-indigo-700"><Icon size={32} aria-hidden /></span>
-              <span className="mt-5 text-sm font-bold text-indigo-600">Paso {index + 1}</span>
+            <div className="group flex h-full flex-col items-center rounded-xl border border-emerald-100 bg-emerald-50/60 p-8 transition duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-xl hover:shadow-emerald-200/60">
+              <span className="grid h-16 w-16 place-items-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-300/60 transition group-hover:bg-emerald-700"><Icon size={32} aria-hidden /></span>
+              <span className="mt-5 text-sm font-bold text-emerald-700">Paso {index + 1}</span>
               <h3 className="mt-1 text-xl font-bold uppercase">{title}</h3>
               <p className="mt-3 text-slate-600">{text}</p>
             </div>
@@ -313,22 +326,35 @@ export function HomePage() {
       </div>
     </section>
 
-    <section id="planes" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-gradient-to-b from-indigo-950 via-indigo-900 to-indigo-950 px-4 py-16 text-center">
+    <section id="planes" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-16 text-center">
       <div aria-hidden className="bg-grid absolute inset-0" />
-      <Glow className="-right-40 top-1/4 h-96 w-96 bg-indigo-400/20" />
-      <Glow className="-left-40 bottom-10 h-96 w-96 bg-sky-400/10 [animation-delay:-3s]" />
+      <Glow className="-right-40 top-1/4 h-96 w-96 bg-emerald-500/10" />
+      <Glow className="-left-40 bottom-10 h-96 w-96 bg-slate-400/10 [animation-delay:-3s]" />
       <Reveal className="relative">
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-indigo-300">Planes</p>
-        <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Elige tu plan</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-indigo-100/80">Menos de {formatSoles(dailyCap)} al día. Sin renovación automática: vuelves a pagar solo si decides seguir.</p>
+        <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-300">Planes</p>
+        <h2 className="mt-3 type-heading text-3xl sm:text-4xl">Elige tu plan</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-slate-300">Menos de {formatSoles(dailyCap)} al día. Sin renovación automática: vuelves a pagar solo si decides seguir.</p>
       </Reveal>
       <Reveal delay={150} className="relative"><PlanCards className="mt-10 w-full" /></Reveal>
     </section>
 
-    <section id="preguntas" className="scroll-mt-16 bg-slate-100 px-4 py-20 text-slate-900">
-      <Reveal className="mx-auto max-w-3xl">
-        <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-indigo-600">Dudas</p>
-        <h2 className="mt-3 text-center text-3xl font-bold tracking-tight">Preguntas frecuentes</h2>
+    <section id="gratis" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col items-center justify-center overflow-hidden bg-slate-50 px-4 py-16 text-center text-slate-900">
+      <Glow className="left-1/2 top-1/3 h-64 w-[36rem] -translate-x-1/2 bg-emerald-100/70" />
+      <Reveal className="relative mx-auto w-full max-w-md">
+        <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Modo gratuito</p>
+        <h2 className="mt-3 type-heading text-3xl sm:text-4xl">Prueba {BUSINESS.brand} sin pagar</h2>
+        <p className="mt-3 text-slate-600">Elige tu grupo, curso y tema y resuelve 10 preguntas con corrección al instante.</p>
+        <div className="mt-8"><FreeModeSelector light onStart={(topicId) => navigate(`/gratis?tema=${encodeURIComponent(topicId)}`)} /></div>
+      </Reveal>
+    </section>
+
+    <section id="preguntas" className="relative scroll-mt-16 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-20 text-white">
+      <div aria-hidden className="bg-grid absolute inset-0" />
+      <Glow className="-left-40 top-10 h-96 w-96 bg-emerald-500/10" />
+      <Glow className="-right-40 bottom-10 h-96 w-96 bg-slate-400/10 [animation-delay:-3s]" />
+      <Reveal className="relative mx-auto max-w-3xl">
+        <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-emerald-300">Dudas</p>
+        <h2 className="mt-3 text-center type-heading text-3xl">Preguntas frecuentes</h2>
         <div className="mt-8 grid gap-3">{faqs.map((faq) => <FaqItem key={faq.question} {...faq} />)}</div>
       </Reveal>
     </section>
@@ -337,4 +363,4 @@ export function HomePage() {
     <PublicFooter />
   </div>;
 }
-export function NotFoundPage() { return <main className="grid min-h-screen place-items-center p-6 text-center"><div><strong className="text-6xl text-indigo-600">404</strong><h1 className="mt-4 text-2xl font-bold">Página no encontrada</h1><Link className="mt-5 inline-block font-semibold text-indigo-600" to="/">Volver al inicio</Link></div></main>; }
+export function NotFoundPage() { return <main className="grid min-h-screen place-items-center p-6 text-center"><div><strong className="text-6xl text-emerald-700">404</strong><h1 className="mt-4 text-2xl font-bold">Página no encontrada</h1><Link className="mt-5 inline-block font-semibold text-emerald-700" to="/">Volver al inicio</Link></div></main>; }

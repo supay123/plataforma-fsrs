@@ -438,3 +438,6 @@ verify_jwt = false
 
 [functions.mercadopago]
 verify_jwt = false
+
+[functions.free-mode]
+verify_jwt = false

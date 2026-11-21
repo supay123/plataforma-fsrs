@@ -24,3 +24,23 @@ export function courseTopicsPath(role: AppRole | undefined, courseId: string) {
 export function importQuestionsPath(role: AppRole | undefined, topicId: string) {
   return `${importBase[staffRole(role)]}/${topicId}/importar`;
 }
+
+const routeBase: Record<"admin" | "teacher", string> = {
+  admin: "/admin/ruta",
+  teacher: "/profesor/ruta",
+};
+
+/** Ruta de las lecciones de un tema del modo ruta según el rol que la abre. */
+export function routeTopicLessonsPath(role: AppRole | undefined, topicId: string) {
+  return `${routeBase[staffRole(role)]}/temas/${topicId}`;
+}
+
+/** Ruta del JSON de una lección del modo ruta según el rol que la abre. */
+export function routeLessonJsonPath(role: AppRole | undefined, lessonId: string) {
+  return `${routeBase[staffRole(role)]}/lecciones/${lessonId}/json`;
+}
+
+/** Ruta de la gestión del modo ruta según el rol que la abre. */
+export function routeManagementPath(role: AppRole | undefined) {
+  return routeBase[staffRole(role)];
+}

@@ -113,6 +113,7 @@ principal es `type="submit"`, así que también se envía con Enter.
 - Archivo: `components/ui/modal-form.tsx` (`ModalForm`).
 - Se controla desde el componente padre: se muestra solo cuando su estado está
   abierto (`{open && <ModalForm …>}`), no necesita provider.
+- `dismissible={false}` lo hace obligatorio: sin X, «Cancelar», Escape ni clic en el fondo; solo se cierra al enviar (lo usa `LeadModal`).
 
 | Prop | Tipo | Descripción |
 | --- | --- | --- |
@@ -140,7 +141,10 @@ Botón con estilos de la aplicación. Acepta todas las props de `<button>`.
 
 | Prop | Valores |
 | --- | --- |
-| `variant` | `"primary"` (por defecto), `"secondary"`, `"danger"`, `"ghost"` |
+| `variant` | `"primary"` (por defecto), `"secondary"`, `"danger"`, `"warning"`, `"ghost"` |
+| `size` | `"md"` (por defecto) o `"sm"`, más compacto, para acciones dentro de filas y tarjetas de lista |
+
+En los portales los botones tienen el borde inferior grueso del estilo Chancón.
 
 Convención para que todos los botones se vean igual en toda la app:
 
@@ -177,6 +181,13 @@ Controles de formulario. Aceptan todas las props del elemento HTML.
 `PasswordInput` incluye el botón del "ojito" para mostrar u ocultar la
 contraseña.
 
+**`Select` es un desplegable propio** (`components/ui/select.tsx`), intercambiable por un `<select>`
+nativo: mismos `<option>` hijos, `value`/`onChange` y `register` de React Hook Form (un `<select>` oculto
+conserva el valor real, la validación `required` y los eventos). Estilo de los campos de cada zona, flecha
+centrada, desplegable del mismo ancho que el campo, textos largos con «…» y un tooltip (`title`) en el botón
+y en cada opción. Teclado: flechas, Inicio/Fin, Enter, Espacio, Escape y letras. Las opciones van separadas por una línea fina. En móvil (< 640 px) los textos largos se parten en varias líneas en vez de cortarse. Mientras está abierto, una capa transparente cierra el desplegable al pulsar fuera sin activar nada de la página. En pruebas,
+el botón es un `combobox`; usa `chooseSelectValue` de `select-test-helpers.ts` en lugar de `selectOptions`.
+
 Para un dato que se muestra pero no se edita (por ejemplo, la institución en el
 perfil del estudiante), usa `Input` con `readOnly` y `value`.
 
@@ -189,12 +200,17 @@ perfil del estudiante), usa `Input` con `readOnly` y `value`.
 ### Card
 
 Contenedor blanco con borde y sombra. Si pasas un `className` con `bg-` o
-`border-`, reemplaza el fondo o el borde por defecto.
+`border-`, reemplaza el fondo o el borde por defecto. Dentro de un portal
+(clase `portal`) es una tarjeta `bg-blocks` con su texto (`text-on-blocks`), borde de 2 px,
+esquinas redondeadas y borde inferior grueso. `glow` resalta el borde con el color
+de marca (paneles principales).
 
 ### PageHeader
 
 Encabezado de página del portal: `title`, `description` opcional y `actions`
-opcionales (botones a la derecha).
+opcionales (botones a la derecha). El título usa `type-display` (Archivo ancho).
+`className` permite quitar el margen inferior (`mb-0! portal:mb-0!`) cuando la
+página ya separa sus bloques con `gap`.
 
 ### Alert
 
@@ -208,8 +224,140 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
 
 ### Spinner y EmptyState
 
-- `Spinner`: indicador de carga centrado.
+- `Spinner`: indicador de carga centrado. **No se usa para cargar datos**: la
+  carga siempre es con `Skeleton` (la única excepción es la carga de las
+  preguntas de la práctica del estudiante).
 - `EmptyState`: recuadro para listas vacías, con el texto como hijo.
+
+### Mascota 3D (`ui/mascot-scene.tsx`, `MascotTips`, `PracticeMascot`)
+
+La mascota es una **cabeza 3D** (`public/models/mascot_head.glb`, 75 KB, con meshopt;
+ficha técnica en `public/models/mascot_head_notes.md`) dibujada con `three` +
+`@react-three/fiber`. Todo el 3D se carga con `lazy` para no meter `three` en el
+paquete principal.
+
+- `ui/mascot-model.ts`: URL del modelo, decodificador meshopt y `preloadMascotModel()`.
+- `ui/use-mascot-animation.ts`: `clipForEvent(evento)` (función pura) traduce un evento
+  de la app a un clip (`rest`→`idle`, `loading`→`think`, `correct`, `wrong`,
+  `streak`→`celebrate`, `levelUp`, `finish`, `sleep`, `appear`, `disappear`, `tip`) y el
+  hook `useMascotAnimation` hace el *crossfade* y vuelve al reposo cuando termina un clip
+  de una sola vez.
+- `ui/mascot-scene.tsx`: `<MascotScene event eventKey rest framing />`. Cámara
+  ortográfica, luz neutra y **tinte desde el tema**: la piel (`M_Skin`) toma
+  `--c-primary` y el dorado (`M_Accent`) toma `--c-secondary` de `<html>`, y se vuelve a
+  teñir si esas variables cambian. Con `prefers-reduced-motion` queda en pose de reposo.
+- `features/sessions/MascotTips.tsx`: carga de las 20 preguntas. La mascota piensa
+  (`loading`) y hace un saltito (`tip`) al cambiar cada consejo, que rota cada 5 s sin
+  repetir hasta mostrarlos todos (`practice-tips.ts`).
+- `features/sessions/PracticeMascot.tsx`: junto a la pregunta y en `XpResult`. Props:
+  `mood` (`idle`, `happy`, `sad`, `thinking`), `event` opcional (`streak`, `levelUp`,
+  `finish`…), `size` y `className`. Su lienzo 3D es 3 veces más alto que la cabeza y
+  sobresale por arriba (sin recibir clics) para que los saltos se vean completos.
+- Sin WebGL, con movimiento reducido y mientras baja el modelo se ve la cabeza PNG
+  (`public/image/mascota-cabeza.png`) con las animaciones CSS `mascot-*` de `styles.css`.
+- `features/sessions/preload-mascot.ts`: `PortalLayout` baja el 3D en segundo plano
+  para el estudiante.
+
+**Regla: una sola mascota por pantalla** (dos solo en casos muy justificados, nunca más;
+cada una crea su propio contexto WebGL). El menú lateral cuenta como una y sigue siendo el PNG.
+
+Reutilizables para colocar la mascota (`features/mascot/`):
+
+- `MascotAdvice`: cabeza + globo de texto (`tone`: `neutral`, `warning`, `success`; `event`
+  y `eventKey` para reaccionar; `gaze` para que mire hacia un lado; `actions` para botones).
+  El globo mide lo que ocupa su texto, con una colita hacia la boca; la mascota mueve la boca
+  al aparecer y cada vez que cambia el mensaje (`speaking` en `PracticeMascot`). `emphasized`
+  la agranda para llamar la atención. `peeking` la apoya en la esquina inferior izquierda de una tarjeta (`relative overflow-hidden`), con el globo a su lado. Funciona igual en móvil: la cabeza queda a la izquierda.
+- `MascotHelp` (profesor): un `MascotAdvice` con un mensaje de la pantalla y, a un clic,
+  «Ayuda de esta pantalla» (pasos en orden) y el enlace «Contáctanos por WhatsApp». Se abre
+  sola solo la primera vez que se entra a esa pantalla (`localStorage`, clave por `screen`).
+- Mensajes como funciones puras con prueba, solo con datos que la pantalla ya carga:
+  `dashboard-advice.ts` (inicio del estudiante), `review-advice.ts` (revisión),
+  `teacher-advice.ts` (lista de estudiantes y resultados) y `palette-advice.ts` (contraste
+  de los colores de la institución; orienta, nunca bloquea) y `route-advice.ts` (guía del
+  administrador en el modo ruta: institución, luego profesor, luego crear).
+- `useModal()`: la opción `mascot` (por ejemplo `"wrong"`, el clip amable de aviso) pone la
+  mascota sobre el título; se usa en las advertencias del administrador.
+- `EmptyState mascot`: mascota dormida sobre el texto, solo en pantallas sin otra mascota.
+- `useInactivity` (`features/sessions`): `true` tras un tiempo sin tocar nada; la práctica
+  duerme a la mascota a los 60 s.
+
+Junto a la mascota, `features/sessions/LoadingProgress.tsx` muestra una
+`ProgressBar` por etapas reales (`loading-progress.ts`): avanza despacio dentro
+de cada etapa y salta cuando termina de verdad la descarga o el descifrado. A
+los 20 s avisa "Esto a veces puede tardar"; al minuto pide contactar al negocio
+(WhatsApp) y ofrece "Reintentar". Al terminar, la barra se queda al 100 % ("¡Listo!") ~0,8 s antes de mostrar la primera pregunta. `PortalLayout` precarga el modelo 3D (`preloadMascot`) para el estudiante, y la cabeza 2D cubre el tiempo hasta que el modelo esté listo.
+
+### Skeleton
+
+Marcador de carga gris con un destello que cruza de izquierda a derecha (se
+detiene con "reducir movimiento"). Archivo: `components/ui/skeleton.tsx`.
+
+- `height` y `width`: número (px) o medida CSS. Por defecto `16` y `"100%"`.
+- `rounded`: `"none" | "sm" | "md" | "lg"` (por defecto) `| "xl" | "2xl" | "3xl" | "full"`.
+- Acepta `className` y el resto de atributos de un `div`; es decorativo (`aria-hidden`).
+
+```tsx
+import { Skeleton } from "../../components/ui/skeleton";
+
+<Skeleton height={48} width={48} rounded="full" />
+<Skeleton height={20} width="60%" />
+```
+
+`PageSkeleton` (mismo archivo) es el esqueleto de una página completa: título,
+descripción y `rows` filas de `rowHeight` px, en `columns` columnas (1 a 3).
+Es lo que se devuelve mientras `isLoading` en las páginas de los portales.
+
+### Estilo Chancón de los portales (`styles.css`, `lib/theme/` y `components/ui/ornaments.tsx`)
+
+Estilo de los tres portales (estudiante, profesor y admin). Referencia visual, solo en
+desarrollo: `/textura/chancon` (`pages/style-guide/ChanconStylePage.tsx`). Las páginas
+públicas, el login y el registro siguen con el estilo SaaS (variantes claras y `dark:`)
+hasta que se migren.
+
+- **Variante `portal:`** (como `dark:`): aplica solo dentro de un elemento con la
+  clase `portal`. `PortalLayout` la pone junto con `dark` en su contenedor y en
+  `<html>` (para toasts y modales). Los componentes compartidos llevan `portal:`
+  solo donde el portal difiere del SaaS; las pantallas que solo existen en un
+  portal usan directamente los tokens.
+- **Paleta central** (`lib/theme/palette.ts`): cada institución elige solo **4
+  colores por modo (claro y oscuro)**: `primary` (Primario), `secondary` (Secundario) y
+  los dos fondos `base` (Fondo base) y `blocks` (Fondo bloques). El
+  texto no se elige: sobre cada fondo se calcula blanco o negro, el que dé más
+  contraste, por separado. Todo lo demás se deriva con `color-mix`. Los estados
+  (`success`, `danger`, `warning`) son fijos. `paletteVars()` devuelve las variables
+  `--c-*`; `applyPalette(html, palette)` las aplica. El modo claro/oscuro, el `instId` y los
+  colores guardados los gestiona `lib/theme/theme-store.ts` y `ThemeProvider`
+  (`useTheme()` da `mode`, `toggleMode`, `instId`); `ThemeToggle` es el interruptor.
+  En modo claro `PortalLayout` y `AuthLayout` no ponen la clase `dark` (sí `portal`). Los valores por defecto también están en `styles.css` (bloque `:root`) como
+  respaldo; `palette.test.ts` comprueba que coincidan.
+- **Fondos y texto**: `bg-base` + `text-on-base` (fondo de la página) y `bg-blocks` +
+  `text-on-blocks` (menú, tarjetas, paneles, campos). Cada uno fija los grises de lo que
+  contiene, así que `text-fg`, `text-fg-muted` y `text-fg-faint` (alias `text-muted`,
+  `text-faint`) toman el gris del fondo en el que estén. Los campos usan `bg-sunken`
+  con `text-on-blocks`.
+- **Tokens de color** (`@theme inline` de `styles.css`): `primary`, `primary-strong`,
+  `primary-soft`, `primary-text`, `on-primary`, `secondary`, `secondary-soft`, `secondary-text`,
+  `line`, `line-strong`, `sunken`, `fg*` y, por estado, `success`, `danger` y
+  `warning` con sufijos `-strong`, `-soft`, `-text` y `on-`. "Correcto" usa `success`,
+  nunca `primary`. Acepta opacidad (`bg-success/10`). No escribir hex ni colores de
+  Tailwind sueltos en pantallas de portal.
+- **Tipografía**: Archivo para títulos (`type-display`, ancho 125 %, para títulos de
+  página y cifras grandes; `type-heading`, ancho 110 %, para títulos dentro de tarjetas)
+  y Plus Jakarta Sans para el cuerpo (por defecto en el portal; `type-body` vuelve al
+  cuerpo dentro de un título). Es la tipografía de todo el sitio, también de la home y
+  las páginas públicas (Cinzel ya no se usa). Se cargan en `index.html`.
+- **Forma**: tarjetas, modales y campos con esquinas redondeadas y borde de 2 px;
+  botones y tarjetas pulsables con borde inferior grueso (`--edge`). Sin esquinas
+  doradas, sin grano ni viñeta. El dorado (acento) va en el rombo de `Eyebrow`, el
+  ítem activo del menú y los números romanos de los temas.
+- **Ornamentos** (`ornaments.tsx`, reexportados por `components/ui`): `Eyebrow`
+  (etiqueta en mayúsculas con rombo de acento) y `ProgressBar` (0–100; `size="sm"`,
+  `tone="success"`).
+- **Layout**: las cuadrículas del portal deben poder encogerse (en `styles.css`,
+  `.portal .grid > *` tiene `min-width: 0`) y las columnas de contenido responden al
+  ancho del contenedor (`@container` en `PortalLayout`; variantes `@xl:`, `@4xl:`…),
+  no al de la ventana, porque el menú lateral le quita espacio.
 
 ---
 
@@ -217,7 +365,7 @@ Etiqueta pequeña de estado. `tone`: `"neutral"` (por defecto), `"success"`,
 
 | Componente | Descripción |
 | --- | --- |
-| `PortalLayout` | Menú lateral, usuario y botón "Salir" de los portales. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. |
+| `PortalLayout` | Estructura de los portales. Escritorio: cuadrícula `menú \| contenido` con menú lateral `sticky` (usuario y "Salir" abajo) que se puede reducir a solo iconos (la cabeza de la mascota lo vuelve a expandir; el estado se recuerda en `localStorage`). Móvil: cabecera con el logo y "Cerrar sesión", y barra inferior fija de iconos con las mismas secciones. Durante una práctica la barra se oculta y la cabecera ofrece salir. Expone `--menu-w` (ancho del menú) para elementos fijos como el pie de la práctica. Se usa en `app/router.tsx` con `role="admin" \| "teacher" \| "student"`. Las páginas internas pueden activar el modo práctica con los hooks de `portal-mode.ts` (ver abajo). |
 | `AuthLayout` | Pantalla partida para el acceso (login, registro, invitación, nueva contraseña y renovación): fondo blanco con el logo y el formulario a la izquierda, y a la derecha una portada en índigo con la vista previa `public/image/preview.webp` (en móvil aparece debajo del formulario). Usa `wide` para formularios de dos columnas, `action` para mostrar algo a la derecha del logo (p. ej. el botón "Iniciar sesión" del registro) y `cover` (`{ title, description }`) para el texto de la portada. |
 | `PublicPage` | Página pública con el logo arriba y el pie de página legal. |
 | `PublicFooter` | Pie de página con enlaces legales y datos de la empresa (ya incluido en `PublicPage`). |
@@ -252,15 +400,44 @@ y envía el token de Yape.
 | Archivo | Qué ofrece |
 | --- | --- |
 | `PlanPicker.tsx` | Selector del plan (mensual o semestral) con su precio. El semestral lleva siempre borde dorado, igual que su tarjeta en el home. |
-| `PlanCards.tsx` | Tarjetas grandes de los dos planes con sus beneficios y el botón «Elegir …» (con destello y leve crecimiento al pasar el mouse por el botón) que lleva al registro con ese plan. El semestral tiene borde dorado animado (`animate-orbit`), repite los beneficios del Plan Estudiante y resalta aparte sus extras. Se usan en el home (sección «Elige tu plan»); acepta `className` para el margen. |
-| `PaymentPanel.tsx` | Pago de un plan con Yape: pide el celular y el código de aprobación de la app de Yape, genera el token, cobra y espera a que se aplique. Explica los rechazos de Mercado Pago y deja reintentar con un código nuevo. Recibe `createPayment(plan, { token, phone })`, `fetchStatus` y `onPaid`, así sirve para el registro y la renovación. Sin Mercado Pago configurado muestra el contacto por WhatsApp. |
+| `PlanCards.tsx` | Tarjetas grandes de los dos planes (semestral a la izquierda, mensual a la derecha) con sus beneficios y el botón «Elegir …» (con destello y leve crecimiento al pasar el mouse por el botón) que lleva al registro con ese plan. El semestral tiene borde dorado animado (`animate-orbit`), repite los beneficios del Plan Estudiante y resalta aparte sus extras. Se usan en el home (sección «Elige tu plan»); acepta `className` para el margen. |
+| `PaymentPanel.tsx` | Pago de un plan con Yape: pide el celular y el código de aprobación de la app de Yape, genera el token, cobra y espera a que se aplique. Explica los rechazos de Mercado Pago y deja reintentar con un código nuevo. Siempre muestra un botón de WhatsApp bajo el de pagar: crece y vuelve a su tamaño (`animate-pop`) cada vez que un pago falla, y al tercer intento fallido se abre además un modal con el contacto. Recibe `createPayment(plan, { token, phone, device_session_id? })`, `fetchStatus` y `onPaid`, así sirve para el registro y la renovación. Sin Mercado Pago configurado muestra el contacto por WhatsApp. |
 | `PlanExpiryBanner.tsx` | Aviso en el portal del estudiante cuando a su plan le quedan `RENEWAL_NOTICE_DAYS` días o menos. |
 | `PaymentsToReview.tsx` | Tarjeta del administrador con los pagos confirmados que no se pudieron aplicar (de Mercado Pago o, los antiguos, de Kuti). Solo aparece si hay alguno. |
-| `yape.ts` | `createYapeToken(publicKey, celular, otp)`: carga el SDK de Mercado Pago y devuelve el token de un solo uso. |
+| `yape.ts` | `createYapeToken(publicKey, celular, otp)`: carga el SDK de Mercado Pago y devuelve el token de un solo uso. `getDeviceSessionId()` / `loadDeviceSessionScript()`: cargan `security.js` y devuelven el identificador del dispositivo para el antifraude (null si no cargó). |
 | `api.ts` | `getPaymentConfig` (Public Key), `createRenewalPayment`, `getRenewalPaymentStatus`, `listPaymentsToReview`, `resolvePayment` y los tipos `PlanPaymentState` y `PlanPaymentStatus`. Los cobros del registro están en `features/registration/api.ts`. |
 
 Los planes y precios están en `config/business.ts` (`PLANS`, `findPlan`,
 `planPriceLabel`) y deben coincidir con `supabase/functions/_shared/plans.ts`.
+
+## Pregunta de práctica (`features/sessions/PracticeQuestion.tsx`)
+
+Pantalla de una pregunta: avance y racha, mascota, enunciado, opciones con corrección al instante,
+explicación y pie fijo con el resultado y los botones. Es solo presentación: quien la usa guarda el
+estado y pasa `feedback`, `selected`, `chosen`, `onSelect` y `actions`; `optionsOverlay` y `notice`
+son huecos opcionales (xp flotante, error al guardar). La usan la práctica del estudiante
+(`pages/student/SessionPage.tsx`) y el modo gratuito (`FreeQuestionRunner`): cambiar su aspecto cambia
+ambos. En celular no hay cabecera durante la práctica: la X a la izquierda de la barra de avance (`onExit`) es la salida y la mascota va en el pie junto a los botones. La explicación se abre en un modal con «Ver explicación» (al fallar) o «¿Por qué?» (al acertar), a la izquierda del pie en escritorio y con el ancho justo de su texto y sin partirse en celular. Al corregir, sobre los botones, dice «Respuesta correcta» o «Mal. La respuesta era la X», y en celular la mascota sube sobre el pie. Al corregir se colorea el fondo de las opciones y del pie, no los bordes. Tamaños de letra en celular: 18 px enunciado, 16 px cuerpo y opciones, 14 px secundarios y 12 px mínimo. Teclado: A–D eligen la opción, las flechas (↑↓←→) se mueven entre opciones y Enter pulsa el botón del pie (confirmar, siguiente o finalizar); se ignoran al escribir en un campo, con un modal abierto y con Enter mantenido. Necesita el estilo de portal (`portal` en un ancestro) y respeta `--menu-w` si hay menú lateral.
+
+## Modo gratuito (`features/free-mode/`)
+
+Prueba pública de 10 preguntas. El formulario (grupo, curso y tema) es un slide claro del home (`id="gratis"`, debajo de los planes; `FreeModeSelector light`); «Comenzar» lleva a `/gratis?tema=<id>` (`pages/public/FreeModePage.tsx`), a pantalla
+completa y sin footer (sin `?tema=` vuelve a `/#gratis`). Sin sesión, FSRS ni xp. Sigue el estilo de
+las páginas públicas (`slate`/`emerald` fijos); la página activa la clase `dark` en su contenedor para que los componentes compartidos
+(`Select`, `Field`, `Input`, `ModalForm`, `Button`) usen sus variantes oscuras.
+
+| Archivo | Qué ofrece |
+| --- | --- |
+| `api.ts` | `getFreeModeCatalog`, `getFreeModeQuestions(topicId)` y `registerFreeModeLead`, más los tipos del catálogo, las preguntas y el lead. |
+| `FreeModeSelector.tsx` | Formulario en cascada grupo → curso → tema; entrega el tema con `onStart`. |
+| `FreeQuestionRunner.tsx` | Guarda el estado de la prueba (elegir, confirmar, racha) y dibuja la pregunta con `PracticeQuestion` (`features/sessions/`), el mismo componente de la práctica del estudiante, con las respuestas correctas que ya trae cada pregunta. Devuelve las respuestas con `onFinish`. La página `/gratis` usa los colores del portal (`portal bg-base`). |
+| `LeadModal.tsx` | `ModalForm` (el modal compartido, obligatorio) de registro, que se abre al terminar la prueba sobre los planes y no se cierra sin registrarse: nombres, apellidos, correo, WhatsApp, consentimiento de datos y campo trampa oculto (`website`). Los errores del servidor salen en toast. |
+| `lead-fields.ts` | Esquema zod del lead; reutiliza los campos de `features/registration/fields.ts`. |
+
+Al terminar la prueba se muestran los planes con `PlanCards` (con «Acertaste X de N») y, encima, el `LeadModal`; hasta registrarse el modal no se puede cerrar y tras registrarse el título pasa a «¡Gracias, …!». Las cargas usan `Skeleton` (con
+`bg-white/10!` para que se vea sobre el fondo oscuro). El botón «Probar gratis» del hero es
+`FreeButton` en `pages/HomePage.tsx` y baja al slide. En el admin de colegios, `features/colleges/demo.ts`
+(`isDemoCollege`) marca la institución demo como protegida.
 
 ## Cursos (`features/courses/`)
 
@@ -283,6 +460,94 @@ también se reutilizan: las rutas son `/admin/cursos/:courseId` y
 profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
 (`courseTopicsPath` e `importQuestionsPath`), así no se repiten rutas por rol.
 
+## Xp y niveles (`features/xp/`)
+
+- `XpResult` (`XpResult.tsx`): pantalla de fin de sesión. El xp ganado crece
+  como número (`useCountUp`) y la barra de nivel se llena, y por cada nivel que
+  sube cambia el número con una animación corta. Con `prefers-reduced-motion`
+  muestra el estado final sin animar. Recibe el `XpAward` que devuelve
+  `practice-session/submit` y `onContinue`.
+- `XpFloat` (`XpFloat.tsx`): "+N xp" flotante durante la sesión. Aparece sobre
+  las opciones, sube hacia la derecha y se desvanece; la racha de 3, 7 o 20
+  sale aparte como un bono dorado. Va dentro de un contenedor `relative`, con
+  `key` por pregunta para repetir la animación. Las animaciones son
+  `animate-xp-float` y `animate-xp-bonus` (`styles.css`); con
+  `prefers-reduced-motion` queda como texto fijo.
+- `xp.ts`: `answerXp`/`trailingStreak` (vista previa del xp por respuesta y
+  racha; el oficial lo calcula el servidor) y `buildLevelSegments` (tramos de la
+  barra).
+- `useCountUp(target)` y `prefersReducedMotion()` (`use-count-up.ts`).
+
+## Medallas (`features/medals/`)
+
+- `MedalSettings` (`MedalSettings.tsx`): pestaña "Medallas" de Configuración del admin. Interruptor
+  activar/desactivar y, si está activado, editores del fin de cada rango de estrellas y de notas
+  (validados con Zod en `medals.ts`; el inicio se deriva del fin del anterior). Guarda tras un modal de aviso.
+- `MedalResult` (`MedalResult.tsx`): medalla actual y estrellas ganadas o perdidas; va dentro de `XpResult`
+  (prop `medal`) y no se muestra si el colegio las desactivó.
+- `LevelBadge` y `GradeGauge` (`features/achievements/`): hexágono de nivel con borde que se llena y medidor semicircular 0–20 de la nota (la cifra va como `children`).
+- `MedalBadge` (`MedalBadge.tsx`): SVG ilustrado de cada una de las 13 medallas (`code`, `size`, `locked` para mostrarla en gris). Cinco familias con silueta, símbolo y metal propios (bronce, plata, jade, violeta, oro) y 1–3 estrellas de escalón. Colores fijos: no siguen el tema de la institución. Se usa en Mis logros y en `MedalResult`.
+- `StarSlots` (`StarSlots.tsx`): hueco de 3 estrellas (`best` llenas, el resto vacías); se usa junto a cada tema, con `MedalRulesHelp` a su lado.
+- `MedalRulesHelp` (`MedalRulesHelp.tsx`): icono SVG "?" con tooltip que abre un modal informativo; por defecto la regla
+  de estrellas por tema, o `title`/`body` propios (en Mis logros abre `MedalGuideBody`: reglas, estrellas por nota y rango de cada medalla). `MedalRulesBody` es el texto de esa regla.
+- `MedalGuideBody` (`MedalGuideBody.tsx`): contenido del modal "¿Cómo funcionan las medallas?": cada medalla con su insignia (a color y con brillo si ya la desbloqueaste, en gris si no) y una línea punteada entre familias. Los números de las medallas se muestran en romano (`medalLabel` en `medals.ts` convierte los nombres que llegan del backend).
+- `api.ts`: `getMedalSettings`, `saveMedalSettings`, `getMyMedal`, `getTopicStars`, `calculateMedal` (Edge Function `medals`).
+
+## Modo ruta (`features/route-mode/`)
+
+- `LessonText` (`LessonText.tsx`): texto de una lección. Respeta los saltos de
+  línea (`whitespace-pre-wrap`) y renderiza las fórmulas con `MathText` (KaTeX,
+  `$...$` y `$$...$$`). Úsalo para cualquier texto largo escrito por el profesor.
+- `RouteManagement` (`RouteManagement.tsx`): gestión de temas para
+  admin y profesor (el admin elige antes el profesor); «Lecciones» abre
+  `RouteLessonsPage` (`ruta/temas/:topicId`), donde se crea cada lección con su
+  nombre como en los temas de un curso. El botón «JSON» de cada lección abre
+  `RouteLessonJsonPage` (`ruta/lecciones/:lessonId/json`): texto, banco de preguntas y
+  `questions_to_show`, con ejemplo y guía de campos (`lesson-json.ts`).
+- `PaginatedText` (`PaginatedText.tsx`): texto largo que nunca pasa de una pantalla;
+  se reparte en páginas (Anterior / Siguiente) con columnas CSS dentro de un alto
+  `dvh` y muestra `lastPageAction` en la última página. Lo usa la lección del estudiante.
+- `RouteIsland` (`RouteIsland.tsx`): isla 2.5D de una lección (elipses con
+  grosor, colores de tema según el estado). La isla `selected` flota
+  (`animate-island-float`, solo con movimiento permitido) y lleva encima a
+  `PracticeMascot`; un clic en cualquier isla desbloqueada abre su lección. Las
+  desbloqueadas brillan más que las bloqueadas, el zigzag continúa entre temas y
+  la cabecera del tema alcanzado va rellena de color primario (la de un tema
+  aún bloqueado, apagada). En `RoutePage` la cabecera de cada tema es `sticky` y la del
+  tema siguiente toma su lugar al llegar.
+- `api.ts`: llamadas a `route-mode` y claves de caché de TanStack Query.
+- Páginas del estudiante: `pages/student/RoutePage.tsx` (mapa de islas por tema con
+  lecciones bloqueadas, disponibles y completadas) y `RouteLessonPage.tsx`
+  (texto paginado, preguntas sorteadas del banco y resultado). Los errores se avisan con toast y las cargas
+  usan `Skeleton`.
+- `PortalLayout`: el enlace "Modo ruta" está en los tres portales; una sección
+  del menú ya no se marca cuando otra más específica de la misma raíz (p. ej.
+  `/estudiante/ruta` dentro de `/estudiante`) coincide.
+
+## Mis logros (`features/achievements/` y `pages/student/AchievementsPage.tsx`)
+
+- `StudentAchievementsPage`: ruta `/estudiante/logros` (ítem "Mis logros" del menú). Composición asimétrica, cada
+  bloque con su `Skeleton` y su toast de error: una tarjeta principal (`PlayerHero`) con la medalla en grande
+  (rayos y brillo detrás; oculta si el colegio las desactivó) y el nivel (`LevelBadge`), y debajo Racha (más ancha:
+  tarjetas de racha actual y mejor, y el tramo de 7 días con hitos en el día 3 y 7) y Nota (`GradeGauge`).
+- `api.ts`: `getStreak`, `getLastGrades` (Edge Function `achievements`).
+- `achievements.ts`: `xpMissingForNextLevel`, `levelProgress`, `daysLabel`, `streakTrack` (tramo de 7 días de la racha).
+- `percentageToGrade` (`features/progress/metrics.ts`): porcentaje de acierto a nota sobre 20.
+
+## Ranking (`features/ranking/`)
+
+- `RankingSettings` (`RankingSettings.tsx`): pestaña "Ranking" de Configuración del admin. Interruptor (apagado por
+  defecto) y casillas de las categorías (NIVEL, MEDALLAS, NOTA; al menos una). Guarda tras un modal de aviso.
+- `RankingPage` (`pages/shared/RankingPage.tsx`, prop `role`): sección "Ranking" del estudiante (con su posición) y
+  del profesor (solo la lista). Selector de categoría (por defecto MEDALLAS), "Actualizar ranking", lista paginada de
+  30 con "Ver más" (spinner solo en esa carga, excepción pedida al uso de Skeleton) y, si falla, mensaje con
+  "Volver a intentar".
+- `useRankingFeed` (`use-ranking-feed.ts`): refresca la caché y consulta; ante `ranking_cache_not_found` refresca y
+  reintenta una vez; expone `feed`, `loadMore` y `reload`.
+- `useRankingSettings` (`use-ranking-visible.ts`): configuración del ranking de la institución del usuario; decide si
+  `PortalLayout` muestra el ítem "Ranking".
+- `api.ts`: `getRankingSettings`, `saveRankingSettings`, `refreshRankingCache`, `getRankingPage` (Edge Function `ranking`).
+
 ## Utilidades (`lib/`)
 
 | Utilidad | Archivo | Descripción |
@@ -295,6 +560,8 @@ profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
 | `studentAccess(perfil)` | `lib/student-access.ts` | Situación del plan del estudiante hoy en Lima: `active` (con `daysLeft`), `expired` (con `daysSinceExpiry`) o `not_started`. Úsala en lugar de comparar fechas a mano. También exporta `RENEWAL_NOTICE_DAYS` (3) y `EXPIRED_REVIEW_DAYS` (7). |
 | `formatDay(valor)` | `lib/dates.ts` | Fecha sin hora (`AAAA-MM-DD`, como las vigencias de acceso) en `DD/MM/AAAA`. Úsala en lugar de `formatDate` para esas fechas: `formatDate` las mostraría un día antes. |
 | `loadYouTubeApi()` y `YouTubePlayer` | `lib/youtube.ts` | Carga una sola vez la API del reproductor de YouTube (falla si el script está bloqueado) y tipa lo que usa la app: reproducir, silenciar, activar el sonido y su estado. La usa el video del home. |
+| `normalizeSearch(texto)` | `lib/text.ts` | Minúsculas, sin tildes y sin espacios sobrantes: para buscadores ("historia" encuentra "Historia del Perú"). |
+| `paletteVars(paleta)`, `applyPalette(elemento, paleta)`, `blackOrWhite(fondo)` | `lib/theme/palette.ts` | Paleta del portal: variables CSS a partir de 4 colores (marca, acento y fondos `page` y `nav`), con el texto en blanco o negro según el contraste. Ver "Estilo Chancón". |
 | `MathText` | `lib/math.tsx` | Muestra texto con fórmulas LaTeX (`$...$` y `$$...$$`) usando KaTeX. |
 | `roleLabel(rol)` | `features/users/api.ts` | Nombre en español del nivel de acceso: "Administrador", "Profesor" o "Estudiante". |
 
@@ -305,6 +572,28 @@ Los íconos vienen de la librería [lucide-react](https://lucide.dev/icons/):
 mano ni agregues otra librería de íconos; busca primero en lucide. El único
 gráfico propio es el del Libro de Reclamaciones (`ComplaintsBookIcon`, una
 imagen PNG).
+
+### Modo práctica (`components/layout/portal-mode.ts`)
+
+Hooks para páginas dentro de `PortalLayout`; fuera de él no hacen nada.
+
+- `usePortalFocus()`: mientras la página está montada, el menú de escritorio
+  se reduce a iconos sin cambiar la preferencia guardada del usuario (si lo
+  expande, vuelve a reducirse en la próxima práctica); en móvil se oculta la barra
+  inferior y la cabecera muestra un botón para salir.
+- `useLeaveWarning(warning)`: mientras `warning` (`{ title, body,
+  confirmLabel? }`) no sea `null`, los enlaces del menú y "Salir" abren un
+  modal de advertencia (`useModal().warning`) antes de navegar o cerrar sesión.
+  Pasa una constante del módulo para que no se reinstale en cada render.
+
+```tsx
+const LEAVE_WARNING: LeaveWarning = { title: "¿Salir de la práctica?", body: "Perderás tu progreso.", confirmLabel: "Salir y perder progreso" };
+
+usePortalFocus();
+useLeaveWarning(enCurso ? LEAVE_WARNING : null);
+```
+
+Ejemplo: `pages/student/SessionPage.tsx`.
 
 ## Sesión y usuario
 

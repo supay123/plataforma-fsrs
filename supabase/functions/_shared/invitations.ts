@@ -1,3 +1,4 @@
+import { collegeCodeById } from "./college-code.ts";
 import { appOrigin } from "./app-url.ts";
 import { RPCS, TABLES } from "./database.constants.ts";
 import { invitationEmail, sendEmail } from "./email.ts";
@@ -8,6 +9,23 @@ import type { EdgeContext } from "./types.ts";
 // Invitaciones de estudiantes: el administrador fija correo, periodo de acceso
 // y, opcionalmente, el grupo (profesor); el estudiante completa sus datos desde
 // el link. La institución siempre sale del grupo.
+
+/**
+ * Borra el registro pendiente (sin pagar) de ese correo para que no bloquee la
+ * invitación; un registro con un pago aprobado sin aplicar se conserva.
+ */
+export async function releasePendingRegistration(
+  context: EdgeContext,
+  email: string,
+): Promise<void> {
+  const { error } = await context.supabaseAdmin.rpc(
+    RPCS.releasePendingRegistration,
+    { p_email: email },
+  );
+  if (error) {
+    throw new AppError(500, "registration_release_failed", error.message);
+  }
+}
 
 export const INVITATION_TTL_DAYS = 7;
 export const INVITATION_PATH = "/estudiante/invitacion";
@@ -58,8 +76,12 @@ export function invitationExpiry(
   return afterTtl < lastAccessMoment ? afterTtl : lastAccessMoment;
 }
 
-export function invitationLink(origin: string, code: string): string {
-  return linkWithCode(origin, INVITATION_PATH, code);
+export function invitationLink(
+  origin: string,
+  code: string,
+  instId?: string | null,
+): string {
+  return linkWithCode(origin, INVITATION_PATH, code, instId);
 }
 
 export function invalidInvitation(): AppError {
@@ -182,12 +204,21 @@ export async function createInvitation(
   const code = generateLinkCode();
   const expiresAt = invitationExpiry(input.access_valid_until).toISOString();
 
-  const { error: deleteError } = await context.supabaseAdmin
+  const { data: existing, error: existingError } = await context.supabaseAdmin
     .from(TABLES.studentInvitations)
-    .delete()
-    .eq("email", input.email);
-  if (deleteError) {
-    throw new AppError(500, "invitation_failed", deleteError.message);
+    .select("id")
+    .eq("email", input.email)
+    .maybeSingle();
+  if (existingError) {
+    throw new AppError(500, "invitation_failed", existingError.message);
+  }
+  if (existing) {
+    throw new AppError(
+      409,
+      "invitation_exists",
+      "An invitation for this email already exists.",
+      { field: "email" },
+    );
   }
   const { data, error } = await context.supabaseAdmin
     .from(TABLES.studentInvitations)
@@ -203,7 +234,18 @@ export async function createInvitation(
     })
     .select(INVITATION_COLUMNS)
     .single();
-  if (error) throw new AppError(500, "invitation_failed", error.message);
+  if (error) {
+    // Dos invitaciones simultáneas al mismo correo.
+    if (error.code === "23505") {
+      throw new AppError(
+        409,
+        "invitation_exists",
+        "An invitation for this email already exists.",
+        { field: "email" },
+      );
+    }
+    throw new AppError(500, "invitation_failed", error.message);
+  }
 
   try {
     await sendEmail(
@@ -213,7 +255,11 @@ export async function createInvitation(
           teacher_name: group.teacher_name,
           college_name: group.college_name,
         },
-        invitationLink(appOrigin(request), code),
+        invitationLink(
+          appOrigin(request),
+          code,
+          await collegeCodeById(context, group.college_id),
+        ),
         expiresAt,
       ),
     );
@@ -278,7 +324,11 @@ export async function resendInvitation(
           teacher_name: previous.teacher?.full_name,
           college_name: previous.college?.name,
         },
-        invitationLink(appOrigin(request), code),
+        invitationLink(
+          appOrigin(request),
+          code,
+          await collegeCodeById(context, previous.college_id),
+        ),
         expiresAt.toISOString(),
       ),
     );

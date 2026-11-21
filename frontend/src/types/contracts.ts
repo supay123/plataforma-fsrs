@@ -38,10 +38,6 @@ export interface TopicQuestion {
 }
 
 export interface AnswerFeedback { is_correct: boolean; correct_option: AnswerOption; explanation: string | null }
-export interface AnswerResult {
-  status: "accepted" | "already_answered"; session_id: string;
-  selected_option: AnswerOption; feedback: AnswerFeedback;
-}
 export interface SessionQuestion {
   session_question_id: string;
   position: number;
@@ -59,12 +55,35 @@ export interface SessionPayload {
   };
   questions: SessionQuestion[];
 }
+/** Lo que el navegador necesita para corregir una pregunta sin llamar al servidor. */
+export interface AnswerKeyEntry { correct_option: AnswerOption; explanation: string | null }
+/** Clave de respuestas cifrada con AES-GCM, indexada por session_question_id. */
+export interface EncryptedAnswerKey {
+  algorithm: "AES-GCM";
+  /** Llave AES de 256 bits en base64. */
+  key: string;
+  items: Record<string, { iv: string; data: string }>;
+}
+export interface PracticePayload extends SessionPayload { answer_key: EncryptedAnswerKey }
 export interface SessionSummary {
   session_id: string; student_id: string; student_name: string; course_id: string;
   course_name: string; topic_id: string; topic_name: string; status: string;
   started_at: string; completed_at: string | null; total_questions: number;
   answered_questions: number; correct_count: number; incorrect_count: number;
   correct_percentage: number | null; error_percentage: number | null;
+}
+/** Montos de xp del colegio y nivel actual del estudiante (GET practice-session/xp-rules). */
+export interface XpRules {
+  xp_per_correct: number; streak_3_bonus: number; streak_7_bonus: number; streak_20_bonus: number;
+  level: number; xp: number; xp_to_next: number;
+}
+export interface XpBreakdown {
+  total: number; correct_xp: number; streak_bonuses: Array<{ streak: number; xp: number }>;
+}
+/** Xp otorgado al cerrar la sesión. `thresholds` trae el costo de cada nivel que cruzó. */
+export interface XpAward {
+  xp_gained: number; level_before: number; xp_before: number; level: number; xp: number;
+  thresholds: number[]; breakdown: XpBreakdown;
 }
 export interface ReviewQuestion {
   position: number; statement: string; option_a: string; option_b: string;

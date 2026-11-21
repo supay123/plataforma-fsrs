@@ -1,12 +1,12 @@
 import { invokeFunction } from "../../lib/api/functions";
-import type { AnswerOption, AnswerResult, ReviewResponse, SessionAnswer, SessionPayload, SessionSummary } from "../../types/contracts";
-export const startSession = (topic_id: string) => invokeFunction<SessionPayload, { topic_id: string }>("start-session", { topic_id });
-export const getSession = (session_id: string) => invokeFunction<SessionPayload, { session_id: string }>("get-session", { session_id });
-export const answerQuestion = (body: { session_question_id: string; selected_option: AnswerOption; response_time_ms: number }) => invokeFunction<AnswerResult, typeof body>("answer-question", body);
-/** Despierta la función de corrección para que la primera respuesta no espere su arranque. */
-export const warmAnswerQuestion = () => invokeFunction<{ status: "ready" }, Record<string, never>>("answer-question", {}, { method: "GET" });
-export const completeSession = (session_id: string, answers?: SessionAnswer[]) => invokeFunction<
-  { session: SessionSummary; request_id?: string },
-  { session_id: string; answers?: SessionAnswer[] }
->("complete-session", answers === undefined ? { session_id } : { session_id, answers });
+import type { PracticePayload, ReviewResponse, SessionAnswer, SessionSummary, XpAward, XpRules } from "../../types/contracts";
+/** Reanuda o crea la sesión del tema; trae las preguntas y su clave de respuestas cifrada. */
+export const startPractice = (topic_id: string) => invokeFunction<PracticePayload, { topic_id: string }>("practice-session/start", { topic_id });
+/** Guarda todas las respuestas pendientes de una vez y cierra la sesión. */
+export const submitPractice = (session_id: string, answers: SessionAnswer[]) => invokeFunction<
+  { session: SessionSummary; xp?: XpAward; request_id?: string },
+  { session_id: string; answers: SessionAnswer[] }
+>("practice-session/submit", { session_id, answers });
+/** Montos de xp del colegio y nivel actual, para mostrar el xp que gana con cada respuesta. */
+export const getXpRules = () => invokeFunction<XpRules, Record<string, never>>("practice-session/xp-rules", {}, { method: "GET" });
 export const getSessionReview = (session_id: string) => invokeFunction<ReviewResponse, { session_id: string }>("get-session-review", { session_id });

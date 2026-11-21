@@ -307,7 +307,7 @@ Deno.test({
     assert.equal(questionWithoutExplanation.explanation, null);
 
     const started = await jsonResponse(
-      "start-session",
+      "practice-session/start",
       { topic_id: topic.id },
       { token: studentToken },
       201,
@@ -316,11 +316,43 @@ Deno.test({
     let questions = started.questions as Array<{
       session_question_id: string;
       question: Record<string, unknown>;
+      feedback: unknown;
     }>;
     assert.equal(session.total_questions, 20);
     assert.equal(questions.length, 20);
     assert.equal("correct_option" in questions[0]!.question, false);
     assert.equal("explanation" in questions[0]!.question, false);
+
+    // The answer key ships encrypted and decrypts with the key it carries.
+    const answerKey = started.answer_key as {
+      algorithm: string;
+      key: string;
+      items: Record<string, { iv: string; data: string }>;
+    };
+    assert.equal(answerKey.algorithm, "AES-GCM");
+    assert.equal(Object.keys(answerKey.items).length, 20);
+    assert.ok(!JSON.stringify(answerKey.items).includes("correct_option"));
+    const fromBase64 = (value: string) =>
+      Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      fromBase64(answerKey.key),
+      "AES-GCM",
+      false,
+      ["decrypt"],
+    );
+    const firstItem = answerKey.items[questions[0]!.session_question_id]!;
+    const decrypted = JSON.parse(
+      new TextDecoder().decode(
+        await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: fromBase64(firstItem.iv) },
+          cryptoKey,
+          fromBase64(firstItem.data),
+        ),
+      ),
+    );
+    assert.equal(decrypted.correct_option, "A");
+    assert.ok("explanation" in decrypted);
 
     const preservedIds = questions.slice(0, 16).map((question) =>
       question.session_question_id
@@ -338,7 +370,7 @@ Deno.test({
     assert.ifError(shrinkSessionError);
 
     const resumed = await jsonResponse(
-      "start-session",
+      "practice-session/start",
       { topic_id: topic.id },
       { token: studentToken },
       201,
@@ -350,97 +382,32 @@ Deno.test({
       questions.slice(0, 16).map((question) => question.session_question_id),
       preservedIds,
     );
-    const pending = await jsonResponse(
-      "get-session",
-      { session_id: session.id },
-      { token: studentToken },
-    );
-    assert.ok(
-      (pending.questions as Array<{ feedback: unknown }>).every((question) =>
-        question.feedback === null
-      ),
-    );
+    assert.ok(questions.every((question) => question.feedback === null));
 
-    const warmed = await fetch(`${testUrl}/functions/v1/answer-question`, {
-      headers: {
-        "apikey": testPublishableKey,
-        "Authorization": `Bearer ${studentToken}`,
-      },
-    });
-    assert.equal(warmed.status, 200);
-    assert.deepEqual(await warmed.json(), { status: "ready" });
-
-    const answered = await jsonResponse(
-      "answer-question",
-      {
-        session_question_id: questions[0]!.session_question_id,
-        selected_option: "A",
-        response_time_ms: 1200,
-      },
-      { token: studentToken },
-    );
-    // The answer is saved after the feedback is sent.
-    let storedAnswer: string | null = null;
-    for (let attempt = 0; attempt < 40 && !storedAnswer; attempt++) {
-      const { data: storedRow, error: storedRowError } = await adminClient
-        .from(TABLES.assessmentSessionQuestions)
-        .select("selected_option")
-        .eq("id", questions[0]!.session_question_id)
-        .single();
-      assert.ifError(storedRowError);
-      storedAnswer = storedRow.selected_option;
-      if (!storedAnswer) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-    assert.equal(storedAnswer, "A");
-    const answeredFeedback = answered.feedback as Record<string, unknown>;
-    assert.equal(answered.status, "accepted");
-    assert.equal(answered.selected_option, "A");
-    assert.equal(answeredFeedback.is_correct, true);
-    assert.equal(answeredFeedback.correct_option, "A");
-    assert.ok("explanation" in answeredFeedback);
-
-    // A retry with a different option must report the stored answer.
-    const retry = await jsonResponse(
-      "answer-question",
-      {
-        session_question_id: questions[0]!.session_question_id,
-        selected_option: "B",
-        response_time_ms: 1200,
-      },
-      { token: studentToken },
-    );
-    assert.equal(retry.status, "already_answered");
-    assert.equal(retry.selected_option, "A");
-    assert.equal((retry.feedback as { is_correct: boolean }).is_correct, true);
-
-    const reloaded = await jsonResponse(
-      "get-session",
-      { session_id: session.id },
-      { token: studentToken },
-    );
-    const reloadedQuestions = reloaded.questions as Array<{
-      session_question_id: string;
-      feedback: { correct_option: string } | null;
-      question: Record<string, unknown>;
-    }>;
-    const reloadedAnswered = reloadedQuestions.find((question) =>
-      question.session_question_id === questions[0]!.session_question_id
-    )!;
-    assert.equal(reloadedAnswered.feedback?.correct_option, "A");
-    assert.equal("correct_option" in reloadedAnswered.question, false);
-    assert.ok(
-      reloadedQuestions
-        .filter((question) => question !== reloadedAnswered)
-        .every((question) => question.feedback === null),
-    );
-
-    const completed = await jsonResponse(
-      "complete-session",
+    // Every pending question must be submitted at once.
+    const incomplete = await jsonResponse(
+      "practice-session/submit",
       {
         session_id: session.id,
         answers: questions.slice(1).map((question) => ({
+          session_question_id: question.session_question_id,
+          selected_option: "A",
+          response_time_ms: 1200,
+        })),
+      },
+      { token: studentToken },
+      409,
+    );
+    assert.equal(
+      (incomplete.error as { code: string }).code,
+      "incomplete_submission",
+    );
+
+    const completed = await jsonResponse(
+      "practice-session/submit",
+      {
+        session_id: session.id,
+        answers: questions.map((question) => ({
           session_question_id: question.session_question_id,
           selected_option: "A",
           response_time_ms: 1200,
@@ -453,7 +420,7 @@ Deno.test({
       20,
     );
     await jsonResponse(
-      "complete-session",
+      "practice-session/submit",
       { session_id: session.id, answers: [] },
       { token: studentToken },
     );
@@ -472,7 +439,7 @@ Deno.test({
     );
 
     const scheduledSession = await jsonResponse(
-      "start-session",
+      "practice-session/start",
       { topic_id: topic.id },
       { token: studentToken },
       201,
@@ -514,7 +481,7 @@ Deno.test({
       })));
     assert.ifError(shortQuestionsError);
     const insufficient = await jsonResponse(
-      "start-session",
+      "practice-session/start",
       { topic_id: shortTopic.id },
       { token: studentToken },
       409,
@@ -1486,7 +1453,7 @@ Deno.test({
     assert.ifError(adminSignInError);
     const token = adminSession.session!.access_token;
 
-    // Grupo (profesor) con un curso en la institución: es lo que fija la
+    // Grupo con un curso en la institución: es lo que fija la
     // invitación y de donde salen la institución y la inscripción.
     const teacherEmail = `teacher.${suffix}@example.com`;
     const { data: teacherUser, error: teacherError } = await adminClient.auth

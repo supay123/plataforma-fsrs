@@ -10,17 +10,15 @@ function_dirs=(
   admin-reset-user-credentials
   admin-student-account
   admin-update-user
-  answer-question
   complaints
-  complete-session
   export-data
+  practice-session
   get-session-review
-  get-session
   import-questions
   questions
+  route-mode
   login-with-code
   recover-password
-  start-session
   public
   registration
   account
@@ -28,6 +26,10 @@ function_dirs=(
   invitations
   student-invitation
   mercadopago
+  medals
+  free-mode
+  achievements
+  ranking
 )
 
 for function_dir in "${function_dirs[@]}"; do

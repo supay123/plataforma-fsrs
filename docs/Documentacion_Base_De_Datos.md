@@ -457,6 +457,13 @@ Versiona la configuración utilizada por la librería `ts-fsrs`.
 - Nombre y versión no pueden estar vacíos.
 - Índice único parcial `fsrs_configs_single_active_idx`: solo puede existir una configuración activa.
 
+### Configuración activa
+
+- `FSRS v6 pasos diarios, máximo 45 días` (migración `20261120130000`): `learning_steps ["12h","1d"]`, `relearning_steps ["1d"]` y `maximum_interval 44`.
+- Primer acierto de una pregunta nueva: vuelve a 1 día. Primer fallo: 12 h. Fallo de una pregunta ya aprendida: 1 día.
+- El tope real es 45 días: `ts-fsrs` suma 1 día después de aplicar `maximum_interval`, por eso el parámetro es 44.
+- `request_retention` queda en el valor por defecto (0.90). Cambiar la configuración se hace creando una fila nueva y activándola, nunca editando la anterior.
+
 ### Políticas RLS
 
 - `fsrs_configs_select`: cualquier usuario autenticado y activo puede leer la configuración.
@@ -700,7 +707,7 @@ Migraciones: `20261013120000_student_invitations.sql` y `20261025120000_invitati
 |---|---|---:|---|---|
 | `id` | `uuid` | No | `gen_random_uuid()` | Identificador. |
 | `email` | `text` | No | — | Correo del estudiante invitado. |
-| `teacher_id` | `uuid` | Sí | — | Grupo (profesor) fijado por el administrador. Si es nulo, el estudiante elige su grupo al aceptar. |
+| `teacher_id` | `uuid` | Sí | — | Grupo fijado por el administrador. Si es nulo, el estudiante elige su grupo al aceptar. |
 | `college_id` | `uuid` | Sí | — | Institución del grupo fijado. En invitaciones antiguas (sin grupo) limita los grupos que puede elegir el estudiante a los de esa institución. |
 | `access_valid_from` | `date` | No | — | Inicio del acceso del estudiante. |
 | `access_valid_until` | `date` | No | — | Fin del acceso del estudiante. |
@@ -1129,3 +1136,220 @@ desde Asignaciones).
 `SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
 
 - `public.edge_change_student_group(p_student_id, p_teacher_id, p_actor_id)`: cambia el grupo en una sola transacción. Valida el profesor entre los de `edge_registration_teachers()`, desactiva las matrículas activas del estudiante en cursos de otros profesores y programa el borrado de su progreso, lo matricula en los cursos no archivados del nuevo profesor (si vuelve a uno que dejó, se cancela su borrado) y le asigna la institución del profesor, que devuelve. Errores: `user_not_found`, `invalid_teacher`.
+
+## Niveles y xp del estudiante
+
+Del estudiante solo se guarda su nivel y el xp que lleva dentro de ese nivel
+(no el total acumulado). Pasar al nivel N cuesta
+`floor(base_xp + base_xp * (N - 1)^(1 + growth) * growth)` (`public.xp_for_level`).
+Con base 100 y growth 0.2: 0→1 = 100, 1→2 = 120, 2→3 = 145. Si el admin cambia
+la fórmula, el nivel y el xp guardados no se tocan: solo cambia el costo del
+siguiente nivel.
+
+### public.college_xp_settings
+
+Una fila por colegio (`college_id`): `base_xp` (100), `growth` (0.2),
+`xp_per_correct` (75), `streak_3_bonus` (15), `streak_7_bonus` (42),
+`streak_20_bonus` (137), con rangos validados por constraints. Se crea con los
+valores por defecto al migrar y de forma perezosa para colegios nuevos. RLS:
+solo el admin lee y escribe (Configuración → Puntos, `features/xp/XpSettings.tsx`); las Edge Functions usan `service_role`.
+
+### public.college_themes
+
+Colores de un colegio por modo: clave `(college_id, mode)` con `mode` `light` o `dark`
+y los 4 colores `primary_color`, `secondary_color`, `base_color` y `blocks_color`
+(`#rrggbb` en minúsculas, validado por constraint). Sin filas, el colegio usa los
+colores por defecto de la plataforma; restablecer los colores borra sus filas. RLS:
+solo el admin lee y escribe; la lectura pública sin sesión la hace la Edge Function
+`public` (`GET /public/theme`) con `service_role`.
+
+### public.student_levels
+
+`student_id`, `level` (0 al empezar) y `xp` (0 al empezar), sin nivel máximo.
+RLS: el estudiante lee su fila y el admin todas; solo se escribe con
+`service_role`.
+
+### public.college_medal_settings
+
+Configuración de medallas de un colegio, 1 a 1 con `colleges` (`college_id` es la
+clave y `ON DELETE CASCADE`). Campos: `enabled` (por defecto `true`),
+`star_range_ends` (fin de cada uno de los 12 primeros rangos de estrellas:
+Postulante 1-3, Pre-Universitario 1-3, Candidato 1-3, Pre-Ingresante 1-3; por defecto
+`{2,5,8,13,18,23,32,41,50,67,84,101}`) y `grade_range_ends` (fin de las notas que dan
+-3, -2, -1, 0, +1 y +2 estrellas; por defecto `{2,5,8,9,13,17}`). Solo se guarda el
+umbral final: el inicio de cada rango es el fin del anterior + 1, Postulante 1 empieza
+en 0, **Ingresante** empieza en el último fin + 1, el rango de -3 empieza en 0 y el de
++3 termina en 20. Las constraints (`public.medal_ends_are_valid`) exigen enteros
+estrictamente crecientes y no negativos, y que el último fin de notas sea como máximo 19.
+Las notas con decimales caen en el rango de su parte entera. La fila se crea con el
+colegio (trigger `colleges_create_medal_settings`) y la migración activó las medallas en
+los colegios existentes. RLS: el admin lee y escribe; profesor y estudiante leen la de su
+colegio. La API (`medals`) devuelve los valores por defecto si no hay fila y la crea al
+modificar.
+
+### public.student_medals
+
+Medalla actual del estudiante, 1 a 1 con `profiles` (`student_id`, `ON DELETE CASCADE`):
+`stars` (>= 0, nunca negativo) y `medal` (`postulante_1` ... `ingresante`). Se crea con el
+estudiante (trigger `profiles_create_student_medal`) y por la migración con 0 estrellas.
+RLS: el estudiante lee la suya, el admin todas y el profesor las de sus estudiantes; solo
+se escribe con `service_role`.
+
+### public.student_topic_stars
+
+Mejor marca de estrellas por estudiante y tema de la práctica normal: clave
+`(student_id, topic_id)`, `best_stars` (0-3) y `completed` (true al llegar a 3). Ambas
+claves foráneas son `ON DELETE CASCADE`. Misma RLS que `student_medals`.
+
+### public.assessment_sessions.medal_award
+
+`jsonb` con el resultado de las medallas de la sesión (null hasta calcularse). Hace
+idempotente `POST /medals/calculate`.
+
+### public.student_activity_days
+
+Racha de días activos. Un registro por estudiante y día calendario de `America/Lima`
+(clave `(student_id, activity_date)`, `student_id` → `profiles` con `ON DELETE CASCADE`).
+Un día cuenta como activo cuando el estudiante completa al menos una sesión. La racha no se
+guarda: se calcula al consultar (`GET /achievements/streak`). RLS: el estudiante lee la suya,
+el admin todas y el profesor las de sus estudiantes; solo se escribe con `service_role`.
+
+`public.record_student_activity(p_student_id uuid, p_activity_at timestamptz default now())`
+(solo `service_role`) registra el día de Lima de `p_activity_at`; es idempotente y devuelve el
+día. La llama `practice-session/submit` al cerrar la sesión y es la que Modo Ruta debe llamar
+al completar una lección.
+
+### Funciones de medallas
+
+- `public.medal_ends_are_valid(p_ends, p_count, p_max)` y `public.medal_for_stars(p_stars, p_ends)`: auxiliares inmutables.
+- `public.edge_apply_session_medal(p_student_id, p_session_id, p_grade, p_stars_for_grade)`
+  (`SECURITY DEFINER`, solo `service_role`): aplica las reglas por tema en una transacción.
+  Estrellas negativas siempre restan (mínimo 0 en total); tema sin completar suma solo la
+  diferencia con su mejor marca; tema completado solo suma +1 con un resultado de +3.
+  Es idempotente por sesión y devuelve `{ enabled: false }` sin tocar nada si el colegio
+  las desactivó.
+
+### public.college_ranking_settings
+
+Configuración del ranking de un colegio, 1 a 1 con `colleges` (`college_id`, `ON DELETE CASCADE`):
+`enabled` (por defecto `false`) y `categories` (`ranking_type[]`, al menos una; por defecto
+`{NIVEL,MEDALLAS,NOTA}`). Se crea con el colegio (trigger `colleges_create_ranking_settings`) y la
+migración la creó para los existentes. La API (`ranking`) devuelve los valores por defecto si no hay fila y
+la crea al guardar. RLS como `college_medal_settings`: lectura del admin y del propio colegio; escritura solo admin.
+
+### public.ranking_type y public.cache_ranking
+
+Enum `ranking_type`: `NIVEL`, `MEDALLAS`, `NOTA`. `cache_ranking` guarda el ranking completo del grupo
+de un usuario como snapshot (`entries` jsonb ordenado, con `position` y `user_id`), una fila por
+(`user_id`, `ranking_type`) (clave primaria; `user_id` referencia `profiles` con `ON DELETE CASCADE`). `expires_at`
+vive 1 hora y se renueva en cada consulta. RLS activado sin políticas y sin permisos para `anon` ni
+`authenticated`: solo `service_role` (los endpoints sirven a cada usuario su propia fila).
+`public.edge_purge_expired_ranking_cache()` (`SECURITY DEFINER`, solo `service_role`) borra las vencidas y
+devuelve cuántas; la ejecuta el cron `purge-expired-ranking-cache` cada 15 minutos y el endpoint de
+refresco. Sin pg_cron, programa esa función con otro planificador.
+
+### public.assessment_sessions.xp_award
+
+`jsonb` con el resultado de otorgar el xp de la sesión (null hasta que se
+otorga). Hace idempotente el cierre.
+
+### Funciones relacionadas
+
+`SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
+
+- `public.edge_college_xp_rules(p_college_id)`: reglas del colegio; crea la fila por defecto si no existe.
+- `public.edge_student_xp_state(p_student_id)`: montos del colegio más nivel, xp y `xp_to_next` del estudiante.
+- `public.edge_award_session_xp(p_student_id, p_session_id, p_xp)`: suma el xp, sube los niveles que correspondan y guarda el resultado en la sesión una sola vez.
+
+## Modo ruta
+
+Temas con lecciones que el estudiante desbloquea en orden. Las preguntas son
+propias de este modo (no son las de `questions`) y no alimentan FSRS. Toda
+lectura de contenido y escritura pasa por la Edge Function `route-mode`
+(`service_role`); las políticas RLS solo cubren lecturas directas.
+
+### public.route_topics
+
+`college_id`, `teacher_id` (el grupo dueño), `name`, `description` y `position`
+(1, 2, 3...: se muestra como "Tema N"). RLS de lectura: admin, el profesor dueño
+y los estudiantes matriculados en cursos de ese profesor.
+
+### public.route_lessons
+
+`topic_id`, `position`, `title`, `content_text` (texto con saltos de línea y
+KaTeX) `questions_to_show` (cuántas preguntas del banco ve el estudiante por intento,
+al azar; 5 por defecto) e `is_ready` (true al guardar su banco de preguntas; solo
+entonces la ven los estudiantes). RLS de lectura: admin y el profesor dueño. Los estudiantes no
+tienen política: el contenido solo se sirve por la Edge Function, que valida el
+bloqueo.
+
+### public.route_questions
+
+Banco de 1 a 100 por lección (`position` 1 a 100, único por lección): `statement`,
+`option_a` a `option_d`, `correct_option` y `explanation`. RLS de lectura: admin
+y el profesor dueño (los estudiantes nunca leen la respuesta correcta).
+
+### public.route_lesson_attempts
+
+Cada intento: `student_id`, `lesson_id`, `correct_count`, `total_questions`,
+`score_percent`, `passed` (`score_percent >= 80`), `answers` y `xp_gained`. Una
+lección se completa cuando algún intento tiene `passed`; la siguiente se
+desbloquea entonces (dentro de la fila de temas y lecciones de cada profesor).
+RLS: el estudiante lee los suyos, el admin todos y el profesor los de sus temas.
+
+### public.route_question_xp_awards
+
+Clave `(student_id, question_id)`: pregunta que ya dio xp al estudiante. Solo la
+primera vez que se responde bien se otorga xp; los reintentos no lo repiten.
+
+### Función relacionada
+
+- `public.edge_record_route_attempt(p_student_id, p_lesson_id, p_answers, p_correct_question_ids, p_total_questions)`:
+  `SECURITY DEFINER`, solo `service_role`. Registra los premios de xp nuevos con
+  `on conflict do nothing` (seguro ante envíos simultáneos), guarda el intento,
+  suma el xp a `student_levels` y devuelve el resultado con el mismo formato de
+  xp que `edge_award_session_xp`. No hay bonos de racha ni estrellas de medalla.
+
+## Modo gratuito
+
+### Institución demo (`public.colleges`)
+
+La migración `20261116020000_free_mode` siembra solo la institución `CHANCON-DEMO`
+("Chancón – Modo gratuito"), sin profesores. El admin crea los profesores de esa
+institución y cada uno, con su nombre como grupo, sus cursos, temas y preguntas
+forman el catálogo del modo gratuito (un tema aparece cuando tiene al menos 10
+preguntas activas). La migración `20261121120000_remove_demo_teacher` elimina el
+profesor demo que una versión anterior sembraba. De esa
+institución salen las preguntas del modo gratuito (Edge Function `free-mode`),
+para no exponer bancos de colegios reales. El código está reservado: los triggers
+`colleges_protect_demo_delete` (BEFORE DELETE) y `colleges_protect_demo_code`
+(BEFORE UPDATE OF code), con `private.protect_demo_college()`, lanzan
+`demo_college_protected` si se intenta borrarla o cambiar su código. Las
+funciones `edge_registration_colleges()` y `edge_registration_teachers()` la
+excluyen para que no se ofrezca en el registro de estudiantes. Sigue
+visible para el administrador.
+
+### public.lead_rate_limits
+
+Intentos de registro de interesados del modo gratuito, solo para limitar la frecuencia. **Los interesados no se guardan en la base de datos**: la Edge Function `free-mode` los agrega a un Google Sheet.
+
+| Columna | Tipo | Nulo | Valor por defecto | Descripción |
+|---|---|---:|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Identificador principal. |
+| `ip_hash` | `text` | No | — | SHA-256 de la IP (nunca en claro). |
+| `email_hash` | `text` | No | — | SHA-256 del correo en minúsculas (nunca en claro). |
+| `created_at` | `timestamptz` | No | `now()` | Momento del intento. |
+
+RLS activa y sin políticas; `anon` y `authenticated` sin permisos: solo `service_role`. Se limpia sola: el RPC borra las filas de más de 24 h al ejecutarse y un job de `pg_cron` (`purge-lead-rate-limits`, cada hora) hace lo mismo.
+
+### Funciones relacionadas
+
+`SECURITY DEFINER`, con `search_path = ''`, y solo la ejecuta `service_role`.
+
+- `public.edge_check_lead_rate_limit(p_ip_hash, p_email_hash)`: con bloqueo consultivo comprueba los límites y registra el intento en `lead_rate_limits`; falla con `lead_ip_limit` (5 por IP cada hora) o `lead_email_limit` (3 por correo cada día).
+- `public.edge_leads_sheet_id()`: lee de Vault el secreto `leads_sheet_id` (ID del Google Sheet); `null` si no existe (el registro responde entonces `503 leads_unavailable`). Se crea con `select vault.create_secret('<ID>', 'leads_sheet_id');`.
+
+## public.v_student_topic_due_reviews
+
+- Cuenta, por estudiante y tema, las preguntas activas cuya tarjeta FSRS está vencida (`due_at <= now()`).
+- Incluye `due_questions` y `oldest_due_at` (la más atrasada). Alimenta la pantalla de repaso del estudiante.

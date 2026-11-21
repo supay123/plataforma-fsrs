@@ -111,7 +111,7 @@ function EvidencePicker({ files, onChange }: { files: File[]; onChange: (files: 
 }
 
 function SectionTitle({ number, className, children }: { number: number; className?: string; children: string }) {
-  return <h2 className={clsx("mt-8 flex items-center gap-3 border-b border-slate-200 pb-2 text-base font-bold text-slate-950", className)}><span className="grid h-7 w-7 place-items-center rounded-full bg-indigo-600 text-sm text-white">{number}</span>{children}</h2>;
+  return <h2 className={clsx("mt-8 flex items-center gap-3 border-b border-slate-200 pb-2 font-bold text-slate-950", className)}><span className="grid h-7 w-7 place-items-center rounded-full bg-indigo-600 text-sm text-white">{number}</span>{children}</h2>;
 }
 
 function TestModeSwitch({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
@@ -138,7 +138,7 @@ function Receipt({ record, pdf }: { record: ComplaintRecord; pdf: Blob }) {
     <h1 className="mt-6 text-2xl font-bold text-slate-950">Hoja de reclamación N.° {sheetLabel(record)}</h1>
     <Button type="button" className="mt-4" onClick={() => downloadPdf(pdf, complaintPdfFilename(record))}><Download size={16} className="mr-2" />Descargar copia (PDF)</Button>
     {complaintSections(record).map((section) => <section key={section.title} className="mt-6">
-      <h2 className="mb-3 border-b border-slate-200 pb-2 text-base font-bold text-slate-950">{section.title}</h2>
+      <h2 className="mb-3 border-b border-slate-200 pb-2 font-bold text-slate-950">{section.title}</h2>
       <Rows rows={section.rows} />
     </section>)}
   </Card>;

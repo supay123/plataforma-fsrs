@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
+import type { MascotEvent } from "./use-mascot-animation";
 
 export type ModalVariant = "delete" | "create" | "warning" | "info";
 export interface ModalOptions {
@@ -12,6 +13,8 @@ export interface ModalOptions {
   onConfirm: () => unknown;
   /** Texto del botón principal; por defecto "Eliminar", "Crear" o "Confirmar". */
   confirmLabel?: string;
+  /** La mascota sobre el título (para avisar del impacto de la acción). */
+  mascot?: MascotEvent;
 }
 /** Modal informativo: solo un botón para cerrarlo, sin acción que confirmar. */
 export interface InfoModalOptions {

@@ -2,7 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { MascotHelp } from "../../features/mascot/MascotHelp";
+import type { Advice } from "../../features/mascot/advice";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader } from "../../components/ui";
+import { Skeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { useToast } from "../../components/ui/use-toast";
 import {
@@ -12,6 +15,7 @@ import {
   importQuestions,
   listTopicQuestions,
 } from "../../features/questions/api";
+import { MathText } from "../../lib/math";
 import type { AnswerOption, ImportResponse, TopicQuestion } from "../../types/contracts";
 
 const OPTIONS = ["A", "B", "C", "D"] as const;
@@ -23,24 +27,31 @@ function QuestionPreview({ question, onDelete }: { question: TopicQuestion; onDe
     C: question.option_c,
     D: question.option_d,
   };
-  return <li className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 p-4">
+  return <li className="flex items-start justify-between gap-3 rounded-2xl border-2 border-line p-4">
     <div className="min-w-0">
-      <p className="font-medium leading-6 text-slate-900">{question.statement}</p>
-      <div className="mt-2 grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
+      <p className="font-medium leading-6 text-fg"><MathText>{question.statement}</MathText></p>
+      <div className="mt-2 grid gap-1 text-sm text-fg-muted sm:grid-cols-2">
         {OPTIONS.map((option) => <span
           key={option}
-          className={option === question.correct_option ? "rounded-lg bg-emerald-50 px-2 py-1 text-emerald-900" : "px-2 py-1"}
+          className={option === question.correct_option ? "bg-success-soft px-2 py-1 text-success-text" : "px-2 py-1"}
         >
-          <strong>{option}.</strong> {options[option]}{option === question.correct_option && <span className="ml-2 text-xs font-semibold">Correcta</span>}
+          <strong>{option}.</strong> <MathText>{options[option]}</MathText>{option === question.correct_option && <span className="ml-2 text-xs font-semibold">Correcta</span>}
         </span>)}
       </div>
-      {question.explanation && <p className="mt-2 text-sm text-slate-500"><strong className="font-medium text-slate-700">Explicación:</strong> {question.explanation}</p>}
+      {question.explanation && <p className="mt-2 text-sm text-fg-muted"><strong className="font-medium text-fg">Explicación:</strong> <MathText>{question.explanation}</MathText></p>}
     </div>
     <Button aria-label={`Eliminar pregunta: ${question.statement}`} className="shrink-0 px-2" title="Eliminar pregunta" variant="ghost" onClick={onDelete}>
       <Trash2 aria-hidden="true" size={18} />
     </Button>
   </li>;
 }
+
+const IMPORT_TIPS = [
+  "Descarga la plantilla con el botón de arriba y no cambies el orden ni el nombre de sus columnas.",
+  "Escribe una pregunta por fila. La explicación es opcional.",
+  "Sube el archivo: primero se valida y verás cuántas filas son válidas, rechazadas o duplicadas.",
+  "Solo después de revisar el resultado, confirma la importación.",
+];
 
 export function ImportPage() {
   const { topicId = "" } = useParams();
@@ -96,7 +107,7 @@ export function ImportPage() {
     title: "Eliminar pregunta",
     body: <>
       <p>La pregunta dejará de aparecer en este tema y en las sesiones nuevas. Se conservarán los resultados históricos de los estudiantes.</p>
-      <p className="mt-3 rounded-xl bg-slate-50 p-3 font-medium text-slate-800">{question.statement}</p>
+      <p className="mt-3 rounded-xl bg-sunken p-3 font-medium">{question.statement}</p>
     </>,
     onConfirm: () => remove.mutateAsync(question.id),
   });
@@ -109,8 +120,13 @@ export function ImportPage() {
     onConfirm: () => removeAll.mutateAsync(),
   });
 
+  const advice: Advice = confirmed ? { event: "correct", tone: "success", text: "¡Listo! Las preguntas ya están en el tema." }
+    : preview && preview.report.rejected > 0 ? { event: "rest", tone: "warning", text: `${preview.report.rejected} fila${preview.report.rejected === 1 ? "" : "s"} se rechazaron. Revisa el detalle: cada una dice qué le falta. Las válidas sí se importarán.` }
+    : preview && preview.report.accepted > 0 ? { event: "correct", tone: "success", text: "Todo en orden. Confirma la importación cuando quieras." }
+    : { event: "rest", tone: "neutral", text: "Descarga la plantilla, llénala sin cambiar sus columnas y súbela aquí para validarla." };
   return <>
     <PageHeader title="Importar preguntas" description="Valida la plantilla antes de confirmar los cambios." actions={<a href="/templates/plantilla-preguntas.xlsx" download><Button variant="secondary">Descargar plantilla</Button></a>} />
+    <MascotHelp className="mb-6 max-w-3xl" screen="import-questions" advice={advice} tips={IMPORT_TIPS} />
     <Card className="max-w-3xl">
       <Alert>La explicación es opcional. Se importarán las filas válidas y se reportarán las rechazadas.</Alert>
       <div className="mt-5">
@@ -125,19 +141,19 @@ export function ImportPage() {
       </div>
       {(validate.error || confirm.error) && <div className="mt-4"><Alert tone="error">{(validate.error ?? confirm.error)?.message}</Alert></div>}
       {preview && !confirmed && <div className="mt-6 grid grid-cols-3 gap-3">
-        {[["Válidas", preview.report.accepted], ["Rechazadas", preview.report.rejected], ["Duplicadas", preview.report.duplicates]].map(([label, value]) => <div className="rounded-xl bg-slate-50 p-4 text-center" key={String(label)}><strong className="block text-2xl">{value}</strong><span className="text-xs text-slate-500">{label}</span></div>)}
+        {[["Válidas", preview.report.accepted], ["Rechazadas", preview.report.rejected], ["Duplicadas", preview.report.duplicates]].map(([label, value]) => <div className="rounded-xl bg-sunken p-4 text-center" key={String(label)}><strong className="block text-2xl">{value}</strong><span className="text-xs text-fg-muted">{label}</span></div>)}
       </div>}
 
-      <div className="mt-8 border-t border-slate-200 pt-6">
+      <div className="mt-8 border-t border-line pt-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-bold text-slate-950">Preguntas del tema</h2>
-            <p className="mt-1 text-sm text-slate-600">Estas son las preguntas que los estudiantes pueden recibir en este tema.</p>
+            <h2 className="font-bold text-fg">Preguntas del tema</h2>
+            <p className="mt-1 text-sm text-fg-muted">Estas son las preguntas que los estudiantes pueden recibir en este tema.</p>
           </div>
           {questions.data && <Badge>{questions.data.length} {questions.data.length === 1 ? "pregunta" : "preguntas"}</Badge>}
         </div>
         {questions.isLoading
-          ? <p className="mt-4 text-sm text-slate-500">Cargando preguntas…</p>
+          ? <div role="status" aria-busy="true" aria-label="Cargando preguntas" className="mt-4 grid gap-3">{[0, 1, 2].map((item) => <Skeleton key={item} height={72} />)}</div>
           : questions.error
             ? <div className="mt-4"><Alert tone="error">{questions.error.message}</Alert></div>
             : questions.data?.length

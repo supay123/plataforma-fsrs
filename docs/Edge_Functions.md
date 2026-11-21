@@ -6,7 +6,7 @@ error handling, CSV, XLSX, session serialization, and FSRS scheduling live in
 
 Endpoints accept `POST` unless noted (`GET public/colleges`, `GET public/teachers`). Except for the
 public ones (`login-with-code`, `recover-password`, `complaints`,
-`public`, and `registration`), callers must send a valid user access token in
+`public`, `free-mode`, and `registration`), callers must send a valid user access token in
 `Authorization: Bearer <token>`. Public endpoints require the project's
 publishable key. A function can expose several endpoints as sub-paths
 (`/functions/v1/<function>/<path>`), dispatched by `_shared/router.ts`. Service-role credentials are never
@@ -52,14 +52,16 @@ pnpm exec supabase gen types --local --schema public \
 | `admin-renew-access` | Admin | Replaces a student's inclusive access-date range and optionally reactivates the profile. |
 | `import-questions` | Admin, teacher | Validates or confirms an official-template XLSX/JSON question import. A teacher is restricted to their own courses. |
 | `questions` | Admin, teacher | Lists a topic's current questions (`GET /questions?topic_id=...`), archives one (`DELETE /questions?id=...`) or all of them (`DELETE /questions/topic?topic_id=...`). Archived questions no longer appear in new sessions but their historical results are kept. A teacher is restricted to their own courses. |
-| `start-session` | Student | Atomically resumes the student's existing in-progress session for a topic or creates one with up to 20 due-first/new questions. |
-| `get-session` | Student | Reloads an owned session. Answered questions include their `feedback`; pending questions never expose the correct answer or explanation. |
-| `answer-question` | Student | Corrects an answer server-side, maps it to FSRS `Again` or `Good`, atomically persists the answer/card/review log, and returns immediate `feedback` for the stored answer. Safe to retry. |
-| `complete-session` | Student | Closes an owned session only after all questions are answered and returns its summary. Repeated completion is safe. |
+| `practice-session` | Student | `POST /start` atomically resumes the student's in-progress session for a topic or creates one with up to 20 due-first/new questions, and returns them with an AES-GCM encrypted answer key so the browser corrects instantly. `POST /submit` saves every pending answer at once, applies FSRS (`Again`/`Good`) with the answer key from the database, and closes the session, awarding the xp earned. `GET /xp-rules` returns the college xp amounts and the student level. Repeated submission is safe. |
+| `medals` | Admin, teacher and student (see routes) | Medals and stars. `GET /settings` returns the college medal configuration (admin passes `?college_id=`; teacher and student get their own college; defaults when there is no row). `PUT /settings` (admin) updates or creates it. `GET /me` returns the student current medal and stars. `GET /topic-stars` returns the student best stars per topic. `POST /calculate` applies the stars of a completed session (grade computed on the server from the stored session; idempotent). Settings and student medal rows are created by database triggers, so there are no create endpoints. |
+| `route-mode` | Admin, teacher, student | Route mode (topics with lessons unlocked in order with >= 80% score). Management by admin or the owning teacher: `POST /route-mode/topics` (`name`, `description?`, `teacher_id` required only for admin), `PUT /route-mode/topics?id=` , `DELETE /route-mode/topics?id=`, `POST /route-mode/lessons` (`topic_id`, `title`: creates the lesson with no content, not ready), `PUT /route-mode/lessons?id=` (`title`: rename), `PUT /route-mode/lessons/content?id=` (`lesson`: `text`, `questions_to_show` and a bank of 1-100 `questions` with `statement`, `option_a`-`option_d`, `correct_option`, optional `explanation`; `questions_to_show` cannot exceed the bank size; questions are upserted by position so awarded xp is kept, extra trailing ones are deleted; marks the lesson ready), `DELETE /route-mode/lessons?id=`. Reads, each role sees its own: `GET /route-mode/topics[?teacher_id=]` and `GET /route-mode/lessons?topic_id=` (students get only ready lessons with `status` `locked`/`available`/`completed` and `best_percent`) and `GET /route-mode/lessons/content?id=` (text and questions; managers get the whole bank; students get it only if the lesson is unlocked, receive `questions_to_show` questions drawn at random from the bank on every request, and never receive `correct_option` or `explanation` in the clear: they come in the AES-GCM `answer_key` (same format as `practice-session`) so the browser grades each question instantly; `403 lesson_locked` otherwise). Student: `GET /route-mode/progress` (topics, lessons and unlocks) and `POST /route-mode/attempts` (`lesson_id`, `answers` of `question_id` + `selected_option`; exactly `questions_to_show` distinct questions of the lesson, scored over that count): the backend grades with the database key, stores the attempt, awards xp only for questions answered correctly for the first time (`route_question_xp_awards`, `xp_per_correct` of the college, no streak bonus, no medal stars) and answers with `correct_count`, `score_percent`, `passed`, `xp`, `next_lesson_id`; `403 lesson_locked` if the previous lesson is not passed. Route questions are separate from `questions` and never feed FSRS. |
+| `achievements` | Student | "Mis logros". `GET /streak` returns the day streak (days active in a row up to today; still alive if only today is missing), best streak and recent active days. `GET /last-grades` returns the grade of the last completed normal-mode session. Medal and level reuse `GET /medals/me` and `GET /practice-session/xp-rules`. |
+| `ranking` | Admin, teacher and student (see routes) | Ranking by college and group (teacher). `GET /settings` returns the college ranking configuration (admin passes `?college_id=`; teacher and student get their own; defaults to disabled when there is no row). `PUT /settings` (admin) updates or creates it. `PUT /cache` (student, teacher) creates or replaces the caller cache for one ranking type. `GET /cache` (student, teacher) reads a page of the caller cache. The settings row is created by a database trigger, so there is no create endpoint. |
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
 | `export-data` | Teacher, admin | Streams a paginated UTF-8 CSV. Teachers are restricted to their own data; admins may filter across the platform. |
 | `complaints` | Public | `POST /complaints/sheets` receives a Libro de Reclamaciones sheet, numbers it from `private.complaint_sheet_number_seq`, renders the official sheet as a PDF (jsPDF) and emails it with the evidence through Gmail to the business, with a copy to the consumer. At most 2 numbered sheets per IP per day (Lima time); only the IP hash and sheet number are kept, for one day. Complaints themselves are never stored. |
-| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to; `GET /public/payment-config` returns the Mercado Pago `public_key` the browser needs to turn the Yape phone and approval code into a token (`503 payments_unavailable` while `MERCADOPAGO_PUBLIC_KEY` is not set). |
+| `public` | Public | Read-only public data. `GET /public/colleges` lists the active colleges; `GET /public/teachers` lists the groups (teachers) a new student can choose, with the college each group belongs to; `GET /public/theme` returns the colors of an institution (`?inst=<college code>`, `theme: null` when it has none); `GET /public/payment-config` returns the Mercado Pago `public_key` the browser needs to turn the Yape phone and approval code into a token (`503 payments_unavailable` while `MERCADOPAGO_PUBLIC_KEY` is not set). |
+| `free-mode` | Public | Free mode of the home page. Questions come from the protected demo college (code `CHANCON-DEMO`), never from real colleges. `GET /free-mode/catalog` lists groups → courses → topics for the three cascading selectors (only topics with at least 10 active questions). `GET /free-mode/questions?topic_id=` returns 10 random active questions with `correct_option` and `explanation`, with no session, FSRS or xp. `POST /free-mode/leads` appends the person who tried it to a Google Sheet; leads are NOT stored in the database (only hashed rate-limit attempts, in `lead_rate_limits`). Duplicates are not checked. |
 | `registration` | Public | Student self sign-up, one endpoint per step: `POST /registration/student/validate` validates the form and stores a pending registration in `student_registrations` (password as a bcrypt hash only); `POST /registration/request-code` emails the 6-digit code; `POST /registration/validateCode` verifies it; `POST /registration/payment` charges the chosen plan with Yape through Mercado Pago; `GET /registration/payment` reports its status and activates the account once Mercado Pago approves it. No account exists until the first payment is confirmed. |
 | `mercadopago` | Mercado Pago signature | `POST /mercadopago/webhook` receives Mercado Pago **Order** notifications (`type: order`), verifies `x-signature` (HMAC-SHA256 of `id:<data.id in lowercase>;request-id:<x-request-id>;ts:<ts>;`) with the secret stored in Vault as `mercadopago_webhook_secret`, fetches the order (`GET /v1/orders/{id}`) and applies it. Called by Mercado Pago, never by the app. |
 | `account` | Student | Profile of any student: `GET /account/profile`, `PUT /account/profile`, `POST /account/email-change`, `POST /account/email-change/confirm`, `POST /account/password-reset` (emails the reset link; `409 email_required` until the student adds a verified email), and `DELETE /account/password-reset` (voids a link sent by mistake). |
@@ -86,15 +88,74 @@ pnpm exec supabase gen types --local --schema public \
 - `questions`: `GET /questions?topic_id=...` to list the topic's questions,
   `DELETE /questions?id=...` to archive one, and
   `DELETE /questions/topic?topic_id=...` to archive all of them.
-- `start-session`: `topic_id`.
-- `get-session`, `complete-session`, `get-session-review`: `session_id`.
-- `answer-question`: `session_question_id`, `selected_option` (`A`–`D`),
-  `response_time_ms`. Responds with `status` (`accepted` or
-  `already_answered`), `session_id`, the stored `selected_option`, and
-  `feedback` (`is_correct`, `correct_option`, `explanation`). The answer is
-  saved right after the response is sent; a retry once it is saved reports the
-  stored answer, even if it sends a different option. `GET` only boots the
-  function (the session page calls it on open).
+- `POST practice-session/start`: `topic_id`. Responds `201` with `session`,
+  `questions` (pending ones never include `correct_option` or `explanation` in
+  clear; already answered ones carry their `feedback`) and `answer_key`
+  (`algorithm: "AES-GCM"`, base64 `key`, and `items` keyed by
+  `session_question_id`, each with base64 `iv` and `data`; the decrypted data is
+  `{ correct_option, explanation }`). The key travels with the payload, so it
+  only hides the answers from casual inspection: grading and FSRS always use the
+  database on submit. `409 insufficient_active_questions` if the topic has too
+  few active questions.
+- `POST practice-session/submit`: `session_id` and `answers` (every pending
+  question exactly once: `session_question_id`, `selected_option` `A`–`D`,
+  `response_time_ms`; at most 20). Responds with the session summary; `409
+  incomplete_submission` if an answer is missing or extra.
+- `achievements` (student, JSON):
+  - `GET /achievements/streak` responds
+    `{ current_streak, best_streak, active_today, last_active_date|null, today, recent_active_days: string[] }`.
+    Days are `YYYY-MM-DD` in `America/Lima`; `recent_active_days` covers the last 30 days. A day is
+    active when the student completes a session (recorded by `practice-session/submit` through
+    `record_student_activity`, idempotent; a failure there does not break the submission).
+  - `GET /achievements/last-grades` responds
+    `{ last_session: { session_id, completed_at, topic_name|null, grade } | null, last_route_lesson: null }`.
+    `grade` is 0-20 (same formula as medals). `last_route_lesson` is reserved for Modo Ruta.
+- `medals` (all responses are JSON):
+  - `GET /medals/settings[?college_id=]` (admin, teacher, student) responds
+    `{ college_id, is_default, enabled, star_range_ends: number[12], grade_range_ends: number[6], medals: [{ code, name, min_stars, max_stars|null }], grade_ranges: [{ stars, min_grade, max_grade }] }`.
+    `400 college_required` if an admin omits `college_id`.
+  - `PUT /medals/settings` (admin): `{ college_id, enabled?, star_range_ends?, grade_range_ends? }`;
+    omitted fields keep their value and a missing row is created. Validation: `star_range_ends` has
+    12 strictly increasing integers >= 0; `grade_range_ends` has 6 strictly increasing integers
+    in 0-19 (the +3 range ends at 20). `400 validation_error` otherwise. Responds like `GET /settings`.
+  - `GET /medals/me` (student) responds `{ enabled: false }` or
+    `{ enabled: true, stars, medal: MedalRange, next_medal: MedalRange|null, stars_to_next: number|null }`.
+    The medal is computed with the current ranges of the college.
+  - `GET /medals/topic-stars` (student) responds `{ enabled, topics: [{ topic_id, best_stars, completed }] }`
+    (topics never practiced are absent = 0 stars).
+  - `POST /medals/calculate` (student): `{ session_id }` only. `404 session_not_found`,
+    `409 session_not_completed`. Responds `{ enabled: false }` or
+    `{ enabled: true, grade, stars_for_grade, stars_delta, stars_before, stars, medal_before, medal, topic_id, topic_best_stars, topic_completed }`.
+    `grade` is `correct_count / total_questions * 20` rounded to 2 decimals; `stars_delta` is the
+    change actually applied (after the floor at 0). Repeating the call returns the same result.
+    Medal codes: `postulante_1..3`, `pre_universitario_1..3`, `candidato_1..3`, `pre_ingresante_1..3`, `ingresante`.
+- `ranking` (all responses are JSON). Types: `NIVEL`, `MEDALLAS`, `NOTA`. Group = students actively
+  enrolled in the courses of the caller's teacher (a teacher sees their own students; a student with
+  several teachers competes with all of their students), same college. Names are public as
+  `Name F. F.` (given names plus family-name initials).
+  - `GET /ranking/settings[?college_id=]` (admin, teacher, student) responds
+    `{ college_id, is_default, enabled, categories: RankingType[], available_categories: RankingType[], visible }`.
+    `available_categories` is empty when disabled and drops `MEDALLAS` when the college has medals off;
+    `visible` is `available_categories.length > 0`. Defaults: `enabled: false`, all categories.
+  - `PUT /ranking/settings` (admin): `{ college_id, enabled?, categories? }` (non-empty, no repeats);
+    omitted fields keep their value; creates the row when missing. `404 college_not_found`.
+  - `PUT /ranking/cache` (student, teacher): `{ type }`. Computes the whole ranking of the group and
+    upserts one `cache_ranking` row per (user, type) with `expires_at = now + 1 hour`; also purges expired
+    rows. Responds `{ type, total_participants, generated_at, expires_at }`. `403 ranking_disabled` /
+    `ranking_category_disabled` when the college has it off.
+  - `GET /ranking/cache?type=&page=&page_size=` (student, teacher): `page` from 1, `page_size` default 30
+    (max 100). Each call renews `expires_at` to now + 1 hour (sliding). Responds
+    `{ type, page, page_size, total_pages, total_participants, my_position|null, items: [{ position, display_name, is_me, level?, xp?, stars?, medal?: { code, name }, grade?, completed_sessions? }], generated_at, expires_at }`.
+    `my_position` is `null` for teachers and for students without a place (NOTA excludes students with no
+    completed session). A page beyond the last returns empty `items`. Missing or expired cache (an expired row
+    is deleted on the spot): `404 ranking_cache_not_found`; the client must call `PUT /ranking/cache` and retry.
+  - Ordering (descending): NIVEL = level, xp; MEDALLAS = stars; NOTA = average of the per-course
+    `course_correct_percentage` (same figure as "Mi aprendizaje"). Ties: whoever reached it first
+    (`updated_at`, or last completed session for NOTA), then user id. Positions are unique (1, 2, 3...).
+  - Cleanup: lazy on read, opportunistic inside `PUT /cache`, and the `purge-expired-ranking-cache`
+    pg_cron job (every 15 minutes, `select public.edge_purge_expired_ranking_cache()`). If pg_cron is not
+    available in an environment, schedule that function with any external scheduler.
+- `get-session-review`: `session_id`.
 - `export-data`: optional `college_id`, `teacher_id`, `course_id`,
   `student_id`, and `topic_id` filters.
 - `POST complaints/sheets` (`multipart/form-data`): `data` (the sheet as
@@ -106,6 +167,44 @@ pnpm exec supabase gen types --local --schema public \
   `details.sheet_number` so the retry reuses the number and leaves no gaps.
 - `GET public/colleges`: no body. Responds with `colleges` (`id`, `name`).
   Creates `Chancón – Particular` once if no college is active.
+- `GET public/theme?inst=<college code>`: colors of an institution for the login
+  page. Responds `{ theme: null }` (200, not an error) when `inst` is missing, the
+  college does not exist or it has no colors; otherwise `{ theme: { light, dark } }`,
+  each one `null` or `{ primary, secondary, base, blocks }` (`#rrggbb`). Emailed
+  links (invitation, password reset) carry `&instId=<college code>` so the browser
+  loads these colors before sign-in.
+- `GET free-mode/catalog`: no body. Responds with `groups`: `[{ id, name,
+  courses: [{ id, name, topics: [{ id, name }] }] }]` (`id` of a group is the
+  teacher's, a teacher of the demo college). `503 free_mode_unavailable` if the demo college is missing.
+- `GET free-mode/questions?topic_id=<uuid>`: responds with `topic` (`id`,
+  `name`) and `questions`: 10 random active questions (`id`, `statement`,
+  `option_a`..`option_d`, `correct_option`, `explanation`). `404 topic_not_found`
+  if the topic is not an active topic of the demo college, `409
+  insufficient_active_questions` if it has fewer than 10.
+- `POST free-mode/leads`: `given_names`, `family_names`, `email`, `phone`
+  (Peruvian mobile, same rules as the sign-up; stored without `+51`),
+  `accepted_data_policy: true` (consent, Ley N.° 29733; `400 consent_required`)
+  and `website` (honeypot: a hidden field that must be empty; if filled the
+  endpoint answers `201 { ok: true }` without saving anything). Responds `201
+  { ok: true }`. Limits through `edge_check_lead_rate_limit`: 5 per IP hash per hour
+  (`429 lead_ip_limit`) and 3 per email hash per day (`429 lead_email_limit`).
+  The lead is never saved in the database: the row `[date (Lima), names,
+  surnames, email, +51 WhatsApp]` is appended to the first sheet of the
+  Google Sheet whose ID is the Vault secret `leads_sheet_id`
+  (`values:append`, `RAW`), authenticating as the same Google account as Gmail
+  (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`; the refresh
+  token must include the scope `https://www.googleapis.com/auth/spreadsheets`).
+  Without the secret or if Google fails the endpoint answers `503
+  leads_unavailable` and the lead is saved nowhere, so the person can retry.
+  Failures are logged as JSON lines (`event`, `request_id`, and when known
+  `status` and `message`; never the person's name, email, WhatsApp or IP).
+  View them in Supabase Dashboard → Edge Functions → free-mode → Logs:
+  `free_mode.lead_sheet_not_configured` (no `leads_sheet_id` secret),
+  `free_mode.lead_sheet_failed` (Google or token error, e.g. `status` 403 for a
+  missing scope) and `free_mode.lead_registration_failed` (the rate-limit
+  check failed unexpectedly).
+- `POST admin-delete-college`: `409 demo_college_protected` for the demo
+  college, checked before any user is deleted.
 - `GET public/teachers`: no body. Responds with `teachers` (`id`, `name`,
   `college_id`, `college_name`): active teachers of an active college with at
   least one non-archived course. The sign-up form, the admin invitation form
@@ -135,8 +234,18 @@ pnpm exec supabase gen types --local --schema public \
 - `POST registration/payment`: `registration_id`, `plan` (`mensual` or
   `semestral`), `token` (single-use Yape token the browser creates with the
   Mercado Pago SDK from the phone and the approval code (OTP) of the Yape app)
-  and `phone` (that Yape phone, 9 digits). Requires a verified email, which is
-  sent to Mercado Pago as the payer. The amount comes from `_shared/plans.ts`,
+  and `phone` (that Yape phone, 9 digits). Optional `device_session_id`: the
+  buyer's device id from Mercado Pago's `security.js`, forwarded as the
+  `X-meli-session-id` header for the fraud engine (ignored if malformed, never
+  blocks the payment). Requires a verified email, which is sent to Mercado
+  Pago as the payer; no other payer data is sent, because whoever pays with
+  Yape is often a relative of the student, so the student's name or document
+  would be false data. The order also describes the product: `description`,
+  `items[]` (title, description, `external_code` = plan id, `category_id`
+  `learnings`, price) and `payment_method.statement_descriptor` (`CHANCON`).
+  Orders rejects unknown fields with `400 unsupported_properties`
+  (`notification_url` is not accepted: the webhook is set in the Mercado Pago
+  panel, event **Order**). The amount comes from `_shared/plans.ts`,
   never from the request. The row is stored in `plan_payments` before calling
   Mercado Pago (its `id` travels as `external_reference` and
   `X-Idempotency-Key`), then an order is created with the Orders API
@@ -157,7 +266,7 @@ pnpm exec supabase gen types --local --schema public \
   administrator). While in process it asks Mercado Pago directly, so payments
   are confirmed even without the webhook (local development). A registration
   with a payment from the last 24 hours is not purged.
-- `POST account/payment`: `plan`, `token`, `phone`. Signed-in student, with the plan
+- `POST account/payment`: `plan`, `token`, `phone`, `device_session_id` (optional). Signed-in student, with the plan
   active or expired (expired students can sign in, but the app only shows the
   renewal page). Same response as `registration/payment`; a student without
   email gets `409 payment_email_required`. Once paid, the months are added
@@ -211,9 +320,11 @@ pnpm exec supabase gen types --local --schema public \
   chooses one while accepting. Legacy clients may still send `college_id`
   instead, which limits the groups the student can choose. Emails a link to
   `<site>/estudiante/invitacion?code=...` that lasts 7 days, never beyond the
-  last day of access. Inviting the same email again replaces the previous
-  invitation. `409 email_taken` if the email already has an account. Responds
-  `201` with `invitation`.
+  last day of access. Inviting an email that already has an invitation
+  is rejected (`409 invitation_exists`); cancel or resend the existing one. A pending self-registration with that email (unpaid) is deleted so
+  it does not block the invitation; the same happens when the invitation is
+  accepted. One with an approved, unapplied payment is kept. `409 email_taken` if
+  the email already has an account. Responds `201` with `invitation`.
 - `POST invitations/resend`: `invitation_id`. New link and validity; the old
   link stops working. `409 invitation_access_ended` if the access period
   already ended.
@@ -249,7 +360,8 @@ pnpm exec supabase gen types --local --schema public \
 
   Secrets: `EMAIL_FROM` and `EMAIL_DELIVERY`:
   `gmail` (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`;
-  scope `gmail.send` only), `resend` (`RESEND_API_KEY`), or, locally only,
+  scope `gmail.send`; to also fill the free-mode leads sheet the token needs
+  `https://www.googleapis.com/auth/spreadsheets` too), `resend` (`RESEND_API_KEY`), or, locally only,
   `log`. See `supabase/functions/.env.example`.
 
 The XLSX importer reads the first worksheet, has a 5 MB limit, and expects:

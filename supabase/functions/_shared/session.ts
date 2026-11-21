@@ -1,4 +1,8 @@
-import type { QuestionPayload } from "./interfaces/session.interfaces.ts";
+import type {
+  AnswerKeyEntry,
+  QuestionPayload,
+} from "./interfaces/session.interfaces.ts";
+import { encryptAnswerKey } from "./answer-key.ts";
 import type { AppProfile, EdgeContext } from "./types.ts";
 import { TABLES } from "./database.constants.ts";
 import { AppError } from "./errors.ts";
@@ -42,11 +46,17 @@ export async function sessionPayload(
     throw new AppError(500, "session_questions_failed", questionError.message);
   }
 
+  // Las preguntas pendientes nunca llevan la respuesta en claro: va en la
+  // clave cifrada para que el navegador corrija sin esperar al servidor.
+  const pendingKey: Record<string, AnswerKeyEntry> = {};
   const questions: QuestionPayload[] = (rows ?? []).map((row) => {
     const nested = Array.isArray(row.questions)
       ? row.questions[0]
       : row.questions;
     const { correct_option, explanation, ...question } = nested;
+    if (row.selected_option === null) {
+      pendingKey[row.id] = { correct_option, explanation };
+    }
     return {
       session_question_id: row.id,
       position: row.position,
@@ -73,5 +83,6 @@ export async function sessionPayload(
       answered_questions: session.answered_questions,
     },
     questions,
+    answer_key: await encryptAnswerKey(pendingKey),
   };
 }

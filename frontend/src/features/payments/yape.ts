@@ -11,7 +11,7 @@ interface MercadoPagoInstance {
 type MercadoPagoConstructor = new (publicKey: string, options?: { locale?: string }) => MercadoPagoInstance;
 
 declare global {
-  interface Window { MercadoPago?: MercadoPagoConstructor }
+  interface Window { MercadoPago?: MercadoPagoConstructor; MP_DEVICE_SESSION_ID?: string }
 }
 
 let sdk: Promise<MercadoPagoConstructor> | null = null;
@@ -45,4 +45,31 @@ export async function createYapeToken(publicKey: string, phoneNumber: string, ot
   } catch {
     throw new AppError("yape_token_failed", "Yape no aceptó el celular o el código de aprobación. Genera un código nuevo en tu app e inténtalo otra vez.");
   }
+}
+
+
+// Script de seguridad de Mercado Pago: identifica el dispositivo del comprador para el antifraude y deja el
+// resultado en window.MP_DEVICE_SESSION_ID.
+const SECURITY_SCRIPT_URL = "https://www.mercadopago.com/v2/security.js";
+const DEVICE_ID_WAIT_MS = 3000;
+const DEVICE_ID_POLL_MS = 100;
+
+/** Carga el script de seguridad; llamarlo al mostrar el pago deja tiempo para que calcule el identificador. */
+export function loadDeviceSessionScript() {
+  if (document.querySelector(`script[src="${SECURITY_SCRIPT_URL}"]`)) return;
+  const script = document.createElement("script");
+  script.src = SECURITY_SCRIPT_URL;
+  script.async = true;
+  script.setAttribute("view", "checkout");
+  document.head.appendChild(script);
+}
+
+/** Identificador del dispositivo, o null si el script no cargó (por ejemplo, con un bloqueador): el pago sigue sin él. */
+export async function getDeviceSessionId(): Promise<string | null> {
+  loadDeviceSessionScript();
+  for (let waited = 0; waited < DEVICE_ID_WAIT_MS; waited += DEVICE_ID_POLL_MS) {
+    if (window.MP_DEVICE_SESSION_ID) return window.MP_DEVICE_SESSION_ID;
+    await new Promise((resolve) => setTimeout(resolve, DEVICE_ID_POLL_MS));
+  }
+  return null;
 }

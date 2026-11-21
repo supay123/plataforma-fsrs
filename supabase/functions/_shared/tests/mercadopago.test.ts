@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import {
+  createYapeOrder,
   type MercadoPagoOrder,
   orderStatusDetail,
   verifyWebhookSignature,
 } from "../mercadopago.ts";
-import { publicPaymentStatus, yapePhone, yapeToken } from "../plan-payments.ts";
+import {
+  deviceSessionId,
+  publicPaymentStatus,
+  yapePhone,
+  yapeToken,
+} from "../plan-payments.ts";
 
 const SECRET = "mp_webhook_secret_123";
 const DATA_ID = "123456789";
@@ -187,4 +193,64 @@ Deno.test("only an applied payment counts as paid", () => {
     }),
     "needs_support",
   );
+});
+
+Deno.test("accepts a device id of Mercado Pago and ignores anything else", () => {
+  const real = "armor." + "a1b2c3d4".repeat(28);
+  assert.equal(deviceSessionId(real), real);
+  assert.equal(deviceSessionId(undefined), undefined);
+  assert.equal(deviceSessionId("short"), undefined);
+  assert.equal(deviceSessionId("has spaces and \n"), undefined);
+  assert.equal(deviceSessionId("x".repeat(513)), undefined);
+});
+
+Deno.test("describes the plan and the device in the Yape order, never the payer's identity", async () => {
+  const originalFetch = globalThis.fetch;
+  Deno.env.set("MERCADOPAGO_ACCESS_TOKEN", "APP_USR-test");
+  let sent: { headers: Headers; body: Record<string, unknown> } | undefined;
+  globalThis.fetch = (_url, init) => {
+    sent = {
+      headers: new Headers(init?.headers),
+      body: JSON.parse(String(init?.body)),
+    };
+    return Promise.resolve(
+      Response.json({ id: "ORD1", status: "processed" }, { status: 201 }),
+    );
+  };
+  try {
+    await createYapeOrder({
+      reference: "ref-1",
+      amount: "14.90",
+      token: "token-12345678",
+      email: "student@example.com",
+      phone: "987654321",
+      plan: { code: "mensual", name: "Plan Estudiante" },
+      deviceSessionId: "device-12345678",
+    });
+    assert.equal(sent?.headers.get("x-meli-session-id"), "device-12345678");
+    assert.equal(sent?.body.description, "Plan Estudiante");
+    assert.deepEqual(sent?.body.items, [{
+      title: "Plan Estudiante",
+      description: "Plan Estudiante",
+      external_code: "mensual",
+      category_id: "learnings",
+      unit_price: "14.90",
+      quantity: 1,
+    }]);
+    const payer = sent?.body.payer as Record<string, unknown>;
+    assert.deepEqual(Object.keys(payer).sort(), ["email", "phone"]);
+
+    await createYapeOrder({
+      reference: "ref-2",
+      amount: "14.90",
+      token: "token-12345678",
+      email: "student@example.com",
+      phone: "987654321",
+      plan: { code: "mensual", name: "Plan Estudiante" },
+    });
+    assert.equal(sent?.headers.has("x-meli-session-id"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Deno.env.delete("MERCADOPAGO_ACCESS_TOKEN");
+  }
 });

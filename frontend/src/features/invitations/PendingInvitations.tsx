@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Badge, Button, Card, EmptyState } from "../../components/ui";
+import { Skeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { useToast } from "../../components/ui/use-toast";
 import { normalizeError } from "../../lib/api/errors";
@@ -54,20 +55,22 @@ export function PendingInvitations() {
 
   return <Card>
     <h2 className="mb-4 font-bold">Invitaciones pendientes</h2>
-    {!invitations.data?.length
-      ? <EmptyState>{invitations.isPending ? "Cargando invitaciones…" : "No hay invitaciones pendientes."}</EmptyState>
+    {invitations.isPending
+      ? <div role="status" aria-busy="true" aria-label="Cargando invitaciones" className="grid gap-3">{[0, 1].map((item) => <Skeleton key={item} height={72} />)}</div>
+      : !invitations.data?.length
+      ? <EmptyState>No hay invitaciones pendientes.</EmptyState>
       : <ul className="grid gap-3">{invitations.data.map((invitation) => {
         const expired = new Date(invitation.expires_at) <= new Date();
-        return <li key={invitation.id} className="grid gap-2 rounded-xl border border-slate-200 p-3 text-sm">
+        return <li key={invitation.id} className="grid gap-2 rounded-xl border-2 border-line p-3 text-sm">
           <div className="flex items-start justify-between gap-2">
-            <strong className="break-all text-slate-900">{invitation.email}</strong>
+            <strong className="break-all text-fg">{invitation.email}</strong>
             <Badge tone={expired ? "warning" : "success"}>{expired ? "Vencida" : "Pendiente"}</Badge>
           </div>
-          <p className="text-slate-600">{groupLabel(invitation)} · Acceso del {formatDay(invitation.access_valid_from)} al {formatDay(invitation.access_valid_until)}</p>
-          <p className="text-xs text-slate-500">{expired ? "El link venció" : "El link vence"} el {formatDate(invitation.expires_at)}.</p>
+          <p className="text-fg-muted">{groupLabel(invitation)} · Acceso del {formatDay(invitation.access_valid_from)} al {formatDay(invitation.access_valid_until)}</p>
+          <p className="text-xs text-fg-muted">{expired ? "El link venció" : "El link vence"} el {formatDate(invitation.expires_at)}.</p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" disabled={resend.isPending} onClick={() => void resendTo(invitation)}>Reenviar</Button>
-            <Button type="button" variant="danger" disabled={cancel.isPending} onClick={() => confirmCancel(invitation)}>Anular</Button>
+            <Button size="sm" type="button" variant="secondary" disabled={resend.isPending} onClick={() => void resendTo(invitation)}>Reenviar</Button>
+            <Button size="sm" type="button" variant="danger" disabled={cancel.isPending} onClick={() => confirmCancel(invitation)}>Anular</Button>
           </div>
         </li>;
       })}</ul>}

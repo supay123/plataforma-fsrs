@@ -135,6 +135,17 @@ export function yapePhone(value: unknown): string {
   return digits;
 }
 
+/**
+ * Identificador de dispositivo de Mercado Pago (security.js). Es opcional: si
+ * falta o no tiene forma válida se ignora, para no impedir el pago. Mide unos
+ * 230 caracteres.
+ */
+export function deviceSessionId(value: unknown): string | undefined {
+  return typeof value === "string" && /^[\w.-]{8,512}$/.test(value)
+    ? value
+    : undefined;
+}
+
 export interface PaymentOwner {
   column: "registration_id" | "profile_id";
   id: string;
@@ -172,6 +183,7 @@ export async function createPlanPayment(
     email: string | null;
     token: string;
     phone: string;
+    deviceSessionId?: string;
   },
 ): Promise<PlanPayment> {
   if (!input.email) {
@@ -232,6 +244,8 @@ export async function createPlanPayment(
       token: input.token,
       email: input.email,
       phone: input.phone,
+      plan: { code: input.plan, name: plan.name },
+      deviceSessionId: input.deviceSessionId,
     });
   } catch (providerError) {
     // Si de todos modos se cobró, el webhook lo encuentra por la referencia.

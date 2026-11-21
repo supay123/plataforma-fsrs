@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner, Textarea } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { ModalForm } from "../../components/ui/modal-form";
 import { useModal } from "../../components/ui/use-modal";
+import { MascotAdvice } from "../mascot/MascotAdvice";
+import { MascotHelp } from "../mascot/MascotHelp";
 import { courseTopicsPath } from "../../lib/portal-paths";
 import type { Tables } from "../../types/database";
 import { useAuth } from "../auth/AuthProvider";
@@ -14,6 +17,13 @@ import { archiveCourse, createCourse, duplicateCourse, listCourses, moveCourse, 
 type CourseFormState = { name: string; description: string; teacher_id: string; college_id: string };
 type TeacherOption = { id: string; full_name: string; college_id: string | null };
 type CollegeOption = { id: string; name: string };
+
+const COURSES_TIPS = [
+  "Crea un curso con el formulario de la derecha y entra a «Temas» para organizarlo.",
+  "En cada tema importas tus preguntas con la plantilla de Excel.",
+  "Tus estudiantes los asigna el administrador: cuando los tengas, los verás en «Estudiantes».",
+  "«Desactivar» oculta un curso sin borrarlo; «Eliminar» es permanente.",
+];
 
 const empty: CourseFormState = { name: "", description: "", teacher_id: "", college_id: "" };
 
@@ -227,8 +237,9 @@ export function CoursesView() {
     duplicate.reset();
     modal.create({
       title: "Duplicar curso",
+      mascot: "rest",
       body: <div className="grid gap-2">
-        <p>Se creará una copia de <strong className="text-slate-900">{course.name}</strong> con sus temas y preguntas, para el mismo profesor.</p>
+        <p>Se creará una copia de <strong className="text-fg">{course.name}</strong> con sus temas y preguntas, para el mismo profesor.</p>
         <p>La copia se llamará «{course.name} - duplicado» y empezará sin progreso de estudiantes.</p>
       </div>,
       confirmLabel: "Duplicar curso",
@@ -239,7 +250,7 @@ export function CoursesView() {
     modal.delete({
       title: "Eliminar curso",
       body: <div className="grid gap-2">
-        <p>¿Seguro que quieres eliminar <strong className="text-slate-900">{course.name}</strong>?</p>
+        <p>¿Seguro que quieres eliminar <strong className="text-fg">{course.name}</strong>?</p>
         <p>
           Esta acción es permanente: el curso dejará de estar disponible para estudiantes y profesores.
         </p>
@@ -249,7 +260,7 @@ export function CoursesView() {
     });
   };
 
-  if (query.isLoading) return <Spinner />;
+  if (query.isLoading) return <PageSkeleton />;
 
   if (isAdmin) return <>
     <PageHeader title="Cursos" description="Todos los cursos de la plataforma, agrupados por profesor." actions={<Button onClick={openCreate}>Nuevo Curso</Button>} />
@@ -264,8 +275,8 @@ export function CoursesView() {
     {duplicate.error && <div className="mt-4"><Alert tone="error">{duplicate.error.message}</Alert></div>}
     {adminGroups.length ? <div className="mt-6 grid gap-6">{adminGroups.map((group) => <section key={group.teacherId}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-bold text-slate-950">{group.teacherName}</h2>
-        <span className="text-sm text-slate-500">{courseCount(group.courses.length)}</span>
+        <h2 className="text-lg font-bold text-fg">{group.teacherName}</h2>
+        <span className="text-sm text-fg-muted">{courseCount(group.courses.length)}</span>
       </div>
       <div className="grid gap-4">{!group.courses.length && <EmptyState>No hay cursos disponibles. Crea uno.</EmptyState>}{group.courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
@@ -273,16 +284,16 @@ export function CoursesView() {
             <h3 className="font-bold">{course.name}</h3>
             <Badge tone={statusTone(course.status)}>{course.status}</Badge>
           </div>
-          <p className="mt-1 text-sm text-slate-500">{course.description || "Sin descripción"}</p>
-          <p className="mt-1 text-xs text-slate-400">{course.colleges?.name ?? "Sin colegio"}</p>
+          <p className="mt-1 text-sm text-fg-muted">{course.description || "Sin descripción"}</p>
+          <p className="mt-1 text-xs text-fg-faint">{course.colleges?.name ?? "Sin colegio"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => openEdit(course)}>Editar</Button>
-          <Button variant="ghost" onClick={() => openMove(course)}>Mover</Button>
-          <Button variant="ghost" disabled={duplicate.isPending && duplicate.variables === course.id} onClick={() => confirmDuplicate(course)}>Duplicar</Button>
-          <Button variant="ghost" disabled={toggle.isPending && toggle.variables?.id === course.id} onClick={() => toggle.mutate(course)}>{course.status === "active" ? "Desactivar" : "Activar"}</Button>
-          <Button variant="danger" disabled={archive.isPending && archive.variables === course.id} onClick={() => confirmDelete(course)}>Eliminar</Button>
-          <Link to={courseTopicsPath(profile?.role, course.id)}><Button>Temas</Button></Link>
+          <Button size="sm" variant="ghost" onClick={() => openEdit(course)}>Editar</Button>
+          <Button size="sm" variant="ghost" onClick={() => openMove(course)}>Mover</Button>
+          <Button size="sm" variant="ghost" disabled={duplicate.isPending && duplicate.variables === course.id} onClick={() => confirmDuplicate(course)}>Duplicar</Button>
+          <Button size="sm" variant="ghost" disabled={toggle.isPending && toggle.variables?.id === course.id} onClick={() => toggle.mutate(course)}>{course.status === "active" ? "Desactivar" : "Activar"}</Button>
+          <Button size="sm" variant="danger" disabled={archive.isPending && archive.variables === course.id} onClick={() => confirmDelete(course)}>Eliminar</Button>
+          <Link to={courseTopicsPath(profile?.role, course.id)}><Button size="sm">Temas</Button></Link>
         </div>
       </Card>)}</div>
     </section>)}</div> : <div className="mt-6"><EmptyState>No hay profesores que coincidan con los filtros.</EmptyState></div>}
@@ -304,7 +315,9 @@ export function CoursesView() {
       onSubmit={() => move.mutate()}
       error={move.error?.message}
     >
-      <p className="text-sm text-slate-600">Elige el profesor que se quedará con <strong className="text-slate-900">{moving.name}</strong>. Solo se muestran profesores del mismo colegio. Los estudiantes del curso pasarán a ser los del nuevo profesor.</p>
+      <MascotAdvice size={48} event="wrong" tone="warning">
+        Elige el profesor que se quedará con <strong>{moving.name}</strong>. Solo se muestran profesores del mismo colegio. Los estudiantes del curso pasarán a ser los del nuevo profesor, y quien lo tenía dejará de verlo.
+      </MascotAdvice>
       <Field label="Nuevo profesor">
         <Select required value={moveTeacherId} onChange={(event) => setMoveTeacherId(event.target.value)}>
           <option value="">Selecciona un profesor</option>
@@ -317,14 +330,17 @@ export function CoursesView() {
 
   return <>
     <PageHeader title="Mis cursos" description="Administra cursos y sus temas." />
+    <MascotHelp className="mb-6" screen="teacher-courses" tips={COURSES_TIPS} advice={courses.length
+      ? { event: "rest", tone: "neutral", text: "Entra a «Temas» de un curso para importar preguntas y ordenar lo que verán tus estudiantes." }
+      : { event: "sleep", tone: "neutral", text: "Aún no tienes cursos. Crea el primero con el formulario de la derecha." }} />
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="grid gap-4">{courses.length ? courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div><div className="flex items-center gap-2"><h2 className="font-bold">{course.name}</h2><Badge tone={statusTone(course.status)}>{course.status}</Badge></div><p className="mt-1 text-sm text-slate-500">{course.description}</p></div>
+        <div><div className="flex items-center gap-2"><h2 className="font-bold">{course.name}</h2><Badge tone={statusTone(course.status)}>{course.status}</Badge></div><p className="mt-1 text-sm text-fg-muted">{course.description}</p></div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => { save.reset(); setEditingId(course.id); setForm({ name: course.name, description: course.description ?? "", teacher_id: course.teacher_id, college_id: course.college_id }); }}>Editar</Button>
-          <Button variant="ghost" disabled={toggle.isPending && toggle.variables?.id === course.id} onClick={() => toggle.mutate(course)}>{course.status === "active" ? "Desactivar" : "Activar"}</Button>
-          <Button variant="danger" disabled={archive.isPending && archive.variables === course.id} onClick={() => confirmDelete(course)}>Eliminar</Button>
-          <Link to={courseTopicsPath(profile?.role, course.id)}><Button>Temas</Button></Link>
+          <Button size="sm" variant="ghost" onClick={() => { save.reset(); setEditingId(course.id); setForm({ name: course.name, description: course.description ?? "", teacher_id: course.teacher_id, college_id: course.college_id }); }}>Editar</Button>
+          <Button size="sm" variant="ghost" disabled={toggle.isPending && toggle.variables?.id === course.id} onClick={() => toggle.mutate(course)}>{course.status === "active" ? "Desactivar" : "Activar"}</Button>
+          <Button size="sm" variant="danger" disabled={archive.isPending && archive.variables === course.id} onClick={() => confirmDelete(course)}>Eliminar</Button>
+          <Link to={courseTopicsPath(profile?.role, course.id)}><Button size="sm">Temas</Button></Link>
         </div>
       </Card>) : <EmptyState>No tienes cursos registrados.</EmptyState>}</div>
       <Card>

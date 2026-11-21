@@ -82,9 +82,14 @@ type ErrorPayload = {
 async function mercadoPagoRequest<T>(
   method: "GET" | "POST",
   path: string,
-  options: { body?: unknown; idempotencyKey?: string } = {},
+  options: {
+    body?: unknown;
+    idempotencyKey?: string;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
+    ...options.headers,
     Authorization: `Bearer ${credential("MERCADOPAGO_ACCESS_TOKEN")}`,
   };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
@@ -132,9 +137,18 @@ async function mercadoPagoRequest<T>(
   return payload;
 }
 
+/** Texto que el comprador ve en el resumen de Yape. */
+const STATEMENT_DESCRIPTOR = "CHANCON";
+/** Categoría de Mercado Pago para cursos y educación. */
+const ITEM_CATEGORY = "learnings";
+
 /**
  * Crea y procesa en el acto una orden pagada con Yape, usando el token que
  * generó el navegador (de un solo uso). La respuesta ya trae el resultado.
+ *
+ * Se describe el producto (el plan) y el dispositivo, nunca a una persona:
+ * quien paga con Yape suele ser un familiar del estudiante, así que sus datos
+ * no sirven como datos del pagador.
  */
 export function createYapeOrder(input: {
   reference: string;
@@ -142,15 +156,30 @@ export function createYapeOrder(input: {
   token: string;
   email: string;
   phone: string;
+  plan: { code: string; name: string };
+  /** Identifica el dispositivo del comprador para el antifraude. */
+  deviceSessionId?: string;
 }): Promise<MercadoPagoOrder> {
   return mercadoPagoRequest<MercadoPagoOrder>("POST", "/v1/orders", {
     // La misma referencia nunca cobra dos veces, aunque se reintente.
     idempotencyKey: input.reference,
+    headers: input.deviceSessionId
+      ? { "X-meli-session-id": input.deviceSessionId }
+      : undefined,
     body: {
       type: "online",
       processing_mode: "automatic",
       external_reference: input.reference,
       total_amount: input.amount,
+      description: input.plan.name,
+      items: [{
+        title: input.plan.name,
+        description: input.plan.name,
+        external_code: input.plan.code,
+        category_id: ITEM_CATEGORY,
+        unit_price: input.amount,
+        quantity: 1,
+      }],
       payer: {
         email: input.email,
         phone: { area_code: "51", number: input.phone },
@@ -162,6 +191,7 @@ export function createYapeOrder(input: {
             id: "yape",
             type: "debit_card",
             token: input.token,
+            statement_descriptor: STATEMENT_DESCRIPTOR,
           },
         }],
       },

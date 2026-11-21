@@ -58,4 +58,15 @@ describe("ModalForm", () => {
     expect(screen.getByRole("button", { name: "Cerrar" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Guardando…" })).toBeDisabled();
   });
+
+  it("con dismissible=false no ofrece cerrarlo", async () => {
+    const user = userEvent.setup();
+    const props = setup({ dismissible: false });
+
+    expect(screen.queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cerrar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cerrar diálogo" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(props.onCancel).not.toHaveBeenCalled();
+  });
 });

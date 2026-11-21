@@ -35,7 +35,7 @@ export function RenewPage() {
     <div className="mt-6 text-center text-sm">
       {expired
         ? <button type="button" className="font-semibold text-slate-600 hover:text-slate-900" onClick={() => void logout()}>Salir</button>
-        : <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante">Volver a mi progreso</Link>}
+        : <Link className="font-semibold text-indigo-600 hover:text-indigo-800" to="/estudiante">Volver a mi aprendizaje</Link>}
     </div>
   </AuthLayout>;
 }

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Alert, Button, Card, Field, Input, PageHeader } from "../../components/ui";
 import { ProfileSection } from "../../features/account/ProfileSection";
+import { MascotAdvice } from "../../features/mascot/MascotAdvice";
+import { AdminSettings } from "../../features/settings/AdminSettings";
 import { saveRecoveryQuestion, resetOwnCredentials } from "../../features/auth/api";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { normalizeError } from "../../lib/api/errors";
@@ -16,6 +18,8 @@ export function SecurityPage() {
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const isStudent = profile?.role === "student";
+  const isAdmin = profile?.role === "admin";
+  const [profileOutcome, setProfileOutcome] = useState<{ saved: boolean; count: number }>({ saved: false, count: 0 });
 
   const save = async () => {
     try {
@@ -37,15 +41,16 @@ export function SecurityPage() {
   // El estudiante administra su perfil y cambia su contraseña con el link que llega a su correo.
   if (isStudent) return <>
     <PageHeader title="Configuración" description="Administra tu perfil y la seguridad de tu cuenta." />
-    <ProfileSection />
+    <MascotAdvice className="mb-6" event={profileOutcome.saved ? "correct" : "rest"} eventKey={profileOutcome.count} tone={profileOutcome.saved ? "success" : "neutral"}>
+      {profileOutcome.saved ? "¡Listo! Guardé tus cambios." : "Mantén tus datos al día."}
+    </MascotAdvice>
+    <ProfileSection onOutcome={(outcome) => setProfileOutcome((current) => ({ saved: outcome === "saved", count: current.count + 1 }))} />
   </>;
 
-  return <>
-    <PageHeader title="Configuración de seguridad" description="Administra la recuperación de tu cuenta y tus credenciales." />
-    <div className="grid gap-6 lg:grid-cols-2">
+  const security = <div className="grid gap-6 lg:grid-cols-2">
       <Card>
         <h2 className="font-bold">Pregunta de seguridad</h2>
-        <p className="mt-1 text-sm text-slate-600">La respuesta se guarda protegida y no podrá consultarse después.</p>
+        <p className="mt-1 text-sm text-fg-muted">La respuesta se guarda protegida y no podrá consultarse después.</p>
         <div className="mt-4 grid gap-4">
           {message && <Alert tone="success">{message}</Alert>}
           {error && <Alert tone="error">{error}</Alert>}
@@ -56,10 +61,16 @@ export function SecurityPage() {
       </Card>
       <Card>
         <h2 className="font-bold">Restablecer credenciales</h2>
-        <p className="mt-1 text-sm text-slate-600">Genera una nueva contraseña. Se mostrará una sola vez.</p>
+        <p className="mt-1 text-sm text-fg-muted">Genera una nueva contraseña. Se mostrará una sola vez.</p>
         {credentials && <Alert tone="success"><strong>Nueva credencial</strong><br />{credentials.user_code} / {credentials.temporary_password}<Button type="button" variant="ghost" className="mt-2" onClick={() => void navigator.clipboard.writeText(`${credentials.user_code}\n${credentials.temporary_password ?? ""}`)}>Copiar</Button></Alert>}
         <Button className="mt-4" type="button" variant="secondary" disabled={resetting} onClick={() => void reset()}>{resetting ? "Restableciendo…" : "Restablecer credenciales"}</Button>
       </Card>
-    </div>
+    </div>;
+
+  // El admin tiene además las pestañas Colores y Puntos (valores de cada institución).
+  if (!isAdmin) return <>
+    <PageHeader title="Configuración de seguridad" description="Administra la recuperación de tu cuenta y tus credenciales." />
+    {security}
   </>;
+  return <AdminSettings security={security} />;
 }

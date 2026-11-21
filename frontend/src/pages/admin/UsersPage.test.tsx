@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModalProvider } from "../../components/ui/modal";
 import { ToastProvider } from "../../components/ui/toast";
 import { UsersPage } from "./UsersPage";
+import { chooseSelectValue } from "../../components/ui/select-test-helpers";
 
 const mocks = vi.hoisted(() => ({
   createUser: vi.fn(),
@@ -78,7 +79,7 @@ describe("UsersPage", () => {
     renderPage();
 
     await screen.findByText("PROFE-1");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Filtrar por colegio" }), "college-1");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Filtrar por colegio" }), "college-1");
     expect(within(screen.getByRole("table")).getByText("Profesor Carlos")).toBeInTheDocument();
     expect(screen.queryByText("Ana Torres")).not.toBeInTheDocument();
 
@@ -109,11 +110,11 @@ describe("UsersPage", () => {
   it("invites students by email instead of creating them directly", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByRole("option", { name: "Profesor Carlos" });
-    expect(screen.getByRole("combobox", { name: "Rol" })).toHaveValue("student");
+    await screen.findByText("Profesor Carlos");
+    expect(screen.getByRole("combobox", { name: "Rol" })).toHaveTextContent("Estudiante");
     expect(screen.queryByLabelText("Código")).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Grupo (opcional)" }), "teacher-1");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Grupo (opcional)" }), "teacher-1");
     await user.type(screen.getByLabelText("Correo del estudiante"), "nueva@example.com");
     await user.type(screen.getByLabelText("Inicio"), "2026-03-01");
     await user.type(screen.getByLabelText("Vencimiento"), "2026-12-31");
@@ -129,7 +130,7 @@ describe("UsersPage", () => {
   it("lets the student choose a group when the admin does not fix one", async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByRole("option", { name: "Profesor Carlos" });
+    await screen.findByText("Profesor Carlos");
 
     await user.type(screen.getByLabelText("Correo del estudiante"), "libre@example.com");
     await user.type(screen.getByLabelText("Inicio"), "2026-03-01");
@@ -146,7 +147,7 @@ describe("UsersPage", () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("PROFE-1");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Rol" }), "teacher");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Rol" }), "teacher");
     expect(screen.getByLabelText("Código")).toBeInTheDocument();
     expect(screen.queryByLabelText("Correo del estudiante")).not.toBeInTheDocument();
   });
