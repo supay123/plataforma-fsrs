@@ -175,7 +175,7 @@ pnpm exec supabase gen types --local --schema public \
   loads these colors before sign-in.
 - `GET free-mode/catalog`: no body. Responds with `groups`: `[{ id, name,
   courses: [{ id, name, topics: [{ id, name }] }] }]` (`id` of a group is the
-  demo teacher's). `503 free_mode_unavailable` if the demo college is missing.
+  teacher's, a teacher of the demo college). `503 free_mode_unavailable` if the demo college is missing.
 - `GET free-mode/questions?topic_id=<uuid>`: responds with `topic` (`id`,
   `name`) and `questions`: 10 random active questions (`id`, `statement`,
   `option_a`..`option_d`, `correct_option`, `explanation`). `404 topic_not_found`

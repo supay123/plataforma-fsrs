@@ -1314,13 +1314,14 @@ primera vez que se responde bien se otorga xp; los reintentos no lo repiten.
 
 ### Institución demo (`public.colleges`)
 
-La migración `20261116020000_free_mode` siembra la institución `CHANCON-DEMO`
-("Chancón – Modo gratuito") con una cuenta de profesor sin contraseña
-(`chancon-demo-profesor`, "Grupo de prueba Chancón", con id fijo
-`5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01`), el curso "Matemática
-básica" y el tema "Operaciones y fracciones" con 12 preguntas activas. De ahí
-salen las preguntas del modo gratuito (Edge Function `free-mode`), para no
-exponer bancos de colegios reales. El código está reservado: los triggers
+La migración `20261116020000_free_mode` siembra solo la institución `CHANCON-DEMO`
+("Chancón – Modo gratuito"), sin profesores. El admin crea los profesores de esa
+institución y cada uno, con su nombre como grupo, sus cursos, temas y preguntas
+forman el catálogo del modo gratuito (un tema aparece cuando tiene al menos 10
+preguntas activas). La migración `20261121120000_remove_demo_teacher` elimina el
+profesor demo que una versión anterior sembraba. De esa
+institución salen las preguntas del modo gratuito (Edge Function `free-mode`),
+para no exponer bancos de colegios reales. El código está reservado: los triggers
 `colleges_protect_demo_delete` (BEFORE DELETE) y `colleges_protect_demo_code`
 (BEFORE UPDATE OF code), con `private.protect_demo_college()`, lanzan
 `demo_college_protected` si se intenta borrarla o cambiar su código. Las

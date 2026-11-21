@@ -42,7 +42,7 @@ create trigger colleges_protect_demo_code
   for each row execute function private.protect_demo_college();
 
 -- ---------------------------------------------------------------------------
--- Siembra: institución demo con un grupo, un curso y un tema de ejemplo
+-- Siembra: institución demo (sin profesores: los crea el admin)
 -- ---------------------------------------------------------------------------
 insert into public.colleges (code, name, description)
 values (
@@ -51,91 +51,6 @@ values (
   'Institución de pruebas que alimenta el modo gratuito del sitio. No se puede eliminar.'
 )
 on conflict ((lower(btrim(code)))) do nothing;
-
-do $$
-declare
-  demo_college_id uuid;
-  demo_teacher_id uuid;
-  demo_course_id uuid;
-  demo_topic_id uuid;
-begin
-  select id into demo_college_id
-  from public.colleges
-  where lower(btrim(code)) = 'chancon-demo';
-
-  demo_teacher_id := '5c1f4a9e-7d2b-4c3a-9e68-0d1c4a5b7e01';
-
-  if not exists (select 1 from public.profiles where id = demo_teacher_id) then
-    -- Mismo formato de correo opaco que usa admin-create-user. Sin contraseña:
-    -- nadie inicia sesión con esta cuenta, solo es dueña del banco de pruebas.
-    insert into auth.users (
-      instance_id, id, aud, role, email, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-    )
-    values (
-      '00000000-0000-0000-0000-000000000000', demo_teacher_id,
-      'authenticated', 'authenticated',
-      demo_teacher_id::text || '@users.fsrs.local', now(),
-      '{"provider":"email","providers":["email"],"role":"teacher"}'::jsonb,
-      '{}'::jsonb, now(), now()
-    );
-    insert into public.profiles (id, college_id, role, user_code, full_name)
-    values (
-      demo_teacher_id, demo_college_id, 'teacher',
-      'chancon-demo-profesor', 'Grupo de prueba Chancón'
-    );
-  end if;
-
-  select id into demo_course_id
-  from public.courses
-  where college_id = demo_college_id
-    and teacher_id = demo_teacher_id
-    and name = 'Matemática básica';
-
-  if demo_course_id is null then
-    insert into public.courses (college_id, teacher_id, name, description, created_by)
-    values (
-      demo_college_id, demo_teacher_id, 'Matemática básica',
-      'Curso de ejemplo del modo gratuito.', demo_teacher_id
-    )
-    returning id into demo_course_id;
-  end if;
-
-  select id into demo_topic_id
-  from public.topics
-  where course_id = demo_course_id and name = 'Operaciones y fracciones';
-
-  if demo_topic_id is null then
-    insert into public.topics (course_id, name, description, position, status, created_by)
-    values (
-      demo_course_id, 'Operaciones y fracciones',
-      'Doce preguntas de ejemplo para probar Chancón.', 1, 'active', demo_teacher_id
-    )
-    returning id into demo_topic_id;
-
-    insert into public.questions (
-      topic_id, statement, option_a, option_b, option_c, option_d,
-      correct_option, explanation, status, created_by
-    )
-    select demo_topic_id, q.statement, q.option_a, q.option_b, q.option_c,
-      q.option_d, q.correct_option, q.explanation, 'active', demo_teacher_id
-    from (values
-      ('¿Cuánto es 7 × 8?', '54', '56', '48', '64', 'B', '7 × 8 = 56.'),
-      ('¿Cuál es el resultado de 3/4 + 1/4?', '1', '4/8', '3/16', '1/2', 'A', 'Las fracciones tienen el mismo denominador: (3 + 1)/4 = 4/4 = 1.'),
-      ('¿Cuánto es 15 − 27?', '12', '−12', '−42', '42', 'B', 'Como 27 es mayor que 15, el resultado es negativo: 15 − 27 = −12.'),
-      ('¿Cuál es el 20 % de 150?', '20', '25', '30', '35', 'C', '20 % de 150 = 150 × 0,20 = 30.'),
-      ('¿Cuánto es 2³ + 3²?', '13', '15', '17', '19', 'C', '2³ = 8 y 3² = 9, entonces 8 + 9 = 17.'),
-      ('Si x + 9 = 21, ¿cuánto vale x?', '10', '11', '12', '30', 'C', 'Se resta 9 a ambos lados: x = 21 − 9 = 12.'),
-      ('¿Cuál de estas fracciones es equivalente a 2/3?', '4/6', '3/4', '2/6', '6/4', 'A', 'Al multiplicar numerador y denominador por 2 se obtiene 4/6.'),
-      ('¿Cuánto es 144 ÷ 12?', '10', '11', '12', '14', 'C', '12 × 12 = 144.'),
-      ('¿Cuál es el mínimo común múltiplo de 4 y 6?', '8', '10', '12', '24', 'C', 'Los múltiplos de 4 son 4, 8, 12… y los de 6 son 6, 12…; el primero común es 12.'),
-      ('Un artículo cuesta S/ 80 y tiene 25 % de descuento. ¿Cuánto se paga?', 'S/ 55', 'S/ 60', 'S/ 65', 'S/ 70', 'B', 'El descuento es 80 × 0,25 = 20, entonces se paga 80 − 20 = S/ 60.'),
-      ('¿Cuánto es 0,5 × 0,4?', '0,02', '0,2', '2', '0,9', 'B', '5 × 4 = 20 y hay dos decimales en total: 0,20 = 0,2.'),
-      ('¿Cuál es el perímetro de un cuadrado de lado 9 cm?', '18 cm', '27 cm', '36 cm', '81 cm', 'C', 'El perímetro es 4 × 9 = 36 cm.')
-    ) as q(statement, option_a, option_b, option_c, option_d, correct_option, explanation);
-  end if;
-end;
-$$;
 
 -- ---------------------------------------------------------------------------
 -- La institución demo no se ofrece en el registro de estudiantes
