@@ -6,6 +6,7 @@ import { ModalProvider } from "../../components/ui/modal";
 import { ToastProvider } from "../../components/ui/toast";
 import { DEFAULT_XP_SETTINGS } from "../xp/api";
 import { AdminSettings } from "./AdminSettings";
+import { chooseSelectValue } from "../../components/ui/select-test-helpers";
 
 const mocks = vi.hoisted(() => ({ listColleges: vi.fn(), getCollegeXpSettings: vi.fn() }));
 vi.mock("../colleges/api", () => ({ listColleges: mocks.listColleges }));
@@ -32,7 +33,7 @@ describe("AdminSettings", () => {
     expect(selector.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Contenido de seguridad")).toBeInTheDocument();
 
-    await user.selectOptions(selector, "c2");
+    await chooseSelectValue(user, selector, "c2");
     await user.click(screen.getByRole("tab", { name: "Colores" }));
     expect(screen.getByText("Tema de Colegio Dos")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Puntos" }));

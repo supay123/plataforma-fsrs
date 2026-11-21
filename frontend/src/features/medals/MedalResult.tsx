@@ -1,6 +1,6 @@
-import { Medal } from "lucide-react";
 import type { MedalAward } from "./api";
 import { MEDAL_NAMES } from "./medals";
+import { MedalBadge } from "./MedalBadge";
 import { MedalRulesHelp } from "./MedalRulesHelp";
 import { StarSlots } from "./StarSlots";
 
@@ -12,7 +12,7 @@ export function MedalResult({ award }: { award: MedalAward | null | undefined })
   return <section aria-label="Medalla" className="mt-8 rounded-2xl border-2 border-line bg-sunken p-4 text-left">
     <div className="flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <Medal aria-hidden size={36} className="shrink-0 text-secondary-text" />
+        <MedalBadge code={award.medal} size={56} />
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-fg-muted">Tu medalla</p>
           <p className="type-heading truncate text-xl">{MEDAL_NAMES[award.medal]}</p>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PLAN, SEMESTER_PLAN, type Plan } from "../../config/business";
@@ -8,9 +8,9 @@ import { ToastProvider } from "../../components/ui/toast";
 import { AppError } from "../../lib/api/errors";
 import { PaymentPanel } from "./PaymentPanel";
 
-const mocks = vi.hoisted(() => ({ getPaymentConfig: vi.fn(), createYapeToken: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getPaymentConfig: vi.fn(), createYapeToken: vi.fn(), getDeviceSessionId: vi.fn() }));
 vi.mock("./api", () => ({ getPaymentConfig: mocks.getPaymentConfig }));
-vi.mock("./yape", () => ({ createYapeToken: mocks.createYapeToken }));
+vi.mock("./yape", () => ({ createYapeToken: mocks.createYapeToken, getDeviceSessionId: mocks.getDeviceSessionId, loadDeviceSessionScript: vi.fn() }));
 
 const createPayment = vi.fn();
 const fetchStatus = vi.fn();
@@ -38,6 +38,7 @@ describe("PaymentPanel", () => {
   beforeEach(() => {
     mocks.getPaymentConfig.mockReset().mockResolvedValue({ public_key: "TEST-public-key" });
     mocks.createYapeToken.mockReset().mockResolvedValue("yape-token-1");
+    mocks.getDeviceSessionId.mockReset().mockResolvedValue("device-1");
     createPayment.mockReset().mockResolvedValue(payment("paid"));
     fetchStatus.mockReset().mockResolvedValue(payment("paid"));
     onPaid.mockReset();
@@ -50,7 +51,7 @@ describe("PaymentPanel", () => {
     expect(screen.getByRole("img", { name: "Paga con Yape" })).toHaveAttribute("src", "/image/yape-logo.svg");
     await pay(user, "+51 111 111 111");
     expect(mocks.createYapeToken).toHaveBeenCalledWith("TEST-public-key", "111111111", "123456");
-    expect(createPayment).toHaveBeenCalledWith("semestral", { token: "yape-token-1", phone: "111111111" });
+    expect(createPayment).toHaveBeenCalledWith("semestral", { token: "yape-token-1", phone: "111111111", device_session_id: "device-1" });
     await waitFor(() => expect(onPaid).toHaveBeenCalledTimes(1));
   });
 
@@ -104,6 +105,38 @@ describe("PaymentPanel", () => {
     expect(await screen.findByText("Yape no aceptó el celular o el código de aprobación.")).toBeInTheDocument();
     expect(createPayment).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Celular de Yape")).toHaveValue("111111111");
+  });
+
+  it("charges without the device id when the security script did not load", async () => {
+    const user = userEvent.setup();
+    mocks.getDeviceSessionId.mockResolvedValue(null);
+    renderPanel();
+    await pay(user);
+    expect(createPayment).toHaveBeenCalledWith("mensual", { token: "yape-token-1", phone: "111111111" });
+  });
+
+  it("always offers the WhatsApp contact below the pay button", async () => {
+    renderPanel();
+    const link = await screen.findByRole("link", { name: /Problemas para pagar/ });
+    expect(link).toHaveAttribute("href", expect.stringContaining("https://wa.me/"));
+    expect(link.className).not.toContain("animate-pop");
+  });
+
+  it("makes the WhatsApp button pop after each failure and opens a modal on the third", async () => {
+    const user = userEvent.setup();
+    let attempt = 0;
+    createPayment.mockImplementation(() => Promise.resolve(payment("failed", { payment_id: `payment-${++attempt}`, status_detail: "cc_rejected_high_risk" })));
+    renderPanel();
+    await pay(user);
+    expect(await screen.findByText(/Mercado Pago no pudo aprobar este pago por seguridad/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Problemas para pagar/ }).className).toContain("animate-pop");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await pay(user, "", "654321");
+    await waitFor(() => expect(createPayment).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await pay(user, "", "111222");
+    const dialog = await screen.findByRole("dialog", { name: "¿Tienes problemas para pagar?" });
+    expect(within(dialog).getByRole("link", { name: "Escribir por WhatsApp" })).toHaveAttribute("href", expect.stringContaining("https://wa.me/"));
   });
 
   it("falls back to WhatsApp while online payments are not configured", async () => {

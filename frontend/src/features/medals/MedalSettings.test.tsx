@@ -25,8 +25,8 @@ describe("MedalSettings", () => {
 
   it("muestra los rangos por defecto de la institución", async () => {
     renderTab();
-    expect(await screen.findByLabelText("Postulante 1: hasta (estrellas)")).toHaveValue(2);
-    expect(screen.getByLabelText("Pre-Ingresante 3: hasta (estrellas)")).toHaveValue(101);
+    expect(await screen.findByLabelText("Postulante I: hasta (estrellas)")).toHaveValue(2);
+    expect(screen.getByLabelText("Pre-Ingresante III: hasta (estrellas)")).toHaveValue(101);
     expect(screen.getByText("Desde 102 estrellas en adelante.")).toBeInTheDocument();
     expect(screen.getByLabelText("-3 estrellas: hasta (nota)")).toHaveValue(2);
     expect(screen.getByText("Hasta la nota 20.")).toBeInTheDocument();
@@ -35,7 +35,7 @@ describe("MedalSettings", () => {
   it("guarda solo tras confirmar el aviso que afecta a toda la institución", async () => {
     const user = userEvent.setup();
     renderTab();
-    const first = await screen.findByLabelText("Postulante 1: hasta (estrellas)");
+    const first = await screen.findByLabelText("Postulante I: hasta (estrellas)");
     await user.clear(first);
     await user.type(first, "3");
     await user.click(screen.getByRole("button", { name: "Guardar medallas" }));
@@ -48,7 +48,7 @@ describe("MedalSettings", () => {
   it("bloquea el guardado con rangos que no van en orden creciente o con decimales", async () => {
     const user = userEvent.setup();
     renderTab();
-    const second = await screen.findByLabelText("Postulante 2: hasta (estrellas)");
+    const second = await screen.findByLabelText("Postulante II: hasta (estrellas)");
     await user.clear(second);
     await user.type(second, "2");
     expect(screen.getByText("Debe ser mayor que el anterior.")).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe("MedalSettings", () => {
     const user = userEvent.setup();
     renderTab();
     await user.click(await screen.findByRole("switch", { name: /Activar medallas/ }));
-    expect(screen.queryByLabelText("Postulante 1: hasta (estrellas)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Postulante I: hasta (estrellas)")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Guardar medallas" }));
     await user.click(await screen.findByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(mocks.saveMedalSettings).toHaveBeenCalledWith("c1", { enabled: false }));

@@ -1,24 +1,18 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import clsx from "clsx";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { PublicPage } from "../../components/layout/PublicLayout";
-import { Alert, Button, EmptyState, Field, Select } from "../../components/ui";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Logo } from "../../components/layout/Logo";
+import { Alert } from "../../components/ui";
+import { useModal } from "../../components/ui/use-modal";
 import { Skeleton } from "../../components/ui/skeleton";
-import { useToast } from "../../components/ui/use-toast";
-import { getFreeModeCatalog, getFreeModeQuestions, type FreeModeQuestion } from "../../features/free-mode/api";
-import { FreeQuestionRunner, type FreeModeAnswers } from "../../features/free-mode/FreeQuestionRunner";
-import { FreeResult } from "../../features/free-mode/FreeResult";
+import { useTheme } from "../../lib/theme/theme-context";
+import { getFreeModeQuestions } from "../../features/free-mode/api";
+import { FreeQuestionRunner } from "../../features/free-mode/FreeQuestionRunner";
 import { LeadModal } from "../../features/free-mode/LeadModal";
 import { PlanCards } from "../../features/payments/PlanCards";
 
-type Stage = { name: "select" } | { name: "practice"; questions: FreeModeQuestion[] } | { name: "result"; questions: FreeModeQuestion[]; answers: FreeModeAnswers } | { name: "plans"; givenNames: string };
-
-/** Forma de los tres selectores mientras carga el catálogo. */
-function SelectorsSkeleton() {
-  return <div role="status" aria-busy="true" aria-label="Cargando" className="grid gap-4">
-    {[0, 1, 2].map((item) => <div key={item} className="grid gap-1.5"><Skeleton height={14} width="6rem" className="bg-white/10!" /><Skeleton height={44} className="bg-white/10!" /></div>)}
-    <Skeleton height={44} className="bg-white/10!" />
-  </div>;
-}
+type Stage = { name: "practice" } | { name: "plans"; correctCount: number; total: number; givenNames: string | null };
 
 /** Forma de la pregunta mientras se traen las 10 preguntas del tema. */
 function PracticeSkeleton() {
@@ -29,77 +23,54 @@ function PracticeSkeleton() {
   </div>;
 }
 
-/** Prueba gratuita: elegir grupo, curso y tema, resolver 10 preguntas, identificarse y ver los planes. */
+/** Prueba gratuita a pantalla completa y sin footer: 10 preguntas del tema elegido en el home (`?tema=`), al terminar ver los planes con el modal para dejar sus datos. */
 export function FreeModePage() {
-  const toast = useToast();
-  const [stage, setStage] = useState<Stage>({ name: "select" });
-  const [groupId, setGroupId] = useState("");
-  const [courseId, setCourseId] = useState("");
-  const [topicId, setTopicId] = useState("");
+  const [searchParameters] = useSearchParams();
+  const topicId = searchParameters.get("tema");
+  const [stage, setStage] = useState<Stage>({ name: "practice" });
   const [leadOpen, setLeadOpen] = useState(false);
+  const { mode } = useTheme();
+  const modal = useModal();
+  const navigate = useNavigate();
 
-  const catalog = useQuery({ queryKey: ["free-mode", "catalog"], queryFn: getFreeModeCatalog, staleTime: 5 * 60_000 });
-  const start = useMutation({
-    mutationFn: () => getFreeModeQuestions(topicId),
-    onSuccess: ({ questions }) => setStage({ name: "practice", questions }),
-    onError: (error) => toast.error(error.message),
+  const questionsQuery = useQuery({
+    queryKey: ["free-mode", "questions", topicId],
+    queryFn: () => getFreeModeQuestions(topicId ?? ""),
+    enabled: Boolean(topicId),
+    gcTime: 0,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 
-  const groups = catalog.data ?? [];
-  const group = groups.find((item) => item.id === groupId);
-  const course = group?.courses.find((item) => item.id === courseId);
+  if (!topicId) return <Navigate to="/#gratis" replace />;
 
-  return <PublicPage>
-    {/* `dark` activa las variantes oscuras de los componentes compartidos (campos, modal, botones). */}
-    <div className="dark mx-auto w-full max-w-6xl px-4 py-10 text-center">
-      {stage.name === "select" && start.isPending && <PracticeSkeleton />}
-      {stage.name === "select" && !start.isPending && <div className="mx-auto max-w-md">
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-300">Modo gratuito</p>
-        <h1 className="mt-3 type-heading text-3xl sm:text-4xl">Prueba Chancón sin pagar</h1>
-        <p className="mt-3 text-slate-300">Elige tu grupo, curso y tema y resuelve 10 preguntas con corrección al instante.</p>
-        <div className="mt-8 rounded-2xl border border-white/10 bg-slate-900 p-5 text-left">
-          {catalog.isLoading ? <SelectorsSkeleton />
-            : catalog.error ? <div className="grid gap-4"><Alert tone="error">{catalog.error.message}</Alert><Button onClick={() => void catalog.refetch()}>Reintentar</Button></div>
-            : groups.length === 0 ? <EmptyState>Aún no hay pruebas disponibles. Vuelve pronto.</EmptyState>
-            : <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); start.mutate(); }}>
-              <Field label="Grupo (profesor)">
-                <Select value={groupId} onChange={(event) => { setGroupId(event.target.value); setCourseId(""); setTopicId(""); }}>
-                  <option value="">Selecciona un grupo</option>
-                  {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </Select>
-              </Field>
-              <Field label="Curso">
-                <Select value={courseId} disabled={!group} onChange={(event) => { setCourseId(event.target.value); setTopicId(""); }}>
-                  <option value="">Selecciona un curso</option>
-                  {group?.courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </Select>
-              </Field>
-              <Field label="Tema">
-                <Select value={topicId} disabled={!course} onChange={(event) => setTopicId(event.target.value)}>
-                  <option value="">Selecciona un tema</option>
-                  {course?.topics.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </Select>
-              </Field>
-              <Button type="submit" className="min-h-11" disabled={!topicId}>Comenzar</Button>
-            </form>}
-        </div>
+  // Mismo estilo y colores que el portal del estudiante, para que la práctica se vea igual en ambos.
+  return <div className={clsx("portal flex min-h-svh flex-col bg-base text-on-base", mode === "dark" && "dark")}>
+    {/* En celular, durante la prueba no hay cabecera: la X de la pregunta es la salida. */}
+    <header className={clsx("mx-auto w-full max-w-6xl px-4 pt-6", stage.name === "practice" && "hidden md:block")}><Link to="/" className="inline-flex"><Logo /></Link></header>
+    <main className={clsx("mx-auto w-full max-w-6xl flex-1 px-4 py-4 text-center md:py-10", stage.name === "practice" && "pb-28")}>
+      {stage.name === "practice" && questionsQuery.isPending && <PracticeSkeleton />}
+      {stage.name === "practice" && questionsQuery.error && <div className="mx-auto grid max-w-md gap-4">
+        <Alert tone="error">{questionsQuery.error.message}</Alert>
+        <Link to="/#gratis" className="font-semibold text-emerald-300 underline underline-offset-4">Volver a elegir tema</Link>
       </div>}
-
-      {stage.name === "practice" && <FreeQuestionRunner questions={stage.questions} onFinish={(answers) => setStage({ name: "result", questions: stage.questions, answers })} />}
-
-      {stage.name === "result" && <>
-        <h1 className="mb-6 type-heading text-3xl">Tu resultado</h1>
-        <FreeResult questions={stage.questions} answers={stage.answers} onIdentify={() => setLeadOpen(true)} />
-      </>}
+      {stage.name === "practice" && questionsQuery.data && <FreeQuestionRunner questions={questionsQuery.data.questions}
+        onExit={() => modal.warning({ title: "¿Salir de la prueba?", body: "Perderás tus respuestas hasta este momento.", confirmLabel: "Salir y perder progreso", onConfirm: () => navigate("/#gratis") })}
+        onFinish={(answers) => {
+          const questions = questionsQuery.data.questions;
+          setStage({ name: "plans", correctCount: questions.filter((question) => answers[question.id] === question.correct_option).length, total: questions.length, givenNames: null });
+          setLeadOpen(true);
+        }} />}
 
       {stage.name === "plans" && <>
         <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-300">Planes</p>
-        <h1 className="mt-3 type-heading text-3xl sm:text-4xl">{`¡Gracias, ${stage.givenNames}!`}</h1>
+        <h1 className="mt-3 type-heading text-3xl sm:text-4xl">{stage.givenNames ? `¡Gracias, ${stage.givenNames}!` : `Acertaste ${stage.correctCount} de ${stage.total}`}</h1>
         <p className="mx-auto mt-3 max-w-2xl text-slate-300">Estos son nuestros planes. Sin renovación automática: vuelves a pagar solo si decides seguir.</p>
         <PlanCards className="mt-10 w-full" />
       </>}
 
-      {leadOpen && <LeadModal onCancel={() => setLeadOpen(false)} onRegistered={(givenNames) => { setLeadOpen(false); setStage({ name: "plans", givenNames }); }} />}
-    </div>
-  </PublicPage>;
+      {leadOpen && <LeadModal onRegistered={(givenNames) => { setLeadOpen(false); setStage((current) => current.name === "plans" ? { ...current, givenNames } : current); }} />}
+    </main>
+  </div>;
 }

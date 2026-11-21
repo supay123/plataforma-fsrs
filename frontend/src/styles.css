@@ -79,6 +79,9 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
   --animate-mascot-happy: mascot-happy 0.6s ease-out;
   --animate-mascot-sad: mascot-sad 0.6s ease-out forwards;
   --animate-mascot-think: mascot-think 1.2s ease-in-out infinite;
+  /* Isla actual del modo ruta: flota suavemente con la mascota encima. */
+  --animate-island-float: island-float 3.5s ease-in-out infinite;
+  @keyframes island-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
   @keyframes mascot-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
   @keyframes mascot-happy {
     0% { transform: translateY(0) scale(1); }
@@ -123,6 +126,12 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
     22% { transform: translate(4px, -16px) scale(1); }
     65% { opacity: 1; }
     100% { opacity: 0; transform: translate(60px, -150px) scale(0.95); }
+  }
+  /* Parpadeo suave de la llama de la racha. */
+  --animate-flame: flame 1.8s ease-in-out infinite;
+  @keyframes flame {
+    0%, 100% { transform: scale(1) rotate(-2deg); }
+    50% { transform: scale(1.1, 1.16) rotate(2deg); }
   }
   @keyframes pop {
     0%, 100% { transform: scale(1); }
@@ -178,15 +187,15 @@ td { border-top: 1px solid #e2e8f0; padding: .85rem .75rem; font-size: .875rem; 
   --c-secondary: #c9a961;
   --c-secondary-soft: color-mix(in oklab, #c9a961 16%, #151b23);
   --c-secondary-text: color-mix(in oklab, #c9a961 72%, #ffffff);
-  --c-success: #29b85a;
-  --c-success-strong: color-mix(in oklab, #29b85a 72%, #000000);
-  --c-success-soft: color-mix(in oklab, #29b85a 15%, #151b23);
-  --c-success-text: color-mix(in oklab, #29b85a 70%, #ffffff);
+  --c-success: #1fd164;
+  --c-success-strong: color-mix(in oklab, #1fd164 72%, #000000);
+  --c-success-soft: color-mix(in oklab, #1fd164 62%, #151b23);
+  --c-success-text: color-mix(in oklab, #1fd164 30%, #ffffff);
   --c-on-success: #000000;
-  --c-danger: #e5484d;
-  --c-danger-strong: color-mix(in oklab, #e5484d 72%, #000000);
-  --c-danger-soft: color-mix(in oklab, #e5484d 15%, #151b23);
-  --c-danger-text: color-mix(in oklab, #e5484d 70%, #ffffff);
+  --c-danger: #ff4b55;
+  --c-danger-strong: color-mix(in oklab, #ff4b55 72%, #000000);
+  --c-danger-soft: color-mix(in oklab, #ff4b55 62%, #151b23);
+  --c-danger-text: color-mix(in oklab, #ff4b55 30%, #ffffff);
   --c-on-danger: #000000;
   --c-warning: #f5c518;
   --c-warning-strong: color-mix(in oklab, #f5c518 72%, #000000);
@@ -228,3 +237,12 @@ html.portal {
 .portal th { color: var(--c-fg-muted); font-size: .75rem; letter-spacing: .08em; }
 .portal td { border-top-color: var(--c-line); }
 @media (prefers-reduced-motion: reduce) { .portal * { transition-duration: 0s !important; animation-duration: 0s !important; } }
+
+/* Todas las barras de desplazamiento son delgadas y discretas. */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, currentColor 35%, transparent) transparent; }
+
+/* Barra de desplazamiento siempre visible en el desplegable de `Select` (en móvil los navegadores la ocultan). */
+.select-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, currentColor 40%, transparent) transparent; overscroll-behavior: contain; }
+.select-scroll::-webkit-scrollbar { width: 8px; }
+.select-scroll::-webkit-scrollbar-thumb { background: color-mix(in oklab, currentColor 40%, transparent); border-radius: 9999px; }
+.select-scroll::-webkit-scrollbar-track { background: transparent; }

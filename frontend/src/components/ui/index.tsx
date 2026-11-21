@@ -1,10 +1,15 @@
 import { Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { useId, useState } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 import clsx from "clsx";
 import { PracticeMascot } from "../../features/sessions/PracticeMascot";
+import { control, controlClass, type ControlProps } from "./control-styles";
+import { ControlIcon } from "./controls";
+import { FieldLabelContext } from "./field-label-context";
+import { Select } from "./select";
 
 export { Eyebrow, ProgressBar } from "./ornaments";
+export { Select };
 
 // En los portales (`portal:`) los botones tienen el borde inferior grueso del estilo Chancón (`--edge`).
 const buttonBase = "inline-flex items-center justify-center rounded-xl text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 dark:rounded-lg portal:rounded-xl portal:shadow-[0_3px_0_var(--edge)] portal:duration-100 portal:enabled:active:translate-y-[3px] portal:enabled:active:shadow-none";
@@ -20,19 +25,9 @@ export function Button({ className, variant = "primary", size = "md", ...props }
 }
 /** Con `hideLabel` la etiqueta queda solo para lectores de pantalla (el control muestra un placeholder). */
 export function Field({ label, error, hint, hideLabel, children }: { label: string; error?: string; hint?: ReactNode; hideLabel?: boolean; children: ReactNode }) {
-  return <label className="grid content-start gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 portal:text-fg"><span className={clsx(hideLabel && "sr-only")}>{label}</span>{children}{hint && <span className="text-xs font-normal text-slate-500 dark:text-slate-400 portal:text-fg-faint">{hint}</span>}{error && <span className="text-xs text-rose-600 dark:text-rose-400 portal:text-danger-text">{error}</span>}</label>;
+  const labelId = useId();
+  return <FieldLabelContext value={labelId}><label className="grid content-start gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 portal:text-fg"><span id={labelId} className={clsx(hideLabel && "sr-only")}>{label}</span>{children}{hint && <span className="text-xs font-normal text-slate-500 dark:text-slate-400 portal:text-fg-faint">{hint}</span>}{error && <span className="text-xs text-rose-600 dark:text-rose-400 portal:text-danger-text">{error}</span>}</label></FieldLabelContext>;
 }
-// En los portales los campos van sobre `sunken` con el texto del fondo nav (así se leen aunque el campo esté sobre la página).
-const control = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:rounded-lg dark:border-white/15 dark:bg-white/[0.04] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20 dark:[&>option]:bg-slate-900 portal:rounded-xl portal:border-2 portal:border-line-strong portal:bg-sunken portal:text-on-blocks portal:placeholder:text-fg-faint portal:focus:border-primary portal:focus:ring-0 portal:[&>option]:bg-blocks";
-// Variante "soft": campos con fondo suave y placeholder, sin etiqueta visible.
-// Tamaño y peso van con `!` porque `font: inherit` de styles.css (sin capa) gana a las utilidades.
-const softControl = "min-h-12 w-full rounded-2xl border border-indigo-100 bg-indigo-50/50 px-3 py-2 text-base! font-normal! text-slate-900 outline-none placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 dark:rounded-lg dark:border-white/15 dark:bg-white/[0.04] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:bg-white/[0.06] dark:focus:ring-emerald-400/20 dark:[&>option]:bg-slate-900 portal:rounded-xl portal:border-2 portal:border-line-strong portal:bg-sunken portal:text-on-blocks portal:placeholder:text-fg-faint portal:focus:border-primary portal:focus:bg-sunken portal:focus:ring-0 portal:[&>option]:bg-blocks";
-interface ControlProps { variant?: "default" | "soft"; /** Ícono a la izquierda del control. */ icon?: ReactNode }
-const controlClass = ({ variant, icon }: ControlProps, ...extra: Array<string | false | undefined>) =>
-  clsx(variant === "soft" ? softControl : control, icon && "peer pl-11", ...extra);
-// El ícono va después del control para poder resaltarlo con `peer-focus`.
-const ControlIcon = ({ icon }: { icon: ReactNode }) =>
-  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 grid w-11 place-items-center text-slate-500 peer-focus:text-indigo-600 dark:peer-focus:text-emerald-400 portal:peer-focus:text-primary-text">{icon}</span>;
 function WithIcon({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return icon ? <span className="relative block">{children}<ControlIcon icon={icon} /></span> : children;
 }
@@ -48,7 +43,6 @@ export function PasswordInput({ className, variant, icon, ...props }: Omit<Input
     </button>
   </span>;
 }
-export function Select({ variant, icon, ...props }: SelectHTMLAttributes<HTMLSelectElement> & ControlProps) { return <WithIcon icon={icon}><select {...props} className={controlClass({ variant, icon }, props.className)} /></WithIcon>; }
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) { return <textarea {...props} className={clsx(control, props.className)} />; }
 export function Card({ children, className, glow = false }: { children: ReactNode; className?: string; glow?: boolean }) {
   const hasBg = className?.includes("bg-");
@@ -56,7 +50,7 @@ export function Card({ children, className, glow = false }: { children: ReactNod
   return (
     <section
       className={clsx(
-        "relative rounded-2xl p-5 shadow-sm dark:rounded-xl portal:rounded-2xl portal:border-2 portal:bg-blocks portal:text-on-blocks portal:shadow-[0_4px_0_var(--c-line)]",
+        "relative rounded-2xl p-4 shadow-sm dark:rounded-xl portal:rounded-2xl portal:border-2 portal:bg-blocks portal:text-on-blocks portal:shadow-[0_4px_0_var(--c-line)]",
         !hasBorder && "border border-slate-200 dark:border-white/10 portal:border-line",
         !hasBg && "bg-white dark:bg-slate-900",
         glow && "portal:border-primary/60",

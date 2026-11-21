@@ -13,3 +13,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// El fondo de index.html cubre hasta que la app pinta su primer cuadro; después manda el de cada pantalla.
+requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.style.removeProperty('background-color')))

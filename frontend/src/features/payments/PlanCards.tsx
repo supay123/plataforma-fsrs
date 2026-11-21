@@ -55,21 +55,20 @@ function PlanCard({ plan, icon: Icon, name, tagline, price, billing, methods, ba
   const shell = "rounded-xl shadow-2xl shadow-black/50";
   if (!gold) return <div className={shell}>{card}</div>;
   // Borde dorado: un degradado cónico oscuro con dos destellos brillantes gira detrás de la tarjeta
-  // y asoma por el margen de 3px; una copia desenfocada detrás proyecta el halo que da vueltas.
+  // y asoma por el margen de 2px; una copia desenfocada detrás proyecta el halo que da vueltas.
   const orbit = <div aria-hidden className="absolute left-1/2 top-1/2 aspect-square w-[250%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,#78350f_0deg,#92400e_120deg,#d97706_160deg,#fcd34d_178deg,#d97706_190deg,#78350f_215deg,#92400e_300deg,#d97706_340deg,#fcd34d_358deg,#78350f_360deg)] motion-safe:animate-orbit" />;
   return <div className={clsx(shell, "relative")}>
     <div aria-hidden className="absolute -inset-1 overflow-hidden rounded-2xl opacity-35 blur-lg">{orbit}</div>
-    <div className="relative overflow-hidden rounded-xl p-[3px]">
+    <div className="relative overflow-hidden rounded-xl p-[2px]">
       {orbit}
       {card}
     </div>
   </div>;
 }
 
-/** Tarjetas de los dos planes, cada una con su botón al registro con el plan elegido. */
+/** Tarjetas de los dos planes (semestral a la izquierda, mensual a la derecha), cada una con su botón al registro con el plan elegido. */
 export function PlanCards({ className }: { className?: string }) {
   return <div className={`mx-auto grid max-w-4xl items-start gap-6 md:grid-cols-2 ${className ?? ""}`}>
-    <PlanCard plan={PLAN.id} icon={Sprout} name={PLAN.name} tagline="Paga mes a mes" price={PLAN.priceSoles} billing="pago mensual" methods="Pago con QR" featuresTitle="Todo incluido:" features={PLAN.features} />
     <PlanCard plan={SEMESTER_PLAN.id} icon={Trees} name={SEMESTER_PLAN.name} tagline="Prepárate todo el ciclo y ahorra" price={semesterMonthly} billing={`${formatSoles(SEMESTER_PLAN.priceSoles)} cada ${SEMESTER_PLAN.months} meses`} methods="Pago con QR o código" badge={`Ahorras ${formatSoles(semesterSavings)}`} gold
       featuresTitle={`Todo lo del ${PLAN.name}:`} features={PLAN.features}
       extrasTitle={`Extra solo en el ${SEMESTER_PLAN.name}:`} extras={[
@@ -78,5 +77,6 @@ export function PlanCards({ className }: { className?: string }) {
         "Precio fijo durante todo el periodo",
         "Pago también con código desde la app de tu banco o Yape",
       ]} />
+    <PlanCard plan={PLAN.id} icon={Sprout} name={PLAN.name} tagline="Paga mes a mes" price={PLAN.priceSoles} billing="pago mensual" methods="Pago con QR" featuresTitle="Todo incluido:" features={PLAN.features} />
   </div>;
 }

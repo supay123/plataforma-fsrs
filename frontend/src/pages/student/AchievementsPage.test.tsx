@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModalProvider } from "../../components/ui/modal";
 import { ToastProvider } from "../../components/ui/toast";
@@ -40,12 +40,38 @@ describe("StudentAchievementsPage", () => {
     expect(await screen.findByLabelText("Promedio general")).toHaveTextContent("14 / 20");
     expect(await screen.findByText(/Última sesión \(Álgebra\)/)).toHaveTextContent("15.5");
     expect(screen.getByText(/Última lección del modo ruta \(Fracciones\)/)).toHaveTextContent("18");
-    expect(await screen.findByText("Postulante 2", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText(/estrellas para/)).toHaveTextContent("faltan 2 estrellas para Postulante 3");
+    expect(await screen.findByText("Postulante II", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText(/estrellas para/)).toHaveTextContent("faltan 2 estrellas para Postulante III");
     expect(await screen.findByLabelText("Racha actual: 4 días")).toBeInTheDocument();
     expect(screen.getByText(/Completa una sesión hoy para no perder/)).toBeInTheDocument();
     expect(await screen.findByLabelText("Nivel 3")).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === "P" && /faltan 60 xp para el nivel 4/.test(element.textContent ?? ""))).toBeInTheDocument();
+  });
+
+  it("abre la explicación de las medallas en un modal con el icono de interrogación", async () => {
+    renderPage();
+    await screen.findByText("Postulante II", { selector: "p" });
+    await screen.findByText("Postulante II", { selector: "p" });
+    fireEvent.click(screen.getByRole("button", { name: "¿Cómo funcionan las medallas?" }));
+    expect(await screen.findByText(/depende del total de estrellas/)).toBeInTheDocument();
+    expect(screen.queryByText("Estrellas por nota")).not.toBeInTheDocument();
+  });
+
+  it("explica las estrellas con un icono aparte del de las medallas", async () => {
+    renderPage();
+    await screen.findByText("Postulante II", { selector: "p" });
+    await screen.findByText("Postulante II", { selector: "p" });
+    fireEvent.click(screen.getByRole("button", { name: "¿Cómo se ganan las estrellas?" }));
+    expect(await screen.findByText(/3 estrellas como máximo/)).toBeInTheDocument();
+    expect(screen.getByText("Estrellas por nota")).toBeInTheDocument();
+  });
+
+  it("muestra el tramo de la racha con los días cumplidos", async () => {
+    mocks.getStreak.mockResolvedValue({ current_streak: 2, best_streak: 9, active_today: true, last_active_date: "2026-11-16", today: "2026-11-16", recent_active_days: [] });
+    renderPage();
+    const track = await screen.findByRole("list", { name: "Racha diaria" });
+    expect(track.querySelectorAll('[aria-label$=": con sesión"]')).toHaveLength(2);
+    expect(await screen.findByLabelText("Mejor racha: 9 días")).toBeInTheDocument();
   });
 
   it("oculta la tarjeta de medalla cuando el colegio la desactivó", async () => {

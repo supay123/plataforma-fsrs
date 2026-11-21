@@ -6,6 +6,7 @@ import { ToastProvider } from "../../components/ui/toast";
 import { AppError } from "../../lib/api/errors";
 import type { RankingItem, RankingPage as RankingPageData, RankingType } from "../../features/ranking/api";
 import { RankingPage } from "./RankingPage";
+import { chooseSelectValue } from "../../components/ui/select-test-helpers";
 
 const mocks = vi.hoisted(() => ({ getRankingSettings: vi.fn(), refreshRankingCache: vi.fn(), getRankingPage: vi.fn() }));
 vi.mock("../../features/ranking/api", async (original) => ({ ...(await original<typeof import("../../features/ranking/api")>()), ...mocks }));
@@ -37,10 +38,10 @@ describe("RankingPage", () => {
     expect(mocks.refreshRankingCache).toHaveBeenCalledWith("MEDALLAS");
     expect(mocks.refreshRankingCache.mock.invocationCallOrder[0]).toBeLessThan(mocks.getRankingPage.mock.invocationCallOrder[0]!);
     expect(mocks.getRankingPage).toHaveBeenCalledWith("MEDALLAS", 1);
-    expect(screen.getByRole("combobox", { name: "Categoría" })).toHaveValue("MEDALLAS");
+    expect(screen.getByRole("combobox", { name: "Categoría" })).toHaveTextContent("Medallas");
     expect(screen.getByText("de 2 participantes")).toBeInTheDocument();
     expect(screen.getByText("(Tú)")).toBeInTheDocument();
-    expect(screen.getAllByText("Postulante 1")).toHaveLength(2);
+    expect(screen.getAllByText("Postulante I")).toHaveLength(2);
   });
 
   it("la primera vez en cada categoría refresca y luego consulta; al volver solo consulta", async () => {
@@ -48,10 +49,10 @@ describe("RankingPage", () => {
     renderPage();
     await screen.findByText("Alumno 1 P. R.");
     mocks.getRankingPage.mockResolvedValue(page([item(1, { level: 3, xp: 40, medal: undefined })], { type: "NIVEL", my_position: 1 }));
-    await user.selectOptions(screen.getByRole("combobox", { name: "Categoría" }), "NIVEL");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Categoría" }), "NIVEL");
     expect(await screen.findByText("Nivel 3")).toBeInTheDocument();
     expect(mocks.refreshRankingCache).toHaveBeenLastCalledWith("NIVEL");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Categoría" }), "MEDALLAS");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Categoría" }), "MEDALLAS");
     await waitFor(() => expect(mocks.getRankingPage).toHaveBeenLastCalledWith("MEDALLAS", 1));
     expect(mocks.refreshRankingCache).toHaveBeenCalledTimes(2);
   });

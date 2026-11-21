@@ -11,6 +11,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Cinzel: home y páginas públicas. Archivo (títulos) y Plus Jakarta Sans (cuerpo): portales. -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Plus+Jakarta+Sans:wght@400..800&display=swap" />
+    <!-- Pinta el fondo base antes de que cargue el JS (evita la pantalla blanca). Misma lógica que theme-store.ts
+         y mismos colores por defecto que DEFAULT_PALETTES (palette.ts); main.tsx lo quita al pintar la app. -->
+    <script>
+      (function () {
+        var color = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "#eef2f6" : "#0a0f16";
+        try {
+          var mode = localStorage.getItem("themeMode");
+          if (mode !== "light" && mode !== "dark") mode = color === "#eef2f6" ? "light" : "dark";
+          color = mode === "light" ? "#eef2f6" : "#0a0f16";
+          var instId = (new URLSearchParams(location.search).get("instId") || localStorage.getItem("instId") || "").trim();
+          var cached = JSON.parse(localStorage.getItem("instTheme") || "null");
+          var palette = instId && cached && cached.inst === instId && cached.theme && cached.theme[mode];
+          if (palette && /^#[0-9a-f]{6}$/i.test(palette.base)) color = palette.base;
+        } catch (error) { /* sin almacenamiento: quedan los colores por defecto */ }
+        document.documentElement.style.backgroundColor = color;
+      })();
+    </script>
     <title>Chancón - Preuniversitario</title>
   </head>
   <body>

@@ -4,7 +4,8 @@ import {
   buildRouteProgress,
   gradeRouteAttempt,
   parseRouteAnswers,
-  parseRouteQuestions,
+  parseRouteLessonContent,
+  pickRandomQuestions,
   routeScorePercent,
 } from "../route-mode.ts";
 
@@ -26,22 +27,39 @@ Deno.test("score percent rounds down", () => {
 });
 
 Deno.test("4 of 5 passes and 3 of 5 does not", () => {
-  const passed = gradeRouteAttempt(key, answersWith(1));
+  const passed = gradeRouteAttempt(key, answersWith(1), 5);
   assert.equal(passed.score_percent, 80);
   assert.equal(passed.passed, true);
   assert.equal(passed.correct_question_ids.length, 4);
-  const failed = gradeRouteAttempt(key, answersWith(2));
+  const failed = gradeRouteAttempt(key, answersWith(2), 5);
   assert.equal(failed.passed, false);
 });
 
-Deno.test("grading requires every question exactly once", () => {
+Deno.test("grading needs the expected count of distinct bank questions", () => {
   assert.throws(
-    () => gradeRouteAttempt(key, answersWith(0).slice(1)),
+    () => gradeRouteAttempt(key, answersWith(0).slice(1), 5),
     (error) => error instanceof AppError && error.status === 409,
   );
   const foreign = answersWith(0);
   foreign[0] = { question_id: questionId(9), selected_option: "A" };
-  assert.throws(() => gradeRouteAttempt(key, foreign), AppError);
+  assert.throws(() => gradeRouteAttempt(key, foreign, 5), AppError);
+});
+
+Deno.test("grading a subset of the bank uses the shown count as total", () => {
+  const shown = answersWith(1).slice(0, 4);
+  const grading = gradeRouteAttempt(key, shown, 4);
+  assert.equal(grading.total_questions, 4);
+  assert.equal(grading.correct_count, 3);
+  assert.equal(grading.score_percent, 75);
+  assert.equal(grading.passed, false);
+});
+
+Deno.test("random pick returns distinct questions of the bank", () => {
+  const picked = pickRandomQuestions(key, 3);
+  assert.equal(picked.length, 3);
+  assert.equal(new Set(picked.map((question) => question.id)).size, 3);
+  assert.equal(pickRandomQuestions(key, 9).length, 5);
+  assert.equal(key.length, 5);
 });
 
 const topics = [
@@ -104,23 +122,50 @@ Deno.test("a failed attempt keeps the next lesson locked, a pass opens it across
   );
 });
 
-Deno.test("questions must be exactly five and valid", () => {
-  const valid = {
-    statement: "¿Cuánto es $2+2$?\nResponde.",
-    option_a: "3",
-    option_b: "4",
-    option_c: "5",
-    option_d: "6",
-    correct_option: "b",
-  };
-  assert.throws(() => parseRouteQuestions([valid]), AppError);
-  const parsed = parseRouteQuestions(Array(5).fill(valid));
-  assert.equal(parsed[0]?.correct_option, "B");
-  assert.equal(parsed[0]?.explanation, null);
-  assert.equal(parsed[0]?.statement.includes("\n"), true);
+const validQuestion = {
+  statement: "¿Cuánto es $2+2$?\nResponde.",
+  option_a: "3",
+  option_b: "4",
+  option_c: "5",
+  option_d: "6",
+  correct_option: "b",
+};
+const validLesson = {
+  text: "Sumar es juntar.\n\nEjemplo: $2+2=4$.",
+  questions_to_show: 2,
+  questions: Array(3).fill(validQuestion),
+};
+
+Deno.test("a lesson JSON keeps its bank and how many to show", () => {
+  const parsed = parseRouteLessonContent(validLesson);
+  assert.equal(parsed.questions.length, 3);
+  assert.equal(parsed.questions_to_show, 2);
+  assert.equal(parsed.content_text.includes("\n\n"), true);
+  assert.equal(parsed.questions[0]?.correct_option, "B");
+  assert.equal(parsed.questions[0]?.explanation, null);
+});
+
+Deno.test("a lesson JSON rejects bad counts and options with their path", () => {
+  for (const toShow of [0, 4, 1.5, "2", undefined]) {
+    assert.throws(
+      () =>
+        parseRouteLessonContent({ ...validLesson, questions_to_show: toShow }),
+      AppError,
+    );
+  }
   assert.throws(
-    () => parseRouteQuestions(Array(5).fill({ ...valid, correct_option: "E" })),
+    () => parseRouteLessonContent({ ...validLesson, questions: [] }),
     AppError,
+  );
+  assert.throws(
+    () =>
+      parseRouteLessonContent({
+        ...validLesson,
+        questions: [validQuestion, { ...validQuestion, correct_option: "E" }],
+      }),
+    (error) =>
+      error instanceof AppError &&
+      error.message.includes("lesson.questions[1].correct_option"),
   );
 });
 

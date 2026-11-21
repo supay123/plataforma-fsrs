@@ -8,8 +8,8 @@ import {
   deleteLesson,
   getLessonContent,
   listLessons,
-  saveLessonQuestions,
-  updateLesson,
+  renameLesson,
+  replaceLessonContent,
 } from "./lessons.ts";
 import { createTopic, deleteTopic, listTopics, updateTopic } from "./topics.ts";
 
@@ -18,14 +18,14 @@ import { createTopic, deleteTopic, listTopics, updateTopic } from "./topics.ts";
 //   POST   /route-mode/topics              crea un tema
 //   PUT    /route-mode/topics?id=          edita un tema
 //   DELETE /route-mode/topics?id=          elimina un tema
-//   POST   /route-mode/lessons             paso 1: crea la lección (título y texto)
-//   PUT    /route-mode/lessons?id=         edita título y texto
+//   POST   /route-mode/lessons             crea una lección con su nombre (aún sin contenido)
+//   PUT    /route-mode/lessons?id=         cambia el nombre de la lección
+//   PUT    /route-mode/lessons/content?id= guarda el JSON: texto y banco de preguntas
 //   DELETE /route-mode/lessons?id=         elimina la lección
-//   PUT    /route-mode/lessons/questions?id= paso 2: guarda las 5 preguntas
 // Lectura (cada rol ve lo suyo):
 //   GET    /route-mode/topics              temas
 //   GET    /route-mode/lessons?topic_id=   lecciones de un tema
-//   GET    /route-mode/lessons/content?id= texto y preguntas (sin respuestas al estudiante)
+//   GET    /route-mode/lessons/content?id= texto y preguntas (al estudiante, sorteadas y con respuestas cifradas en answer_key)
 // Estudiante:
 //   POST   /route-mode/attempts            envía un intento; califica y da xp
 //   GET    /route-mode/progress            temas, lecciones y desbloqueos
@@ -40,10 +40,10 @@ export default {
           "DELETE /topics": deleteTopic,
           "GET /topics": listTopics,
           "POST /lessons": createLesson,
-          "PUT /lessons": updateLesson,
+          "PUT /lessons": renameLesson,
+          "PUT /lessons/content": replaceLessonContent,
           "DELETE /lessons": deleteLesson,
           "GET /lessons": listLessons,
-          "PUT /lessons/questions": saveLessonQuestions,
           "GET /lessons/content": getLessonContent,
           "POST /attempts": submitAttempt,
           "GET /progress": getProgress,

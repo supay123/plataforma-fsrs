@@ -106,7 +106,7 @@ function GradeCard() {
     <div className="mt-4"><Bar value={totalScore} /></div>
     {best && weakest && best !== weakest && <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-(--c-line) pt-3 text-sm">
       <div className="min-w-0"><dt className="text-xs text-faint">Más fuerte</dt><dd className="flex justify-between gap-2 text-muted"><span className="truncate">{best.name}</span><span className="text-on-blocks tabular-nums">{gradeOf(best.percentage!)}</span></dd></div>
-      <div className="min-w-0"><dt className="text-xs text-faint">Por reforzar</dt><dd className="flex justify-between gap-2 text-muted"><span className="truncate">{weakest.name}</span><span className="text-on-blocks tabular-nums">{gradeOf(weakest.percentage!)}</span></dd></div>
+      <div className="min-w-0"><dt className="text-xs text-faint">Por repasar</dt><dd className="flex justify-between gap-2 text-muted"><span className="truncate">{weakest.name}</span><span className="text-on-blocks tabular-nums">{gradeOf(weakest.percentage!)}</span></dd></div>
     </dl>}
   </Card>;
 }

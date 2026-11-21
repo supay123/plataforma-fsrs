@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { PortalLayout } from "../components/layout/PortalLayout";
-import { PageSkeleton } from "../components/ui/skeleton";
+import { BaseBackground } from "../components/ui/base-background";
 import { LoginPage } from "../features/auth/LoginPage";
 import { HomePage, NotFoundPage } from "../pages/HomePage";
 import { RoleGuard } from "./guards";
@@ -15,7 +15,10 @@ const TermsPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({
 const PrivacyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const RefundPolicyPage = lazy(() => import("../pages/public/LegalPages").then((m) => ({ default: m.RefundPolicyPage })));
 const ComplaintsBookPage = lazy(() => import("../pages/public/ComplaintsBookPage").then((m) => ({ default: m.ComplaintsBookPage })));
+const VersionPage = lazy(() => import("../pages/public/VersionPage").then((m) => ({ default: m.VersionPage })));
 const AdminRoutePage = lazy(() => import("../pages/admin/RoutePage").then((m) => ({ default: m.RoutePage })));
+const AdminRouteLessonsPage = lazy(() => import("../pages/admin/RoutePage").then((m) => ({ default: m.RouteLessonsPage })));
+const AdminRouteLessonJsonPage = lazy(() => import("../pages/admin/RoutePage").then((m) => ({ default: m.RouteLessonJsonPage })));
 const AdminCoursesPage = lazy(() => import("../pages/admin/CoursesPage").then((m) => ({ default: m.CoursesPage })));
 const CollegesPage = lazy(() => import("../pages/admin/CollegesPage").then((m) => ({ default: m.CollegesPage })));
 const AssignmentsPage = lazy(() => import("../pages/admin/AssignmentsPage").then((m) => ({ default: m.AssignmentsPage })));
@@ -27,10 +30,13 @@ const RankingPage = lazy(() => import("../pages/shared/RankingPage").then((m) =>
 const SecurityPage = lazy(() => import("../pages/shared/SecurityPage").then((m) => ({ default: m.SecurityPage })));
 const StudentCoursePage = lazy(() => import("../pages/student/CoursePage").then((m) => ({ default: m.StudentCoursePage })));
 const StudentAchievementsPage = lazy(() => import("../pages/student/AchievementsPage").then((m) => ({ default: m.StudentAchievementsPage })));
+const StudentReviewTopicsPage = lazy(() => import("../pages/student/ReviewTopicsPage").then((m) => ({ default: m.StudentReviewTopicsPage })));
 const StudentDashboardPage = lazy(() => import("../pages/student/DashboardPage").then((m) => ({ default: m.StudentDashboardPage })));
 const RenewPage = lazy(() => import("../pages/student/RenewPage").then((m) => ({ default: m.RenewPage })));
 const SessionPage = lazy(() => import("../pages/student/SessionPage").then((m) => ({ default: m.SessionPage })));
 const TeacherRoutePage = lazy(() => import("../pages/teacher/RoutePage").then((m) => ({ default: m.RoutePage })));
+const TeacherRouteLessonsPage = lazy(() => import("../pages/teacher/RoutePage").then((m) => ({ default: m.RouteLessonsPage })));
+const TeacherRouteLessonJsonPage = lazy(() => import("../pages/teacher/RoutePage").then((m) => ({ default: m.RouteLessonJsonPage })));
 const StudentRoutePage = lazy(() => import("../pages/student/RoutePage").then((m) => ({ default: m.RoutePage })));
 const StudentRouteLessonPage = lazy(() => import("../pages/student/RouteLessonPage").then((m) => ({ default: m.RouteLessonPage })));
 const CoursesPage = lazy(() => import("../pages/teacher/CoursesPage").then((m) => ({ default: m.CoursesPage })));
@@ -40,7 +46,7 @@ const StudentsPage = lazy(() => import("../pages/teacher/StudentsPage").then((m)
 const TopicsPage = lazy(() => import("../pages/teacher/TopicsPage").then((m) => ({ default: m.TopicsPage })));
 
 export function AppRouter() {
-  return <Suspense fallback={<div className="mx-auto max-w-6xl p-8"><PageSkeleton /></div>}><Routes>
+  return <Suspense fallback={<BaseBackground />}><Routes>
     <Route path="/" element={<HomePage />} />
     {ChanconStylePage && <Route path="/textura/chancon" element={<ChanconStylePage />} />}
     <Route path="/gratis" element={<FreeModePage />} />
@@ -48,6 +54,7 @@ export function AppRouter() {
     <Route path="/privacidad" element={<PrivacyPage />} />
     <Route path="/reembolsos" element={<RefundPolicyPage />} />
     <Route path="/libro-reclamaciones" element={<ComplaintsBookPage />} />
+    <Route path="/version" element={<VersionPage />} />
     <Route path="/admin/login" element={<LoginPage role="admin" />} />
     <Route path="/profesor/login" element={<LoginPage role="teacher" />} />
     <Route path="/estudiante/login" element={<LoginPage role="student" />} />
@@ -56,13 +63,13 @@ export function AppRouter() {
     <Route path="/estudiante/invitacion" element={<InvitationPage />} />
     <Route path="/estudiante/renovar" element={<RoleGuard role="student" allowExpired><RenewPage /></RoleGuard>} />
     <Route path="/admin" element={<RoleGuard role="admin"><PortalLayout role="admin" /></RoleGuard>}>
-      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="cursos" element={<AdminCoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="ruta" element={<AdminRoutePage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
+      <Route index element={<Navigate to="usuarios" replace />} /><Route path="usuarios" element={<UsersPage />} /><Route path="usuarios/:userId" element={<UserAccountPage />} /><Route path="cursos" element={<AdminCoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="colegios" element={<CollegesPage />} /><Route path="asignaciones" element={<AssignmentsPage />} /><Route path="ruta" element={<AdminRoutePage />} /><Route path="ruta/temas/:topicId" element={<AdminRouteLessonsPage />} /><Route path="ruta/lecciones/:lessonId/json" element={<AdminRouteLessonJsonPage />} /><Route path="profesores/:teacherId" element={<TeacherDetailPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="/profesor" element={<RoleGuard role="teacher"><PortalLayout role="teacher" /></RoleGuard>}>
-      <Route index element={<Navigate to="cursos" replace />} /><Route path="ranking" element={<RankingPage role="teacher" />} /><Route path="cursos" element={<CoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="estudiantes" element={<StudentsPage />} /><Route path="ruta" element={<TeacherRoutePage />} /><Route path="estudiantes/:studentId/resultados" element={<StudentResultsPage />} /><Route path="sesiones/:sessionId" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
+      <Route index element={<Navigate to="cursos" replace />} /><Route path="ranking" element={<RankingPage role="teacher" />} /><Route path="cursos" element={<CoursesPage />} /><Route path="cursos/:courseId" element={<TopicsPage />} /><Route path="temas/:topicId/importar" element={<ImportPage />} /><Route path="estudiantes" element={<StudentsPage />} /><Route path="ruta" element={<TeacherRoutePage />} /><Route path="ruta/temas/:topicId" element={<TeacherRouteLessonsPage />} /><Route path="ruta/lecciones/:lessonId/json" element={<TeacherRouteLessonJsonPage />} /><Route path="estudiantes/:studentId/resultados" element={<StudentResultsPage />} /><Route path="sesiones/:sessionId" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="/estudiante" element={<RoleGuard role="student"><PortalLayout role="student" /></RoleGuard>}>
-      <Route index element={<StudentDashboardPage />} /><Route path="ranking" element={<RankingPage role="student" />} /><Route path="logros" element={<StudentAchievementsPage />} /><Route path="cursos/:courseId" element={<StudentCoursePage />} /><Route path="ruta" element={<StudentRoutePage />} /><Route path="ruta/lecciones/:lessonId" element={<StudentRouteLessonPage />} /><Route path="temas/:topicId/sesion" element={<SessionPage />} /><Route path="sesiones/:sessionId/revision" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
+      <Route index element={<StudentDashboardPage />} /><Route path="ranking" element={<RankingPage role="student" />} /><Route path="logros" element={<StudentAchievementsPage />} /><Route path="repasar" element={<StudentReviewTopicsPage />} /><Route path="cursos/:courseId" element={<StudentCoursePage />} /><Route path="ruta" element={<StudentRoutePage />} /><Route path="ruta/lecciones/:lessonId" element={<StudentRouteLessonPage />} /><Route path="temas/:topicId/sesion" element={<SessionPage />} /><Route path="sesiones/:sessionId/revision" element={<ReviewPage />} /><Route path="configuracion" element={<SecurityPage />} />
     </Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes></Suspense>;

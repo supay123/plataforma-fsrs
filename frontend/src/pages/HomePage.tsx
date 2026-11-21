@@ -1,11 +1,12 @@
 import clsx from "clsx";
 import { ArrowRight, BookOpen, ChevronDown, ClipboardCheck, Crosshair, Gauge, LogIn, Pause, Play, RotateCcw, RotateCw, Target, Volume2, Zap, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "../components/layout/Logo";
 import { PublicFooter } from "../components/layout/PublicLayout";
 import { BUSINESS, PLAN, formatSoles } from "../config/business";
 import { useAuth } from "../features/auth/AuthProvider";
+import { FreeModeSelector } from "../features/free-mode/FreeModeSelector";
 import { PlanCards } from "../features/payments/PlanCards";
 // El video intenta empezar con sonido; si el navegador lo bloquea, sigue en
 // silencio y "Toca para escuchar" lo reinicia desde 0 con sonido.
@@ -31,7 +32,6 @@ const steps: Array<{ icon: LucideIcon; title: string; text: string }> = [
 const faqs = [
   { question: `¿${BUSINESS.brand} reemplaza a mi academia?`, answer: "No. La teoría la aprendes en tu academia o en tus libros. Aquí compruebas con preguntas si de verdad la dominas y entrenas justo en lo que te falta." },
   { question: "¿Cuánto tiempo al día necesito?", answer: "Con unos 15 minutos al día es suficiente: es lo que toma una sesión de estudio de 20 preguntas. La haces cuando quieras; lo importante es practicar seguido para que tus repasos lleguen a tiempo." },
-  { question: "¿Funciona en el celular? ¿Tengo que instalar algo?", answer: `No necesitas instalar nada. ${BUSINESS.brand} funciona desde el navegador de tu celular, tablet o computadora. Solo necesitas conexión a internet.` },
   { question: "¿Qué es el repaso espaciado?", answer: `Es un método que te vuelve a mostrar cada pregunta justo cuando estás por olvidarla. ${BUSINESS.brand} usa un algoritmo de repetición espaciada para programar tus repasos y te insiste más en las preguntas que fallas, hasta que domines el tema.` },
   { question: "¿Se renueva automáticamente?", answer: "No. No hay débitos ni renovaciones automáticas, así que no necesitas cancelar nada: solo pagas cuando decides seguir." },
   { question: "Soy menor de edad, ¿puedo registrarme?", answer: "Sí, pero la cuenta debe crearla y el plan pagarlo tu padre, madre o apoderado." },
@@ -42,17 +42,17 @@ const faqs = [
 function FaqItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  return <div className={clsx("rounded-2xl border bg-slate-50 shadow-sm transition", open ? "border-emerald-300 shadow-md" : "border-slate-200")}>
+  return <div className={clsx("rounded-2xl border bg-slate-950/60 shadow-sm transition", open ? "border-emerald-400/60 shadow-md shadow-black/30" : "border-white/10")}>
     <h3>
       <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}
-        className={clsx("flex w-full items-center justify-between gap-4 p-5 text-left font-semibold transition", open && "text-emerald-700")}>
+        className={clsx("flex w-full items-center justify-between gap-4 p-5 text-left font-semibold transition", open && "text-emerald-300")}>
         {question}
-        <ChevronDown size={20} aria-hidden className={clsx("shrink-0 text-emerald-600 transition-transform duration-300", open && "rotate-180")} />
+        <ChevronDown size={20} aria-hidden className={clsx("shrink-0 text-emerald-400 transition-transform duration-300", open && "rotate-180")} />
       </button>
     </h3>
     {/* La fila pasa de 0fr a 1fr para animar la altura sin medirla. */}
     <div id={id} role="region" className={clsx("grid transition-all duration-300 ease-out motion-reduce:transition-none", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
-      <div className="overflow-hidden" inert={!open}><p className="px-5 pb-5 text-sm leading-6 text-slate-600">{answer}</p></div>
+      <div className="overflow-hidden" inert={!open}><p className="px-5 pb-5 text-sm leading-6 text-slate-300">{answer}</p></div>
     </div>
   </div>;
 }
@@ -112,8 +112,6 @@ function Header() {
         <Link to="/estudiante/login" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold transition hover:border-emerald-400 hover:bg-slate-900">
           <LogIn size={16} aria-hidden className="hidden sm:block" />Iniciar sesión
         </Link>
-        <FreeButton />
-        {/* En celular el header solo tiene sitio para dos botones; "Empieza ahora" sigue en el cuerpo. */}
         <StartButton compact className="hidden sm:inline-flex" />
       </nav>
     </div>
@@ -246,15 +244,19 @@ function StartButton({ compact = false, className }: { compact?: boolean; classN
   </button>;
 }
 
-/** Lleva a la prueba gratuita de 10 preguntas. */
+/** Baja al slide de la prueba gratuita de 10 preguntas. */
 function FreeButton() {
-  return <Link to="/gratis" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/60 px-4 text-sm font-semibold text-emerald-300 transition duration-300 hover:border-emerald-300 hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 sm:px-5">
-    Comenzar gratis
-  </Link>;
+  return <button type="button" onClick={() => scrollToSection("gratis")} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/60 px-4 text-sm font-semibold text-emerald-300 transition duration-300 hover:border-emerald-300 hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 sm:px-5">
+    Probar gratis
+  </button>;
 }
 
 export function HomePage() {
   const { profile, loading } = useAuth();
+  const navigate = useNavigate();
+  const { hash } = useLocation();
+  // Al volver a `/#gratis`, React Router no desplaza solo hasta la sección.
+  useEffect(() => { if (hash) document.getElementById(hash.slice(1))?.scrollIntoView(); }, [hash, loading]);
   // Se activa cada vez que termina el video para animar el botón principal.
   const [popStart, setPopStart] = useState(false);
   if (!loading && profile) return <Navigate to={profile.role === "teacher" ? "/profesor" : `/${profile.role === "student" ? "estudiante" : "admin"}`} replace />;
@@ -299,7 +301,7 @@ export function HomePage() {
       </div>
     </section>
 
-    {/* Las secciones alternan fondo oscuro, blanco, oscuro y claro para que se distinga dónde empieza cada una. */}
+    {/* Las secciones alternan fondo oscuro y claro para que se distinga dónde empieza cada una. */}
     <section id="pasos" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col justify-center overflow-hidden bg-slate-50 px-4 py-16 text-center text-slate-900">
       <Glow className="left-1/2 top-1/3 h-64 w-[36rem] -translate-x-1/2 bg-emerald-100/70" />
       <div className="relative mx-auto max-w-5xl">
@@ -336,9 +338,22 @@ export function HomePage() {
       <Reveal delay={150} className="relative"><PlanCards className="mt-10 w-full" /></Reveal>
     </section>
 
-    <section id="preguntas" className="scroll-mt-16 bg-slate-100 px-4 py-20 text-slate-900">
-      <Reveal className="mx-auto max-w-3xl">
-        <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Dudas</p>
+    <section id="gratis" className="relative flex min-h-[calc(100svh-4rem)] scroll-mt-16 flex-col items-center justify-center overflow-hidden bg-slate-50 px-4 py-16 text-center text-slate-900">
+      <Glow className="left-1/2 top-1/3 h-64 w-[36rem] -translate-x-1/2 bg-emerald-100/70" />
+      <Reveal className="relative mx-auto w-full max-w-md">
+        <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Modo gratuito</p>
+        <h2 className="mt-3 type-heading text-3xl sm:text-4xl">Prueba {BUSINESS.brand} sin pagar</h2>
+        <p className="mt-3 text-slate-600">Elige tu grupo, curso y tema y resuelve 10 preguntas con corrección al instante.</p>
+        <div className="mt-8"><FreeModeSelector light onStart={(topicId) => navigate(`/gratis?tema=${encodeURIComponent(topicId)}`)} /></div>
+      </Reveal>
+    </section>
+
+    <section id="preguntas" className="relative scroll-mt-16 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-20 text-white">
+      <div aria-hidden className="bg-grid absolute inset-0" />
+      <Glow className="-left-40 top-10 h-96 w-96 bg-emerald-500/10" />
+      <Glow className="-right-40 bottom-10 h-96 w-96 bg-slate-400/10 [animation-delay:-3s]" />
+      <Reveal className="relative mx-auto max-w-3xl">
+        <p className="text-center text-sm font-bold uppercase tracking-[0.2em] text-emerald-300">Dudas</p>
         <h2 className="mt-3 text-center type-heading text-3xl">Preguntas frecuentes</h2>
         <div className="mt-8 grid gap-3">{faqs.map((faq) => <FaqItem key={faq.question} {...faq} />)}</div>
       </Reveal>

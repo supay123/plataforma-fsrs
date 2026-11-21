@@ -168,6 +168,9 @@ No restilizar pantallas sueltas a medias: se migra por pantalla completa.
   conozca el lenguaje. No comentar lo que el código ya dice, ni línea por línea, ni
   repetir el nombre de lo que viene debajo.
 - Un comentario que se vuelve falso al cambiar el código se corrige o se borra en el mismo cambio.
+- **Quitar un comportamiento es borrar el código que lo produce**, no añadir código nuevo que
+  lo contrarreste o lo tape (clases que anulan a otras, estados que desactivan lo anterior).
+  Si algo ya no hace falta, se elimina de raíz junto con su comentario.
 
 ## Documentación
 

@@ -1,7 +1,10 @@
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
 import { RPCS } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
-import { createInvitation } from "../_shared/invitations.ts";
+import {
+  createInvitation,
+  releasePendingRegistration,
+} from "../_shared/invitations.ts";
 import { parseEmail } from "../_shared/registration.ts";
 import type { EdgeContext } from "../_shared/types.ts";
 import {
@@ -40,6 +43,7 @@ export async function createInvitationHandler(
     );
   }
 
+  await releasePendingRegistration(context, email);
   const { data: inUse, error: inUseError } = await context.supabaseAdmin.rpc(
     RPCS.emailInUse,
     { p_email: email },

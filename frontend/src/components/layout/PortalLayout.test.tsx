@@ -90,13 +90,11 @@ describe("PortalLayout", () => {
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
   });
 
-  it("hides the bottom bar and offers leaving during a practice on mobile", () => {
+  it("hides the bottom bar and the mobile header during a practice", () => {
     renderPortal("/estudiante/temas/tema-1/sesion");
     expect(screen.queryByRole("navigation", { name: "Principal (móvil)" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Salir de la práctica" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("Perderás tu progreso.");
-    fireEvent.click(screen.getByRole("button", { name: "Salir y perder progreso" }));
-    expect(screen.getByText("Inicio")).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cerrar sesión" })).not.toBeInTheDocument();
   });
 
   it("reduces the menu during a practice without changing the saved preference", () => {

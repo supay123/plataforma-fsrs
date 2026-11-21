@@ -2,6 +2,7 @@ import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
 import {
   createPlanPayment,
+  deviceSessionId,
   paymentResponse,
   yapePhone,
   yapeToken,
@@ -56,6 +57,7 @@ export async function createPayment(
     email: registration.email,
     token,
     phone,
+    deviceSessionId: deviceSessionId(body.device_session_id),
   });
   return json(paymentResponse(payment), 201);
 }

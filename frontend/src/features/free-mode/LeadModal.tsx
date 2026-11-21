@@ -8,8 +8,8 @@ import { useToast } from "../../components/ui/use-toast";
 import { registerFreeModeLead } from "./api";
 import { leadSchema, type LeadValues } from "./lead-fields";
 
-/** Modal de registro del modo gratuito: nombres, apellidos, correo, WhatsApp y consentimiento. */
-export function LeadModal({ onCancel, onRegistered }: { onCancel: () => void; onRegistered: (givenNames: string) => void }) {
+/** Modal de registro del modo gratuito (obligatorio: no se cierra sin registrarse): nombres, apellidos, correo, WhatsApp y consentimiento. */
+export function LeadModal({ onRegistered }: { onRegistered: (givenNames: string) => void }) {
   const toast = useToast();
   const { register, handleSubmit, formState: { errors } } = useForm<LeadValues>({
     resolver: zodResolver(leadSchema),
@@ -21,8 +21,8 @@ export function LeadModal({ onCancel, onRegistered }: { onCancel: () => void; on
     onError: (error) => toast.error(error.message),
   });
 
-  return <ModalForm title="Identifícate para ver tu resultado completo" confirmLabel="Continuar" pendingLabel="Guardando…" pending={save.isPending} onCancel={onCancel} onSubmit={() => void handleSubmit((values) => save.mutate(values))()}>
-    <p className="text-sm text-slate-600 dark:text-slate-300">Déjanos tus datos y te mostramos los planes. Solo los usaremos para contactarte sobre nuestros planes.</p>
+  return <ModalForm title="Déjanos tus datos" confirmLabel="Continuar" pendingLabel="Guardando…" pending={save.isPending} dismissible={false} onSubmit={() => void handleSubmit((values) => save.mutate(values))()}>
+    <p className="text-sm text-slate-600 dark:text-slate-300">Te contactaremos por correo o WhatsApp con información de nuestros planes. Solo usaremos tus datos para eso y puedes retirar tu consentimiento cuando quieras.</p>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Nombres" error={errors.given_names?.message}><Input autoComplete="given-name" {...register("given_names")} /></Field>
       <Field label="Apellidos" error={errors.family_names?.message}><Input autoComplete="family-name" {...register("family_names")} /></Field>
@@ -34,9 +34,9 @@ export function LeadModal({ onCancel, onRegistered }: { onCancel: () => void; on
       <label>No llenar este campo<input type="text" tabIndex={-1} autoComplete="off" {...register("website")} /></label>
     </div>
     <div>
-      <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+      <label className="flex items-start gap-2 text-left text-sm text-slate-700 dark:text-slate-300">
         <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-emerald-500" {...register("accepted_data_policy")} />
-        <span>Autorizo a Chancón a tratar mis nombres, apellidos, correo y WhatsApp para contactarme por correo electrónico o WhatsApp y ofrecerme sus planes. Puedo retirar este consentimiento cuando quiera. Más información en la <Link to="/privacidad" target="_blank" className="font-semibold underline underline-offset-2">Política de privacidad</Link> (Ley N.° 29733).</span>
+        <span>Acepto recibir ofertas y promociones de Chancón. Ver <Link to="/privacidad" target="_blank" className="font-semibold underline underline-offset-2">Política de privacidad</Link>.</span>
       </label>
       {errors.accepted_data_policy && <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">{errors.accepted_data_policy.message}</p>}
     </div>

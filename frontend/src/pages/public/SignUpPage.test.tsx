@@ -7,6 +7,7 @@ import { ModalProvider } from "../../components/ui/modal";
 import { ToastProvider } from "../../components/ui/toast";
 import { AppError } from "../../lib/api/errors";
 import { SignUpPage } from "./SignUpPage";
+import { chooseSelectValue } from "../../components/ui/select-test-helpers";
 
 const mocks = vi.hoisted(() => ({
   listRegistrationTeachers: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock("../../features/payments/api", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../features/payments/api")>(),
   getPaymentConfig: () => Promise.resolve({ public_key: "TEST-public-key" }),
 }));
-vi.mock("../../features/payments/yape", () => ({ createYapeToken: mocks.createYapeToken }));
+vi.mock("../../features/payments/yape", () => ({ createYapeToken: mocks.createYapeToken, getDeviceSessionId: vi.fn().mockResolvedValue("device-1"), loadDeviceSessionScript: vi.fn() }));
 vi.mock("../../features/auth/AuthProvider", () => ({ useAuth: () => ({ login: mocks.login }) }));
 vi.mock("../../features/auth/save-credentials", () => ({ saveCredentials: mocks.saveCredentials }));
 
@@ -60,9 +61,8 @@ const PAID = { payment_id: "payment-1", plan: "mensual", amount: 14.9, status: "
 async function chooseGroup(user: ReturnType<typeof userEvent.setup>) {
   const group = screen.getByRole("combobox", { name: /Grupo/ });
   await waitFor(() => expect(group).toBeEnabled());
-  expect(group).toHaveValue("");
-  expect(screen.getByRole("option", { name: "Selecciona tu grupo" })).toBeInTheDocument();
-  await user.selectOptions(group, "teacher-1");
+  expect(group).toHaveTextContent("Selecciona tu grupo");
+  await chooseSelectValue(user, group, "teacher-1");
 }
 
 async function fillForm(user: ReturnType<typeof userEvent.setup>, overrides: { password?: string } = {}) {
@@ -146,7 +146,7 @@ describe("SignUpPage", () => {
     await user.type(screen.getByLabelText("Celular de Yape"), "111111111");
     await user.type(screen.getByLabelText(/^Código de aprobación/), "123456");
     await user.click(screen.getByRole("button", { name: /Pagar S\/ 14.90 con Yape/ }));
-    await waitFor(() => expect(mocks.createRegistrationPayment).toHaveBeenCalledWith("registration-1", "mensual", { token: "yape-token-1", phone: "111111111" }));
+    await waitFor(() => expect(mocks.createRegistrationPayment).toHaveBeenCalledWith("registration-1", "mensual", { token: "yape-token-1", phone: "111111111", device_session_id: "device-1" }));
     expect(mocks.createYapeToken).toHaveBeenCalledWith("TEST-public-key", "111111111", "123456");
   });
 

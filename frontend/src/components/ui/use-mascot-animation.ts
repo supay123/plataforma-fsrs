@@ -55,6 +55,21 @@ function addGazeMorphs(face: Mesh, { x, y }: MascotGaze): void {
   }
 }
 
+const SPEECH_BLEND_SPEED = 14;
+
+/** Apertura de la boca (0 a 1): dos senos desfasados dan un ritmo irregular, como sílabas. */
+export function syllableOpening(seconds: number): number {
+  return Math.abs(Math.sin(seconds * 9)) * (0.6 + 0.4 * Math.abs(Math.sin(seconds * 3.7)));
+}
+
+/** La boca solo tiene los morphs `surprised` ("o") y `smile`; hablar es abrir y cerrar la "o" sin pasar de media boca. */
+function addMouthMovement(face: Mesh, opening: number): void {
+  const index = face.morphTargetDictionary?.surprised;
+  const influences = face.morphTargetInfluences;
+  if (index === undefined || !influences) return;
+  influences[index] = MathUtils.clamp((influences[index] ?? 0) + opening * 0.55, 0, 1);
+}
+
 const FADE_IN_S = 0.15;
 const FADE_BACK_S = 0.25;
 
@@ -68,13 +83,15 @@ interface Options {
   reduced?: boolean;
   /** Se suma a lo que haga el clip, porque el clip reescribe los morphs en cada cuadro. */
   gaze?: MascotGaze | null;
+  /** Mueve la boca como si hablara; se suma a lo que haga el clip. */
+  speaking?: boolean;
 }
 
 /**
  * Reproduce el clip de cada evento con *crossfade*, vuelve al reposo cuando termina uno de una
  * sola vez y entra con `appear`. Se usa dentro de `<Canvas>`.
  */
-export function useMascotAnimation(root: Object3D, clips: AnimationClip[], { event, eventKey = 0, rest = "rest", reduced = false, gaze = null }: Options): void {
+export function useMascotAnimation(root: Object3D, clips: AnimationClip[], { event, eventKey = 0, rest = "rest", reduced = false, gaze = null, speaking = false }: Options): void {
   const mixer = useMemo(() => new AnimationMixer(root), [root]);
   const current = useRef<AnimationAction | null>(null);
   const started = useRef(false);
@@ -143,6 +160,11 @@ export function useMascotAnimation(root: Object3D, clips: AnimationClip[], { eve
     if (faceMesh.current) addGazeMorphs(faceMesh.current, currentGaze.current);
   }, []);
 
+  const speakingRef = useRef(speaking);
+  const speechAmount = useRef(0);
+  const speechClock = useRef(0);
+  useEffect(() => { speakingRef.current = speaking; }, [speaking]);
+
   useEffect(() => {
     if (!reduced) return;
     currentGaze.current = { ...(gaze ?? { x: 0, y: 0 }) };
@@ -159,5 +181,8 @@ export function useMascotAnimation(root: Object3D, clips: AnimationClip[], { eve
     currentGaze.current.x += (target.x - currentGaze.current.x) * blend;
     currentGaze.current.y += (target.y - currentGaze.current.y) * blend;
     addGaze();
+    speechAmount.current += ((speakingRef.current ? 1 : 0) - speechAmount.current) * (1 - Math.exp(-delta * SPEECH_BLEND_SPEED));
+    speechClock.current += delta;
+    if (faceMesh.current && speechAmount.current > 0.01) addMouthMovement(faceMesh.current, speechAmount.current * syllableOpening(speechClock.current));
   });
 }

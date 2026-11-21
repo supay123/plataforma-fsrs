@@ -27,4 +27,6 @@ export interface CreatePaymentBody {
   token?: unknown;
   /** Celular de Yape con el que se generó el token. */
   phone?: unknown;
+  /** Identificador de dispositivo de Mercado Pago (opcional, para el antifraude). */
+  device_session_id?: unknown;
 }

@@ -1,7 +1,12 @@
 import { requireProfile, writeAudit } from "../_shared/auth.ts";
+import { encryptAnswerKey } from "../_shared/answer-key.ts";
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
-import { parseRouteQuestions, routeLessonText } from "../_shared/route-mode.ts";
+import type { AnswerKeyEntry } from "../_shared/interfaces/session.interfaces.ts";
+import {
+  parseRouteLessonContent,
+  pickRandomQuestions,
+} from "../_shared/route-mode.ts";
 import type { EdgeContext } from "../_shared/types.ts";
 import { requiredString, uuid } from "../_shared/validation.ts";
 import {
@@ -12,8 +17,8 @@ import {
 } from "./access.ts";
 import type {
   CreateLessonBody,
-  SaveLessonQuestionsBody,
-  UpdateLessonBody,
+  RenameLessonBody,
+  ReplaceLessonContentBody,
 } from "./interfaces.ts";
 import { loadStudentRoute, requireUnlockedLesson } from "./student-route.ts";
 
@@ -21,7 +26,10 @@ function queryParam(request: Request, name: string): string {
   return uuid(new URL(request.url).searchParams.get(name), name);
 }
 
-/** POST /route-mode/lessons — paso 1: crea la lección con su título y texto. */
+/**
+ * POST /route-mode/lessons — crea una lección con su nombre al final del tema.
+ * Queda sin texto ni preguntas (`is_ready` false) hasta guardar su JSON.
+ */
 export async function createLesson(
   request: Request,
   context: EdgeContext,
@@ -34,7 +42,6 @@ export async function createLesson(
     uuid(body.topic_id, "topic_id"),
   );
   const title = requiredString(body.title, "title", 160);
-  const contentText = routeLessonText(body.content_text);
 
   const { data: last, error: lastError } = await context.supabaseAdmin
     .from(TABLES.routeLessons)
@@ -50,7 +57,7 @@ export async function createLesson(
     .insert({
       topic_id: topic.id,
       title,
-      content_text: contentText,
+      content_text: "",
       position: (last?.[0]?.position ?? 0) + 1,
       created_by: manager.id,
     })
@@ -69,8 +76,8 @@ export async function createLesson(
   return json({ lesson }, 201);
 }
 
-/** PUT /route-mode/lessons?id=... — edita título y texto de la lección. */
-export async function updateLesson(
+/** PUT /route-mode/lessons?id=... — cambia el nombre de la lección. */
+export async function renameLesson(
   request: Request,
   context: EdgeContext,
 ): Promise<Response> {
@@ -80,20 +87,13 @@ export async function updateLesson(
     manager,
     queryParam(request, "id"),
   );
-  const body = await readJson<UpdateLessonBody>(request);
-  const changes: { title?: string; content_text?: string } = {};
-  if (body.title !== undefined) {
-    changes.title = requiredString(body.title, "title", 160);
-  }
-  if (body.content_text !== undefined) {
-    changes.content_text = routeLessonText(body.content_text);
-  }
-  if (Object.keys(changes).length === 0) {
-    throw new AppError(400, "validation_error", "Nothing to update.");
-  }
+  const body = await readJson<RenameLessonBody>(request);
   const { data, error } = await context.supabaseAdmin
     .from(TABLES.routeLessons)
-    .update({ ...changes, updated_at: new Date().toISOString() })
+    .update({
+      title: requiredString(body.title, "title", 160),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", lesson.id)
     .select("id,topic_id,position,title,is_ready")
     .single();
@@ -104,6 +104,76 @@ export async function updateLesson(
     context,
     manager,
     "route_lesson.update",
+    "route_lesson",
+    lesson.id,
+  );
+  return json({ lesson: data });
+}
+
+/**
+ * PUT /route-mode/lessons/content?id=... — guarda el JSON de la lección: texto,
+ * banco de preguntas y cuántas se muestran. Las preguntas se actualizan por
+ * posición (conservando sus ids, así el xp ya otorgado no se repite) y las que
+ * sobran al final se eliminan. Deja la lección lista para los estudiantes.
+ */
+export async function replaceLessonContent(
+  request: Request,
+  context: EdgeContext,
+): Promise<Response> {
+  const manager = await requireRouteManager(context);
+  const { lesson } = await authorizedRouteLesson(
+    context,
+    manager,
+    queryParam(request, "id"),
+  );
+  const body = await readJson<ReplaceLessonContentBody>(request);
+  const content = parseRouteLessonContent(body.lesson);
+
+  const { error: questionsError } = await context.supabaseAdmin
+    .from(TABLES.routeQuestions)
+    .upsert(
+      content.questions.map((question, index) => ({
+        ...question,
+        lesson_id: lesson.id,
+        position: index + 1,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: "lesson_id,position" },
+    );
+  if (questionsError) {
+    throw new AppError(
+      400,
+      "route_questions_save_failed",
+      questionsError.message,
+    );
+  }
+  const { error: trimError } = await context.supabaseAdmin
+    .from(TABLES.routeQuestions)
+    .delete()
+    .eq("lesson_id", lesson.id)
+    .gt("position", content.questions.length);
+  if (trimError) {
+    throw new AppError(400, "route_questions_save_failed", trimError.message);
+  }
+
+  const { data, error } = await context.supabaseAdmin
+    .from(TABLES.routeLessons)
+    .update({
+      content_text: content.content_text,
+      questions_to_show: content.questions_to_show,
+      is_ready: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", lesson.id)
+    .select("id,topic_id,position,title,is_ready")
+    .single();
+  if (error) {
+    throw new AppError(400, "route_lesson_update_failed", error.message);
+  }
+  await writeAudit(
+    context,
+    manager,
+    "route_lesson.content",
     "route_lesson",
     lesson.id,
   );
@@ -136,56 +206,6 @@ export async function deleteLesson(
     lesson.id,
   );
   return json({ deleted: true });
-}
-
-/**
- * PUT /route-mode/lessons/questions?id=... — paso 2: guarda exactamente las 5
- * preguntas. Reemplaza las anteriores por posición (conservando sus ids, así
- * el xp ya otorgado por una pregunta no se repite) y deja la lección lista.
- */
-export async function saveLessonQuestions(
-  request: Request,
-  context: EdgeContext,
-): Promise<Response> {
-  const manager = await requireRouteManager(context);
-  const { lesson } = await authorizedRouteLesson(
-    context,
-    manager,
-    queryParam(request, "id"),
-  );
-  const body = await readJson<SaveLessonQuestionsBody>(request);
-  const questions = parseRouteQuestions(body.questions);
-
-  const { error } = await context.supabaseAdmin
-    .from(TABLES.routeQuestions)
-    .upsert(
-      questions.map((question, index) => ({
-        ...question,
-        lesson_id: lesson.id,
-        position: index + 1,
-        updated_at: new Date().toISOString(),
-      })),
-      { onConflict: "lesson_id,position" },
-    );
-  if (error) {
-    throw new AppError(400, "route_questions_save_failed", error.message);
-  }
-
-  const { error: readyError } = await context.supabaseAdmin
-    .from(TABLES.routeLessons)
-    .update({ is_ready: true, updated_at: new Date().toISOString() })
-    .eq("id", lesson.id);
-  if (readyError) {
-    throw new AppError(400, "route_lesson_update_failed", readyError.message);
-  }
-  await writeAudit(
-    context,
-    manager,
-    "route_lesson.questions",
-    "route_lesson",
-    lesson.id,
-  );
-  return json({ saved: true, lesson_id: lesson.id, is_ready: true });
 }
 
 /**
@@ -224,14 +244,18 @@ export async function listLessons(
   if (error) {
     throw new AppError(500, "route_lesson_lookup_failed", error.message);
   }
-  return json({ lessons: data ?? [] });
+  return json({
+    topic: { id: topic.id, name: topic.name, position: topic.position },
+    lessons: data ?? [],
+  });
 }
 
 /**
  * GET /route-mode/lessons/content?id=...
  * Texto y preguntas de una lección. El estudiante la recibe solo si está
- * desbloqueada y sin la opción correcta ni la explicación; el profesor y el
- * administrador reciben todo para editarla.
+ * desbloqueada, con `questions_to_show` preguntas sorteadas del banco y con la
+ * opción correcta y la explicación solo dentro de la clave cifrada
+ * `answer_key`; el profesor y el administrador reciben todo el banco.
  */
 export async function getLessonContent(
   request: Request,
@@ -252,7 +276,9 @@ export async function getLessonContent(
 
   const { data: lesson, error } = await context.supabaseAdmin
     .from(TABLES.routeLessons)
-    .select("id,topic_id,position,title,content_text,is_ready")
+    .select(
+      "id,topic_id,position,title,content_text,is_ready,questions_to_show",
+    )
     .eq("id", lessonId)
     .single();
   if (error) {
@@ -274,13 +300,23 @@ export async function getLessonContent(
     );
   }
 
+  if (profile.role !== "student") return json({ lesson, questions });
+
+  // Igual que en la práctica: las respuestas viajan cifradas para corregir al
+  // instante; la nota real la recalcula el servidor al enviar el intento.
+  const answerKey: Record<string, AnswerKeyEntry> = {};
+  const picked = pickRandomQuestions(questions ?? [], lesson.questions_to_show);
+  const visibleQuestions = picked.map((question) => {
+    const { correct_option, explanation, ...visible } = question;
+    answerKey[question.id] = {
+      correct_option: correct_option.trim(),
+      explanation,
+    };
+    return visible;
+  });
   return json({
     lesson,
-    questions: (questions ?? []).map((question) => {
-      if (profile.role !== "student") return question;
-      const { correct_option: _hidden, explanation: _explanation, ...visible } =
-        question;
-      return visible;
-    }),
+    questions: visibleQuestions,
+    answer_key: await encryptAnswerKey(answerKey),
   });
 }

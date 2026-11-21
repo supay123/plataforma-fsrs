@@ -20,6 +20,7 @@ const translatedMessages: Record<string, string> = {
   validation_error: "Revisa los datos ingresados.",
   weak_password: "La contraseña no cumple los requisitos.",
   email_taken: "Este correo ya tiene una cuenta. Inicia sesión o usa otro correo.",
+  invitation_exists: "Ya existe una invitación con este correo. Cancélala o reenvíala desde las invitaciones pendientes.",
   registration_conflict: "Ya hay un registro en curso con este correo. Inténtalo de nuevo en unos segundos.",
   invalid_college: "Selecciona una institución de la lista.",
   invalid_teacher: "Selecciona un grupo de la lista.",

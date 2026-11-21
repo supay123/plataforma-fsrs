@@ -128,15 +128,18 @@ describe("SessionPage", () => {
 
     await user.click(screen.getByRole("button", { name: /AOpción A 1/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(screen.getAllByText("¡Correcto!")).not.toHaveLength(0);
-    expect(screen.getByText("Porque A es la correcta.")).toBeInTheDocument();
+    expect(screen.getAllByText("Respuesta correcta")).not.toHaveLength(0);
+    expect(screen.queryByText("Porque A es la correcta.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "¿Por qué?" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Porque A es la correcta.");
+    await user.click(screen.getByRole("button", { name: "Entendido" }));
     expect(screen.getByRole("button", { name: /AOpción A 1/ })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByText("Pregunta 2 de 3")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /BOpción B 2/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(screen.getAllByText("Incorrecto. La respuesta correcta es la A.")).not.toHaveLength(0);
+    expect(screen.getAllByText("Mal. La respuesta era la A")).not.toHaveLength(0);
     expect(screen.getByText("Tu respuesta")).toBeInTheDocument();
     expect(screen.getByText("Respuesta correcta")).toBeInTheDocument();
 
@@ -177,7 +180,7 @@ describe("SessionPage", () => {
     await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
     expect(screen.queryByText("+75 xp")).not.toBeInTheDocument();
-    expect(screen.getAllByText("¡Correcto!")).not.toHaveLength(0);
+    expect(screen.getAllByText("Respuesta correcta")).not.toHaveLength(0);
   });
 
   it("shows the xp result after finishing and then goes to the review", async () => {
@@ -214,19 +217,11 @@ describe("SessionPage", () => {
     await user.click(await screen.findByRole("button", { name: /AOpción A 1/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
     await user.click(screen.getByRole("button", { name: "Finalizar examen" }));
-    expect(await screen.findByText("Postulante 2")).toBeInTheDocument();
+    expect(await screen.findByText("Postulante II")).toBeInTheDocument();
     expect(mocks.calculateMedal).toHaveBeenCalledWith("session-1");
     expect(screen.getByText(/Ganaste 3 estrellas/)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "3 de 3 estrellas" })).toBeInTheDocument();
   }, 15000);
-
-  it("explains the star rule on the loading screen only when medals are enabled", async () => {
-    mocks.getMyMedal.mockResolvedValue({ enabled: true, stars: 0, medal: {}, next_medal: null, stars_to_next: null });
-    mocks.decryptAnswerKey.mockReturnValue(new Promise(() => undefined));
-    renderPage();
-    expect(await screen.findByText("Estrellas por tema")).toBeInTheDocument();
-    expect(screen.getByText(/solo ganas \+1 estrella con un resultado de \+3/)).toBeInTheDocument();
-  });
 
   it("resumes on the first pending question and only submits pending ones", async () => {
     const user = userEvent.setup();

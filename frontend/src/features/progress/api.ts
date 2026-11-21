@@ -5,8 +5,4 @@ export async function sessionResults(studentId?: string) { let query = supabase.
 export async function teacherStudents() { const { data, error } = await supabase.from("v_teacher_students").select("*").order("student_name"); if (error) throw error; return data; }
 export async function topicAccess(courseId?: string) { let query = supabase.from("v_student_topic_access_status").select("*"); if (courseId) query = query.eq("course_id", courseId); const { data, error } = await query; if (error) throw error; return data; }
 export async function setTopicAccess(value: { student_id: string; topic_id: string; is_blocked: boolean; updated_by: string }) { const { data, error } = await supabase.from("student_topic_access").upsert(value, { onConflict: "student_id,topic_id" }).select().single(); if (error) throw error; return data; }
-export async function countDueReviews(): Promise<number> {
-  const { count, error } = await supabase.from("student_question_cards").select("id", { count: "exact", head: true }).lte("due_at", new Date().toISOString());
-  if (error) throw error;
-  return count ?? 0;
-}
+export async function topicDueReviews() { const { data, error } = await supabase.from("v_student_topic_due_reviews").select("*"); if (error) throw error; return data; }

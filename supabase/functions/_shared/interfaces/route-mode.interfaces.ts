@@ -42,6 +42,12 @@ export interface RouteQuestionInput {
   explanation: string | null;
 }
 
+export interface RouteLessonContent {
+  content_text: string;
+  questions_to_show: number;
+  questions: RouteQuestionInput[];
+}
+
 export interface RouteAnswerInput {
   question_id: string;
   selected_option: "A" | "B" | "C" | "D";

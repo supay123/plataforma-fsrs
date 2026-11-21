@@ -26,8 +26,8 @@ export function getPaymentConfig() {
   return invokeFunction<{ public_key: string }, Record<string, never>>("public/payment-config", {}, { method: "GET" });
 }
 
-/** Token de Yape (de un solo uso) y el celular con el que se generó. */
-export interface YapePayment { token: string; phone: string }
+/** Token de Yape (de un solo uso), el celular con el que se generó y el identificador del dispositivo (antifraude), si se obtuvo. */
+export interface YapePayment { token: string; phone: string; device_session_id?: string }
 
 /** POST /account/payment: cobra con Yape la renovación del plan. */
 export function createRenewalPayment(plan: PlanId, yape: YapePayment) {

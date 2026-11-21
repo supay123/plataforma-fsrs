@@ -16,7 +16,7 @@ import { loadStudentRoute, requireUnlockedLesson } from "./student-route.ts";
  * POST /route-mode/attempts
  * Califica un intento con la clave de la base de datos, lo guarda, otorga el
  * xp de las preguntas bien respondidas por primera vez y devuelve el
- * resultado con la corrección. Una lección bloqueada responde 403.
+ * resultado. Una lección bloqueada responde 403.
  */
 export async function submitAttempt(
   request: Request,
@@ -28,16 +28,27 @@ export async function submitAttempt(
   const answers = parseRouteAnswers(body.answers);
   await requireUnlockedLesson(context, student, lessonId);
 
+  const { data: lesson, error: lessonError } = await context.supabaseAdmin
+    .from(TABLES.routeLessons)
+    .select("questions_to_show")
+    .eq("id", lessonId)
+    .single();
+  if (lessonError) {
+    throw new AppError(500, "route_lesson_lookup_failed", lessonError.message);
+  }
   const { data: questions, error } = await context.supabaseAdmin
     .from(TABLES.routeQuestions)
-    .select("id,position,correct_option,explanation")
-    .eq("lesson_id", lessonId)
-    .order("position");
+    .select("id,correct_option")
+    .eq("lesson_id", lessonId);
   if (error) {
     throw new AppError(500, "route_question_lookup_failed", error.message);
   }
 
-  const grading = gradeRouteAttempt(questions ?? [], answers);
+  const grading = gradeRouteAttempt(
+    questions ?? [],
+    answers,
+    lesson.questions_to_show,
+  );
   const { data: result, error: recordError } = await context.supabaseAdmin.rpc(
     RPCS.recordRouteAttempt,
     {
@@ -68,21 +79,11 @@ export async function submitAttempt(
     }));
   }
 
-  const selectedById = new Map(
-    answers.map((answer) => [answer.question_id, answer.selected_option]),
-  );
   const unlocked = await nextLessonId(context, student, lessonId);
   return json({
     ...(result as Record<string, Json>),
     pass_percent: ROUTE_PASS_PERCENT,
     next_lesson_id: grading.passed ? unlocked : null,
-    review: (questions ?? []).map((question) => ({
-      question_id: question.id,
-      selected_option: selectedById.get(question.id),
-      correct_option: question.correct_option.trim(),
-      is_correct: grading.correct_question_ids.includes(question.id),
-      explanation: question.explanation,
-    })),
   });
 }
 

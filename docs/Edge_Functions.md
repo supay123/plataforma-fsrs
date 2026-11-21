@@ -54,7 +54,7 @@ pnpm exec supabase gen types --local --schema public \
 | `questions` | Admin, teacher | Lists a topic's current questions (`GET /questions?topic_id=...`), archives one (`DELETE /questions?id=...`) or all of them (`DELETE /questions/topic?topic_id=...`). Archived questions no longer appear in new sessions but their historical results are kept. A teacher is restricted to their own courses. |
 | `practice-session` | Student | `POST /start` atomically resumes the student's in-progress session for a topic or creates one with up to 20 due-first/new questions, and returns them with an AES-GCM encrypted answer key so the browser corrects instantly. `POST /submit` saves every pending answer at once, applies FSRS (`Again`/`Good`) with the answer key from the database, and closes the session, awarding the xp earned. `GET /xp-rules` returns the college xp amounts and the student level. Repeated submission is safe. |
 | `medals` | Admin, teacher and student (see routes) | Medals and stars. `GET /settings` returns the college medal configuration (admin passes `?college_id=`; teacher and student get their own college; defaults when there is no row). `PUT /settings` (admin) updates or creates it. `GET /me` returns the student current medal and stars. `GET /topic-stars` returns the student best stars per topic. `POST /calculate` applies the stars of a completed session (grade computed on the server from the stored session; idempotent). Settings and student medal rows are created by database triggers, so there are no create endpoints. |
-| `route-mode` | Admin, teacher, student | Route mode (topics with lessons unlocked in order with >= 80% score). Management by admin or the owning teacher: `POST /route-mode/topics` (`name`, `description?`, `teacher_id` required only for admin), `PUT /route-mode/topics?id=` , `DELETE /route-mode/topics?id=`, `POST /route-mode/lessons` (step 1: `topic_id`, `title`, `content_text`), `PUT /route-mode/lessons?id=`, `DELETE /route-mode/lessons?id=`, `PUT /route-mode/lessons/questions?id=` (step 2: exactly 5 `questions` with `statement`, `option_a`-`option_d`, `correct_option`, optional `explanation`; upserts by position and marks the lesson ready). Reads, each role sees its own: `GET /route-mode/topics[?teacher_id=]` and `GET /route-mode/lessons?topic_id=` (students get only ready lessons with `status` `locked`/`available`/`completed` and `best_percent`) and `GET /route-mode/lessons/content?id=` (text and questions; students get it only if the lesson is unlocked and never receive `correct_option` or `explanation`; `403 lesson_locked` otherwise). Student: `GET /route-mode/progress` (topics, lessons and unlocks) and `POST /route-mode/attempts` (`lesson_id`, `answers` of `question_id` + `selected_option`): the backend grades with the database key, stores the attempt, awards xp only for questions answered correctly for the first time (`route_question_xp_awards`, `xp_per_correct` of the college, no streak bonus, no medal stars) and answers with `correct_count`, `score_percent`, `passed`, `xp`, `next_lesson_id` and the `review`; `403 lesson_locked` if the previous lesson is not passed. Route questions are separate from `questions` and never feed FSRS. |
+| `route-mode` | Admin, teacher, student | Route mode (topics with lessons unlocked in order with >= 80% score). Management by admin or the owning teacher: `POST /route-mode/topics` (`name`, `description?`, `teacher_id` required only for admin), `PUT /route-mode/topics?id=` , `DELETE /route-mode/topics?id=`, `POST /route-mode/lessons` (`topic_id`, `title`: creates the lesson with no content, not ready), `PUT /route-mode/lessons?id=` (`title`: rename), `PUT /route-mode/lessons/content?id=` (`lesson`: `text`, `questions_to_show` and a bank of 1-100 `questions` with `statement`, `option_a`-`option_d`, `correct_option`, optional `explanation`; `questions_to_show` cannot exceed the bank size; questions are upserted by position so awarded xp is kept, extra trailing ones are deleted; marks the lesson ready), `DELETE /route-mode/lessons?id=`. Reads, each role sees its own: `GET /route-mode/topics[?teacher_id=]` and `GET /route-mode/lessons?topic_id=` (students get only ready lessons with `status` `locked`/`available`/`completed` and `best_percent`) and `GET /route-mode/lessons/content?id=` (text and questions; managers get the whole bank; students get it only if the lesson is unlocked, receive `questions_to_show` questions drawn at random from the bank on every request, and never receive `correct_option` or `explanation` in the clear: they come in the AES-GCM `answer_key` (same format as `practice-session`) so the browser grades each question instantly; `403 lesson_locked` otherwise). Student: `GET /route-mode/progress` (topics, lessons and unlocks) and `POST /route-mode/attempts` (`lesson_id`, `answers` of `question_id` + `selected_option`; exactly `questions_to_show` distinct questions of the lesson, scored over that count): the backend grades with the database key, stores the attempt, awards xp only for questions answered correctly for the first time (`route_question_xp_awards`, `xp_per_correct` of the college, no streak bonus, no medal stars) and answers with `correct_count`, `score_percent`, `passed`, `xp`, `next_lesson_id`; `403 lesson_locked` if the previous lesson is not passed. Route questions are separate from `questions` and never feed FSRS. |
 | `achievements` | Student | "Mis logros". `GET /streak` returns the day streak (days active in a row up to today; still alive if only today is missing), best streak and recent active days. `GET /last-grades` returns the grade of the last completed normal-mode session. Medal and level reuse `GET /medals/me` and `GET /practice-session/xp-rules`. |
 | `ranking` | Admin, teacher and student (see routes) | Ranking by college and group (teacher). `GET /settings` returns the college ranking configuration (admin passes `?college_id=`; teacher and student get their own; defaults to disabled when there is no row). `PUT /settings` (admin) updates or creates it. `PUT /cache` (student, teacher) creates or replaces the caller cache for one ranking type. `GET /cache` (student, teacher) reads a page of the caller cache. The settings row is created by a database trigger, so there is no create endpoint. |
 | `get-session-review` | Student, teacher, admin | Returns the completed result and detailed answers. Students see only their own sessions; teachers see only their courses. |
@@ -234,8 +234,18 @@ pnpm exec supabase gen types --local --schema public \
 - `POST registration/payment`: `registration_id`, `plan` (`mensual` or
   `semestral`), `token` (single-use Yape token the browser creates with the
   Mercado Pago SDK from the phone and the approval code (OTP) of the Yape app)
-  and `phone` (that Yape phone, 9 digits). Requires a verified email, which is
-  sent to Mercado Pago as the payer. The amount comes from `_shared/plans.ts`,
+  and `phone` (that Yape phone, 9 digits). Optional `device_session_id`: the
+  buyer's device id from Mercado Pago's `security.js`, forwarded as the
+  `X-meli-session-id` header for the fraud engine (ignored if malformed, never
+  blocks the payment). Requires a verified email, which is sent to Mercado
+  Pago as the payer; no other payer data is sent, because whoever pays with
+  Yape is often a relative of the student, so the student's name or document
+  would be false data. The order also describes the product: `description`,
+  `items[]` (title, description, `external_code` = plan id, `category_id`
+  `learnings`, price) and `payment_method.statement_descriptor` (`CHANCON`).
+  Orders rejects unknown fields with `400 unsupported_properties`
+  (`notification_url` is not accepted: the webhook is set in the Mercado Pago
+  panel, event **Order**). The amount comes from `_shared/plans.ts`,
   never from the request. The row is stored in `plan_payments` before calling
   Mercado Pago (its `id` travels as `external_reference` and
   `X-Idempotency-Key`), then an order is created with the Orders API
@@ -256,7 +266,7 @@ pnpm exec supabase gen types --local --schema public \
   administrator). While in process it asks Mercado Pago directly, so payments
   are confirmed even without the webhook (local development). A registration
   with a payment from the last 24 hours is not purged.
-- `POST account/payment`: `plan`, `token`, `phone`. Signed-in student, with the plan
+- `POST account/payment`: `plan`, `token`, `phone`, `device_session_id` (optional). Signed-in student, with the plan
   active or expired (expired students can sign in, but the app only shows the
   renewal page). Same response as `registration/payment`; a student without
   email gets `409 payment_email_required`. Once paid, the months are added
@@ -310,9 +320,11 @@ pnpm exec supabase gen types --local --schema public \
   chooses one while accepting. Legacy clients may still send `college_id`
   instead, which limits the groups the student can choose. Emails a link to
   `<site>/estudiante/invitacion?code=...` that lasts 7 days, never beyond the
-  last day of access. Inviting the same email again replaces the previous
-  invitation. `409 email_taken` if the email already has an account. Responds
-  `201` with `invitation`.
+  last day of access. Inviting an email that already has an invitation
+  is rejected (`409 invitation_exists`); cancel or resend the existing one. A pending self-registration with that email (unpaid) is deleted so
+  it does not block the invitation; the same happens when the invitation is
+  accepted. One with an approved, unapplied payment is kept. `409 email_taken` if
+  the email already has an account. Responds `201` with `invitation`.
 - `POST invitations/resend`: `invitation_id`. New link and validity; the old
   link stops working. `409 invitation_access_ended` if the access period
   already ended.

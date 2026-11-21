@@ -25,13 +25,13 @@ const FRAMING = { fit: 1.25, center: 0.16 };
  * movimiento reducido (y mientras baja el modelo) se ve la cabeza PNG con animaciones CSS.
  * El lienzo 3D sobresale por arriba sin estorbar (no recibe clics) para que los saltos se vean completos.
  */
-export function PracticeMascot({ mood = "idle", event, eventKey, gaze, size = 56, className }: { mood?: MascotMood; event?: MascotEvent; eventKey?: number; gaze?: MascotGaze | null; size?: number; className?: string }) {
+export function PracticeMascot({ mood = "idle", event, eventKey, gaze, speaking, size = 56, className }: { mood?: MascotMood; event?: MascotEvent; eventKey?: number; gaze?: MascotGaze | null; speaking?: boolean; size?: number; className?: string }) {
   const [use3d] = useState(() => supportsWebGL() && !prefersReducedMotion());
   const [ready, setReady] = useState(false);
   const markReady = useCallback(() => setReady(true), []);
   return <div className={clsx("shrink-0", className)} style={{ width: size, height: size }}><div className="relative h-full w-full">
     {use3d && <Suspense fallback={null}>
-      <MascotScene event={event ?? MOOD_EVENT[mood]} eventKey={eventKey} framing={FRAMING} gaze={gaze} onReady={markReady} className="pointer-events-none absolute bottom-0 left-0 z-10 h-[300%] w-full" />
+      <MascotScene event={event ?? MOOD_EVENT[mood]} eventKey={eventKey} framing={FRAMING} gaze={gaze} speaking={speaking} onReady={markReady} className="pointer-events-none absolute bottom-0 left-0 z-10 h-[300%] w-full" />
     </Suspense>}
     {!ready && <img key={mood} src="/image/mascota-cabeza.png" alt="" aria-hidden width={size} height={size}
       className={clsx("h-full w-full select-none drop-shadow-[0_6px_10px_rgb(0_0_0/0.25)]", MOTION[mood])} />}

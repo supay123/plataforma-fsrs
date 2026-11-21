@@ -13,16 +13,14 @@ export interface UpdateTopicBody {
 export interface CreateLessonBody {
   topic_id?: unknown;
   title?: unknown;
-  content_text?: unknown;
 }
 
-export interface UpdateLessonBody {
+export interface RenameLessonBody {
   title?: unknown;
-  content_text?: unknown;
 }
 
-export interface SaveLessonQuestionsBody {
-  questions?: unknown;
+export interface ReplaceLessonContentBody {
+  lesson?: unknown;
 }
 
 export interface SubmitAttemptBody {

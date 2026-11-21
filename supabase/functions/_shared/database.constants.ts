@@ -68,6 +68,7 @@ export const RPCS = {
   recordStudentActivity: "record_student_activity",
   purgeExpiredRankingCache: "edge_purge_expired_ranking_cache",
   registrationColleges: "edge_registration_colleges",
+  releasePendingRegistration: "edge_release_pending_registration",
   registrationTeachers: "edge_registration_teachers",
   reserveComplaintSheet: "edge_reserve_complaint_sheet",
   revokeUserSessions: "edge_revoke_user_sessions",

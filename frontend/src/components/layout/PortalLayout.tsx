@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, Medal, PanelLeftClose, Route as RouteIcon, Settings, Trophy, Users, X } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, ListChecks, LogOut, Medal, PanelLeftClose, Route as RouteIcon, Settings, Trophy, Users } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -23,7 +23,6 @@ const links: Record<AppRole, NavItem[]> = {
 };
 const settingsPath: Record<AppRole, string> = { admin: "/admin/configuracion", teacher: "/profesor/configuracion", student: "/estudiante/configuracion" };
 const rankingPath: Record<AppRole, string> = { admin: "", teacher: "/profesor/ranking", student: "/estudiante/ranking" };
-const homePath: Record<AppRole, string> = { admin: "/admin/usuarios", teacher: "/profesor/cursos", student: "/estudiante" };
 const STORAGE_KEY = "portal-menu-collapsed";
 
 // El navegador puede bloquear el almacenamiento: el menú funciona igual sin recordar el estado.
@@ -134,11 +133,10 @@ export function PortalLayout({ role }: { role: AppRole }) {
     </div>
   </aside>;
 
+  // Durante una práctica no hay cabecera en celular: la pregunta trae su propia X para salir.
   const mobileHeader = <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b-2 border-line bg-blocks px-4 text-on-blocks md:hidden">
     <Logo onLight={mode === "light"} className="h-6" />
-    {focus
-      ? <button type="button" aria-label="Salir de la práctica" className="rounded-xl p-2 text-fg-muted hover:bg-line hover:text-fg" onClick={() => leave(() => navigate(homePath[role]))}><X size={22} /></button>
-      : <div className="flex items-center gap-1"><ThemeToggle /><button type="button" aria-label="Cerrar sesión" className="rounded-xl p-2 text-fg-muted hover:bg-line hover:text-fg" onClick={() => leave(() => logout())}><LogOut size={20} /></button></div>}
+    <div className="flex items-center gap-1"><ThemeToggle /><button type="button" aria-label="Cerrar sesión" className="rounded-xl p-2 text-fg-muted hover:bg-line hover:text-fg" onClick={() => leave(() => logout())}><LogOut size={20} /></button></div>
   </header>;
 
   // Barra inferior: solo iconos; el activo lleva una línea debajo. Se oculta durante una práctica.
@@ -156,8 +154,8 @@ export function PortalLayout({ role }: { role: AppRole }) {
     <div className={clsx("portal min-h-dvh overflow-x-clip bg-base text-on-base md:grid md:transition-[grid-template-columns] md:duration-200", mode === "dark" && "dark")} style={{ gridTemplateColumns: "var(--menu-w) minmax(0, 1fr)", "--menu-w": compactDesktop ? "4.5rem" : "16rem" } as CSSProperties}>
       {sidebar}
       <div className="min-w-0">
-        {mobileHeader}
-        <main className={clsx("p-4 md:p-8", focus ? "pb-24" : "pb-28 md:pb-16")}>
+        {!focus && mobileHeader}
+        <main className={clsx("p-4 md:p-8", focus ? "pb-20" : "pb-20 md:pb-16")}>
           <div className="@container mx-auto max-w-7xl">{role === "student" && profile && <PlanExpiryBanner profile={profile} />}<Outlet /></div>
         </main>
       </div>

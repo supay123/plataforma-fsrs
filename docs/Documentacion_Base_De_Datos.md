@@ -457,6 +457,13 @@ Versiona la configuración utilizada por la librería `ts-fsrs`.
 - Nombre y versión no pueden estar vacíos.
 - Índice único parcial `fsrs_configs_single_active_idx`: solo puede existir una configuración activa.
 
+### Configuración activa
+
+- `FSRS v6 pasos diarios, máximo 45 días` (migración `20261120130000`): `learning_steps ["12h","1d"]`, `relearning_steps ["1d"]` y `maximum_interval 44`.
+- Primer acierto de una pregunta nueva: vuelve a 1 día. Primer fallo: 12 h. Fallo de una pregunta ya aprendida: 1 día.
+- El tope real es 45 días: `ts-fsrs` suma 1 día después de aplicar `maximum_interval`, por eso el parámetro es 44.
+- `request_retention` queda en el valor por defecto (0.90). Cambiar la configuración se hace creando una fila nueva y activándola, nunca editando la anterior.
+
 ### Políticas RLS
 
 - `fsrs_configs_select`: cualquier usuario autenticado y activo puede leer la configuración.
@@ -700,7 +707,7 @@ Migraciones: `20261013120000_student_invitations.sql` y `20261025120000_invitati
 |---|---|---:|---|---|
 | `id` | `uuid` | No | `gen_random_uuid()` | Identificador. |
 | `email` | `text` | No | — | Correo del estudiante invitado. |
-| `teacher_id` | `uuid` | Sí | — | Grupo (profesor) fijado por el administrador. Si es nulo, el estudiante elige su grupo al aceptar. |
+| `teacher_id` | `uuid` | Sí | — | Grupo fijado por el administrador. Si es nulo, el estudiante elige su grupo al aceptar. |
 | `college_id` | `uuid` | Sí | — | Institución del grupo fijado. En invitaciones antiguas (sin grupo) limita los grupos que puede elegir el estudiante a los de esa institución. |
 | `access_valid_from` | `date` | No | — | Inicio del acceso del estudiante. |
 | `access_valid_until` | `date` | No | — | Fin del acceso del estudiante. |
@@ -1270,14 +1277,15 @@ y los estudiantes matriculados en cursos de ese profesor.
 ### public.route_lessons
 
 `topic_id`, `position`, `title`, `content_text` (texto con saltos de línea y
-KaTeX) e `is_ready` (true al guardar las 5 preguntas; solo entonces la ven los
-estudiantes). RLS de lectura: admin y el profesor dueño. Los estudiantes no
+KaTeX) `questions_to_show` (cuántas preguntas del banco ve el estudiante por intento,
+al azar; 5 por defecto) e `is_ready` (true al guardar su banco de preguntas; solo
+entonces la ven los estudiantes). RLS de lectura: admin y el profesor dueño. Los estudiantes no
 tienen política: el contenido solo se sirve por la Edge Function, que valida el
 bloqueo.
 
 ### public.route_questions
 
-Exactamente 5 por lección (`position` 1 a 5, único por lección): `statement`,
+Banco de 1 a 100 por lección (`position` 1 a 100, único por lección): `statement`,
 `option_a` a `option_d`, `correct_option` y `explanation`. RLS de lectura: admin
 y el profesor dueño (los estudiantes nunca leen la respuesta correcta).
 
@@ -1339,3 +1347,8 @@ RLS activa y sin políticas; `anon` y `authenticated` sin permisos: solo `servic
 
 - `public.edge_check_lead_rate_limit(p_ip_hash, p_email_hash)`: con bloqueo consultivo comprueba los límites y registra el intento en `lead_rate_limits`; falla con `lead_ip_limit` (5 por IP cada hora) o `lead_email_limit` (3 por correo cada día).
 - `public.edge_leads_sheet_id()`: lee de Vault el secreto `leads_sheet_id` (ID del Google Sheet); `null` si no existe (el registro responde entonces `503 leads_unavailable`). Se crea con `select vault.create_secret('<ID>', 'leads_sheet_id');`.
+
+## public.v_student_topic_due_reviews
+
+- Cuenta, por estudiante y tema, las preguntas activas cuya tarjeta FSRS está vencida (`due_at <= now()`).
+- Incluye `due_questions` y `oldest_due_at` (la más atrasada). Alimenta la pantalla de repaso del estudiante.

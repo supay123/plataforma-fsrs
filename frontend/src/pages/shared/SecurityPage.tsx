@@ -42,7 +42,7 @@ export function SecurityPage() {
   if (isStudent) return <>
     <PageHeader title="Configuración" description="Administra tu perfil y la seguridad de tu cuenta." />
     <MascotAdvice className="mb-6" event={profileOutcome.saved ? "correct" : "rest"} eventKey={profileOutcome.count} tone={profileOutcome.saved ? "success" : "neutral"}>
-      {profileOutcome.saved ? "¡Listo! Guardé tus cambios." : "Mantén tus datos al día: así tu institución y tú pueden encontrar tu cuenta sin problemas."}
+      {profileOutcome.saved ? "¡Listo! Guardé tus cambios." : "Mantén tus datos al día."}
     </MascotAdvice>
     <ProfileSection onOutcome={(outcome) => setProfileOutcome((current) => ({ saved: outcome === "saved", count: current.count + 1 }))} />
   </>;

@@ -43,3 +43,44 @@ Deno.test("reconstructs a persisted FSRS card", () => {
   assert.equal(card.reps, 3);
   assert.equal(card.last_review?.toISOString(), "2026-07-26T15:00:00.000Z");
 });
+
+const dailyStepsConfig = {
+  library_name: "ts-fsrs",
+  library_version: "5.4.1",
+  parameters: {
+    learning_steps: ["12h", "1d"],
+    relearning_steps: ["1d"],
+    maximum_interval: 44,
+  },
+};
+
+function hoursUntilDue(result: ReturnType<typeof scheduleAnswer>, from: Date) {
+  return (new Date(String(result.due)).getTime() - from.getTime()) / 3600000;
+}
+
+Deno.test("a new question answered correctly returns in 1 day and incorrectly in 12 hours", () => {
+  const now = new Date("2026-11-20T10:00:00.000Z");
+  assert.equal(hoursUntilDue(scheduleAnswer(null, dailyStepsConfig, true, now), now), 24);
+  assert.equal(hoursUntilDue(scheduleAnswer(null, dailyStepsConfig, false, now), now), 12);
+});
+
+Deno.test("an interval never exceeds 45 days", () => {
+  let reviewedAt = new Date("2026-11-20T10:00:00.000Z");
+  let result = scheduleAnswer(null, dailyStepsConfig, true, reviewedAt);
+  for (let answer = 0; answer < 8; answer++) {
+    reviewedAt = new Date(String(result.due));
+    result = scheduleAnswer({
+      due_at: String(result.due),
+      stability: String(result.stability),
+      difficulty: String(result.difficulty),
+      elapsed_days: Number(result.elapsed_days),
+      scheduled_days: Number(result.scheduled_days),
+      learning_steps: Number(result.learning_steps),
+      reps: Number(result.reps),
+      lapses: Number(result.lapses),
+      state: Number(result.state),
+      last_review_at: String(result.last_review),
+    }, dailyStepsConfig, true, reviewedAt);
+    assert.ok(hoursUntilDue(result, reviewedAt) <= 45 * 24);
+  }
+});

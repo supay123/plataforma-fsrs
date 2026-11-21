@@ -53,7 +53,7 @@ function Editor({ collegeId, collegeName, saved }: { collegeId: string; collegeN
     {enabled && <div className="mt-6 grid gap-6 lg:grid-cols-2">
       <Card>
         <h2 className="type-heading text-lg">Estrellas de cada medalla</h2>
-        <p className="mt-1 text-sm text-fg-muted">Indica hasta cuántas estrellas llega cada medalla. Siempre en orden creciente, sin negativos ni decimales; Postulante 1 empieza en 0.</p>
+        <p className="mt-1 text-sm text-fg-muted">Indica hasta cuántas estrellas llega cada medalla. Siempre en orden creciente, sin negativos ni decimales; Postulante I empieza en 0.</p>
         <div className="mt-4 grid gap-4">
           {MEDAL_CODES.map((code, index) => index < starTexts.length
             ? <RangeRow key={code} label={MEDAL_NAMES[code]} from={startOf(stars.values, index)}>

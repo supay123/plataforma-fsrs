@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../components/ui/toast";
 import { AppError } from "../../lib/api/errors";
 import { InvitationPage } from "./InvitationPage";
+import { chooseSelectValue } from "../../components/ui/select-test-helpers";
 
 const mocks = vi.hoisted(() => ({
   checkStudentInvitation: vi.fn(),
@@ -104,10 +105,9 @@ describe("InvitationPage", () => {
     mocks.checkStudentInvitation.mockResolvedValue(openInvitation);
     renderPage();
 
-    const group = await screen.findByLabelText("Grupo");
-    expect(group).not.toHaveAttribute("readonly");
-    await screen.findByRole("option", { name: "Prof. Julio Paz" });
-    await user.selectOptions(group, "teacher-2");
+    const group = await screen.findByRole("combobox", { name: "Grupo" });
+    await screen.findByText("Prof. Julio Paz");
+    await chooseSelectValue(user, group, "teacher-2");
     await fillStudentData(user);
     await user.click(screen.getByRole("button", { name: "Crear mi cuenta" }));
     expect(await screen.findByText("Pantalla de login")).toBeInTheDocument();
@@ -119,7 +119,7 @@ describe("InvitationPage", () => {
     mocks.checkStudentInvitation.mockResolvedValue(openInvitation);
     renderPage();
 
-    await screen.findByLabelText("Grupo");
+    await screen.findByRole("combobox", { name: "Grupo" });
     await fillStudentData(user);
     await user.click(screen.getByRole("button", { name: "Crear mi cuenta" }));
 
@@ -133,8 +133,8 @@ describe("InvitationPage", () => {
     });
     renderPage();
 
-    await screen.findByLabelText("Grupo");
-    await screen.findByRole("option", { name: "Prof. Julio Paz" });
-    expect(screen.queryByRole("option", { name: "Prof. Rosa Díaz" })).not.toBeInTheDocument();
+    await screen.findByRole("combobox", { name: "Grupo" });
+    await screen.findByText("Prof. Julio Paz");
+    expect(screen.queryByText("Prof. Rosa Díaz")).not.toBeInTheDocument();
   });
 });

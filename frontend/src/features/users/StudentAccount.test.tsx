@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import { ModalProvider } from "../../components/ui/modal";
 import { ToastProvider } from "../../components/ui/toast";
 import type { AdminStudentProfile } from "./api";
 import { StudentDataCard, StudentPasswordResetCard } from "./StudentAccount";
+import { chooseSelectValue } from "../../components/ui/select-test-helpers";
 
 const mocks = vi.hoisted(() => ({
   updateStudentProfile: vi.fn(),
@@ -73,8 +74,7 @@ describe("StudentDataCard", () => {
     expect(screen.getByLabelText("Celular")).toHaveValue("+51967799163");
     expect(screen.getByLabelText("Número de documento")).toHaveValue("12345678");
     expect(screen.getByLabelText("Correo electrónico")).toHaveValue("luis@example.com");
-    expect(await screen.findByRole("option", { name: "Ana Pérez — Universidad Uno" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Grupo")).toHaveValue("teacher-1");
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Grupo" })).toHaveTextContent("Ana Pérez — Universidad Uno"));
     expect(screen.getByLabelText("Código de acceso")).toHaveValue("20480750");
 
     await user.clear(screen.getByLabelText("Celular"));
@@ -92,10 +92,10 @@ describe("StudentDataCard", () => {
   it("warns how the email and group change affect the student before saving them", async () => {
     const user = userEvent.setup();
     renderWithProviders(<StudentDataCard user={student} profile={profile} />);
-    await screen.findByRole("option", { name: "Luigi Emanual — Colegio Dos" });
+    await screen.findByText("Luigi Emanual — Colegio Dos");
     await user.clear(screen.getByLabelText("Correo electrónico"));
     await user.type(screen.getByLabelText("Correo electrónico"), "nuevo@example.com");
-    await user.selectOptions(screen.getByLabelText("Grupo"), "teacher-2");
+    await chooseSelectValue(user, screen.getByRole("combobox", { name: "Grupo" }), "teacher-2");
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
     expect(await screen.findByText(/Su correo cambiará de luis@example.com a nuevo@example.com/)).toBeInTheDocument();

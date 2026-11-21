@@ -4,7 +4,7 @@ export interface DashboardAdviceInput {
   courseCount: number;
   lastCompletedAt: string | null;
   /** `null` si no se pudo saber cuántas preguntas toca repasar. */
-  dueReviews: number | null;
+  topicsToReview: number;
   now: Date;
 }
 
@@ -21,12 +21,12 @@ function startOfDay(date: Date): number {
 }
 
 /** Mensaje de la mascota en el inicio del estudiante, según lo que ya practicó. */
-export function dashboardAdvice({ courseCount, lastCompletedAt, dueReviews, now }: DashboardAdviceInput): Advice {
+export function dashboardAdvice({ courseCount, lastCompletedAt, topicsToReview, now }: DashboardAdviceInput): Advice {
   if (courseCount === 0) return { event: "sleep", text: "Todavía no tienes cursos activos. Cuando tu institución te asigne uno, lo verás aquí." };
   if (!lastCompletedAt) return { event: "rest", text: "¡Hola! Elige un curso y haz tu primera práctica. Yo te acompaño." };
-  if (dueReviews !== null && dueReviews > 0) {
-    const questions = dueReviews === 1 ? "1 pregunta lista" : `${dueReviews} preguntas listas`;
-    return { event: "rest", text: `Tienes ${questions} para repasar. Es el mejor momento para no olvidarlas.` };
+  if (topicsToReview > 0) {
+    const topics = topicsToReview === 1 ? "1 tema" : `${topicsToReview} temas`;
+    return { event: "rest", text: `Tienes ${topics} por repasar.` };
   }
   const daysAway = Math.round((startOfDay(now) - startOfDay(new Date(lastCompletedAt))) / DAY_MS);
   if (daysAway === 0) return { event: "correct", text: "¡Ya practicaste hoy! Volver mañana mantiene tu ritmo." };

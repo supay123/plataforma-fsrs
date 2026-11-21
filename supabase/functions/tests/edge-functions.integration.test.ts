@@ -1453,7 +1453,7 @@ Deno.test({
     assert.ifError(adminSignInError);
     const token = adminSession.session!.access_token;
 
-    // Grupo (profesor) con un curso en la institución: es lo que fija la
+    // Grupo con un curso en la institución: es lo que fija la
     // invitación y de donde salen la institución y la inscripción.
     const teacherEmail = `teacher.${suffix}@example.com`;
     const { data: teacherUser, error: teacherError } = await adminClient.auth

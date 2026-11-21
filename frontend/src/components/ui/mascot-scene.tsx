@@ -20,6 +20,7 @@ export interface MascotSceneProps {
   rest?: MascotEvent;
   framing?: MascotFraming;
   gaze?: MascotGaze | null;
+  speaking?: boolean;
   onReady?: () => void;
   className?: string;
 }
@@ -63,14 +64,14 @@ function useThemeTint(head: Object3D): void {
   }, [head, invalidate]);
 }
 
-function Head({ event, eventKey, rest, reduced, gaze, onReady }: { event: MascotEvent; eventKey: number; rest: MascotEvent; reduced: boolean; gaze: MascotGaze | null; onReady?: () => void }) {
+function Head({ event, eventKey, rest, reduced, gaze, speaking, onReady }: { event: MascotEvent; eventKey: number; rest: MascotEvent; reduced: boolean; gaze: MascotGaze | null; speaking: boolean; onReady?: () => void }) {
   const gltf = useLoader(GLTFLoader, MASCOT_MODEL_URL, withMeshopt);
   const head = useMemo(() => cloneHead(gltf.scene), [gltf.scene]);
   useEffect(() => () => {
     head.traverse((object) => { if (object instanceof Mesh) (object.material as Material).dispose(); });
   }, [head]);
   useThemeTint(head);
-  useMascotAnimation(head, gltf.animations, { event, eventKey, rest, reduced, gaze });
+  useMascotAnimation(head, gltf.animations, { event, eventKey, rest, reduced, gaze, speaking });
   useEffect(() => { onReady?.(); }, [onReady]);
   return <primitive object={head} />;
 }
@@ -106,7 +107,7 @@ function Lighting() {
 }
 
 /** Cabeza de la mascota en 3D (se carga aparte para no meter `three` en el paquete principal). */
-export default function MascotScene({ event = "rest", eventKey = 0, rest = "rest", framing = DEFAULT_FRAMING, gaze = null, onReady, className }: MascotSceneProps) {
+export default function MascotScene({ event = "rest", eventKey = 0, rest = "rest", framing = DEFAULT_FRAMING, gaze = null, speaking = false, onReady, className }: MascotSceneProps) {
   const reduced = useState(prefersReducedMotion)[0];
   // El lienzo sobresale por arriba de la mascota: `pointer-events: none` explícito en el propio <Canvas>
   // (su contenedor puede volver a activarlos) para que nunca tape botones o pestañas que queden debajo.
@@ -121,7 +122,7 @@ export default function MascotScene({ event = "rest", eventKey = 0, rest = "rest
     >
       <Lighting />
       <Rig fit={framing.fit} center={framing.center} />
-      <Suspense fallback={null}><Head event={event} eventKey={eventKey} rest={rest} reduced={reduced} gaze={gaze} onReady={onReady} /></Suspense>
+      <Suspense fallback={null}><Head event={event} eventKey={eventKey} rest={rest} reduced={reduced} gaze={gaze} speaking={speaking} onReady={onReady} /></Suspense>
     </Canvas>
   </div>;
 }

@@ -40,8 +40,8 @@ export const DEFAULT_PALETTES: Record<ThemeMode, BasePalette> = {
 
 /** Fijos: no los edita ninguna institución. */
 export const STATUS = {
-  success: "#29b85a",
-  danger: "#e5484d",
+  success: "#1fd164",
+  danger: "#ff4b55",
   warning: "#f5c518",
 } as const;
 
@@ -83,11 +83,15 @@ export function paletteVars(base: BasePalette): CSSProperties {
     "--c-secondary-text": mix(secondary, 72, textOnBlocks),
   };
   // Estados fijos, con su versión suave (fondo) y de texto sobre el fondo nav
+  // Sobre fondos oscuros el color suave se apaga (queda marrón o verde sucio): necesita más color y un texto más luminoso.
+  const onDark = textOnBlocks === WHITE;
+  const softPercent = onDark ? 62 : 28;
+  const textPercent = onDark ? 30 : 64;
   for (const [name, color] of Object.entries(STATUS)) {
     vars[`--c-${name}`] = color;
     vars[`--c-${name}-strong`] = mix(color, 72, BLACK);
-    vars[`--c-${name}-soft`] = mix(color, 15, blocksBackground);
-    vars[`--c-${name}-text`] = mix(color, 70, textOnBlocks);
+    vars[`--c-${name}-soft`] = mix(color, softPercent, blocksBackground);
+    vars[`--c-${name}-text`] = mix(color, textPercent, textOnBlocks);
     vars[`--c-on-${name}`] = blackOrWhite(color);
   }
   return vars as CSSProperties;

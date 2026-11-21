@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { PageSkeleton } from "../components/ui/skeleton";
+import { BaseBackground } from "../components/ui/base-background";
 import { useAuth } from "../features/auth/AuthProvider";
 import { studentAccess } from "../lib/student-access";
 import type { AppRole } from "../types/contracts";
@@ -10,7 +10,7 @@ const home: Record<AppRole, string> = { admin: "/admin", teacher: "/profesor", s
 export function RoleGuard({ role, children, allowExpired = false }: { role: AppRole; children: ReactNode; allowExpired?: boolean }) {
   const { loading, profile } = useAuth();
   const location = useLocation();
-  if (loading) return <div className="dark portal min-h-dvh bg-base p-8 text-on-base"><div className="mx-auto max-w-6xl"><PageSkeleton /></div></div>;
+  if (loading) return <BaseBackground />;
   if (!profile) return <Navigate to={`${home[role]}/login`} state={{ from: location.pathname }} replace />;
   if (!profile.is_active) return <Navigate to={`${home[role]}/login`} replace />;
   if (profile.role !== role) return <Navigate to={home[profile.role]} replace />;

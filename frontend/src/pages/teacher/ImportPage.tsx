@@ -15,6 +15,7 @@ import {
   importQuestions,
   listTopicQuestions,
 } from "../../features/questions/api";
+import { MathText } from "../../lib/math";
 import type { AnswerOption, ImportResponse, TopicQuestion } from "../../types/contracts";
 
 const OPTIONS = ["A", "B", "C", "D"] as const;
@@ -28,16 +29,16 @@ function QuestionPreview({ question, onDelete }: { question: TopicQuestion; onDe
   };
   return <li className="flex items-start justify-between gap-3 rounded-2xl border-2 border-line p-4">
     <div className="min-w-0">
-      <p className="font-medium leading-6 text-fg">{question.statement}</p>
+      <p className="font-medium leading-6 text-fg"><MathText>{question.statement}</MathText></p>
       <div className="mt-2 grid gap-1 text-sm text-fg-muted sm:grid-cols-2">
         {OPTIONS.map((option) => <span
           key={option}
           className={option === question.correct_option ? "bg-success-soft px-2 py-1 text-success-text" : "px-2 py-1"}
         >
-          <strong>{option}.</strong> {options[option]}{option === question.correct_option && <span className="ml-2 text-xs font-semibold">Correcta</span>}
+          <strong>{option}.</strong> <MathText>{options[option]}</MathText>{option === question.correct_option && <span className="ml-2 text-xs font-semibold">Correcta</span>}
         </span>)}
       </div>
-      {question.explanation && <p className="mt-2 text-sm text-fg-muted"><strong className="font-medium text-fg">Explicación:</strong> {question.explanation}</p>}
+      {question.explanation && <p className="mt-2 text-sm text-fg-muted"><strong className="font-medium text-fg">Explicación:</strong> <MathText>{question.explanation}</MathText></p>}
     </div>
     <Button aria-label={`Eliminar pregunta: ${question.statement}`} className="shrink-0 px-2" title="Eliminar pregunta" variant="ghost" onClick={onDelete}>
       <Trash2 aria-hidden="true" size={18} />

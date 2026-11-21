@@ -7,7 +7,7 @@ export const leadSchema = z.object({
   family_names: studentFields.family_names,
   email: studentFields.email,
   phone: studentFields.phone,
-  accepted_data_policy: z.boolean().refine((value) => value, "Debes aceptar el uso de tus datos para continuar."),
+  accepted_data_policy: z.boolean().refine((value) => value, "Debes autorizar el contacto para continuar."),
   website: z.string(),
 });
 export type LeadValues = z.infer<typeof leadSchema>;

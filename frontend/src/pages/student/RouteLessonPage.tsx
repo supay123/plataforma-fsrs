@@ -2,19 +2,33 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Eyebrow, PageHeader, ProgressBar } from "../../components/ui";
+import { usePortalFocus } from "../../components/layout/portal-mode";
+import { Button, Card, Eyebrow, PageHeader } from "../../components/ui";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/ui/use-toast";
-import { LessonText } from "../../features/route-mode/LessonText";
+import { PaginatedText } from "../../features/route-mode/PaginatedText";
 import {
   getRouteLessonContent, routeLessonContentKey, routeProgressKey, submitRouteAttempt,
   type RouteAttemptResult, type RouteOption, type RouteQuestion,
 } from "../../features/route-mode/api";
-import { MathText } from "../../lib/math";
+import { PracticeQuestion } from "../../features/sessions/PracticeQuestion";
+import { decryptAnswerKey } from "../../features/sessions/answer-key";
+import type { AnswerFeedback, AnswerKeyEntry } from "../../types/contracts";
 
 const OPTIONS: RouteOption[] = ["A", "B", "C", "D"];
 const optionText = (question: RouteQuestion, option: RouteOption) => question[`option_${option.toLowerCase()}` as "option_a"];
 const ROUTE_HOME = "/estudiante/ruta";
+
+/** Aciertos seguidos que terminan en la última pregunta respondida (cuenta hasta `upTo` preguntas). */
+function currentStreak(questions: RouteQuestion[], answers: Record<string, RouteOption>, answerKey: Record<string, AnswerKeyEntry>, upTo: number): number {
+  let streak = 0;
+  for (let index = upTo - 1; index >= 0; index--) {
+    const questionId = questions[index]!.id;
+    if (answers[questionId] !== answerKey[questionId]?.correct_option) break;
+    streak++;
+  }
+  return streak;
+}
 
 function LessonSkeleton() {
   return <div role="status" aria-busy="true" aria-label="Cargando">
@@ -24,7 +38,7 @@ function LessonSkeleton() {
   </div>;
 }
 
-function ResultView({ result, questions, nextLessonId, onRetry }: { result: RouteAttemptResult; questions: RouteQuestion[]; nextLessonId: string | null; onRetry: () => void }) {
+function ResultView({ result, nextLessonId, onRetry }: { result: RouteAttemptResult; nextLessonId: string | null; onRetry: () => void }) {
   const need = result.xp.thresholds[result.xp.thresholds.length - 1]!;
   return <div className="grid gap-6">
     <Card glow className="text-center sm:p-8">
@@ -43,31 +57,22 @@ function ResultView({ result, questions, nextLessonId, onRetry }: { result: Rout
         <Link to={ROUTE_HOME}><Button variant="secondary">Volver a la ruta</Button></Link>
       </div>
     </Card>
-    <section aria-label="Revisión" className="grid gap-3">
-      {result.review.map((item, index) => {
-        const question = questions.find((entry) => entry.id === item.question_id);
-        if (!question) return null;
-        return <Card key={item.question_id} className={clsx("p-4", item.is_correct ? "portal:border-success" : "portal:border-danger")}>
-          <Eyebrow>{`Pregunta ${index + 1} · ${item.is_correct ? "Correcta" : "Incorrecta"}`}</Eyebrow>
-          <h3 className="mt-2 font-semibold whitespace-pre-wrap"><MathText>{question.statement}</MathText></h3>
-          <p className="mt-2 text-sm text-fg-muted">Tu respuesta: <MathText>{`${item.selected_option}. ${optionText(question, item.selected_option)}`}</MathText></p>
-          {!item.is_correct && <p className="text-sm text-success-text">Correcta: <MathText>{`${item.correct_option}. ${optionText(question, item.correct_option)}`}</MathText></p>}
-          {item.explanation && <div className="mt-2 rounded-xl bg-sunken p-3 text-sm whitespace-pre-wrap"><MathText>{item.explanation}</MathText></div>}
-        </Card>;
-      })}
-    </section>
   </div>;
 }
 
 export function RouteLessonPage() {
+  usePortalFocus();
   const { lessonId = "" } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
   const client = useQueryClient();
-  const content = useQuery({ queryKey: routeLessonContentKey(lessonId), queryFn: () => getRouteLessonContent(lessonId), enabled: Boolean(lessonId), retry: false });
+  // Cada apertura trae un sorteo nuevo de preguntas; no se refresca solo para no cambiarlas a mitad de lección.
+  const content = useQuery({ queryKey: routeLessonContentKey(lessonId), queryFn: () => getRouteLessonContent(lessonId), enabled: Boolean(lessonId), retry: false, staleTime: 0, gcTime: 0, refetchOnWindowFocus: false, refetchOnReconnect: false });
   const [step, setStep] = useState<"text" | "questions" | "result">("text");
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, RouteOption>>({});
+  const [selected, setSelected] = useState<RouteOption | null>(null);
+  const [answerKey, setAnswerKey] = useState<Record<string, AnswerKeyEntry> | null>(null);
   const [result, setResult] = useState<RouteAttemptResult | null>(null);
 
   // Una lección bloqueada (o inexistente) responde 403/404: se avisa y se vuelve a la ruta.
@@ -76,6 +81,14 @@ export function RouteLessonPage() {
     toast.error(content.error.message);
     navigate(ROUTE_HOME, { replace: true });
   }, [content.error, toast, navigate]);
+
+  useEffect(() => {
+    const encryptedKey = content.data?.answer_key;
+    if (!encryptedKey) return;
+    let cancelled = false;
+    decryptAnswerKey(encryptedKey).then((key) => { if (!cancelled) setAnswerKey(key); }, () => toast.error("No se pudieron cargar las preguntas."));
+    return () => { cancelled = true; };
+  }, [content.data, toast]);
 
   const submit = useMutation({
     mutationFn: () => submitRouteAttempt({ lesson_id: lessonId, answers: Object.entries(answers).map(([question_id, selected_option]) => ({ question_id, selected_option })) }),
@@ -87,49 +100,49 @@ export function RouteLessonPage() {
     onError: (error) => toast.error(error.message),
   });
 
-  if (content.isLoading || !content.data) return <LessonSkeleton />;
+  if (content.isLoading || !content.data || !answerKey) return <LessonSkeleton />;
   const { lesson, questions } = content.data;
   const question = questions[current];
-  const retry = () => { setAnswers({}); setCurrent(0); setResult(null); setStep("text"); };
+  const retry = () => { setAnswerKey(null); void content.refetch(); setAnswers({}); setSelected(null); setCurrent(0); setResult(null); setStep("text"); };
 
   if (step === "result" && result) return <>
     <PageHeader title={lesson.title} />
-    <ResultView result={result} questions={questions} nextLessonId={result.next_lesson_id} onRetry={retry} />
+    <ResultView result={result} nextLessonId={result.next_lesson_id} onRetry={retry} />
   </>;
 
   if (step === "text" || !question) return <>
-    <PageHeader title={lesson.title} description="Lee la lección con calma. Después responderás 5 preguntas." />
-    <Card className="p-5 sm:p-8"><LessonText className="text-lg leading-relaxed">{lesson.content_text}</LessonText></Card>
-    <div className="mt-6 flex flex-wrap gap-3">
-      <Button disabled={questions.length === 0} onClick={() => setStep("questions")}>Ir a las preguntas</Button>
-      <Link to={ROUTE_HOME}><Button variant="secondary">Volver a la ruta</Button></Link>
-    </div>
+    <PageHeader title={lesson.title} description={`Lee la lección con calma. Después responderás ${questions.length} ${questions.length === 1 ? "pregunta" : "preguntas"}.`} />
+    <PaginatedText lastPageAction={<Button disabled={questions.length === 0} onClick={() => setStep("questions")}>Ir a las preguntas</Button>}>{lesson.content_text}</PaginatedText>
+    <div className="mt-4"><Link to={ROUTE_HOME}><Button variant="ghost">Volver a la ruta</Button></Link></div>
   </>;
 
-  const selected = answers[question.id];
+  const chosen = answers[question.id] ?? null;
+  const entry = answerKey[question.id]!;
+  const feedback: AnswerFeedback | null = chosen
+    ? { is_correct: chosen === entry.correct_option, correct_option: entry.correct_option as RouteOption, explanation: entry.explanation }
+    : null;
   const isLast = current === questions.length - 1;
-  return <div className="mx-auto grid max-w-2xl gap-5">
-    <div className="flex items-center gap-4">
-      <div className="flex-1"><ProgressBar value={((current + (selected ? 1 : 0)) / questions.length) * 100} label="Avance de la lección" /></div>
-      <span className="text-sm tabular-nums text-fg-muted">{current + 1} / {questions.length}</span>
-    </div>
-    <Card className="p-4 sm:p-6">
-      <Eyebrow>{`Pregunta ${current + 1} de ${questions.length}`}</Eyebrow>
-      <h2 className="mt-2 text-xl font-semibold whitespace-pre-wrap sm:text-2xl"><MathText>{question.statement}</MathText></h2>
-    </Card>
-    <div className="grid gap-3" role="radiogroup" aria-label="Opciones">
-      {OPTIONS.map((option) => <button key={option} type="button" role="radio" aria-checked={selected === option} onClick={() => setAnswers((previous) => ({ ...previous, [question.id]: option }))}
-        className={clsx("flex min-h-14 items-center gap-4 rounded-xl border-2 px-4 py-3 text-left shadow-[0_4px_0_var(--edge)] transition duration-100 active:translate-y-1 active:shadow-none",
-          selected === option ? "border-fg bg-sunken [--edge:var(--c-fg)]" : "border-line-strong bg-blocks [--edge:var(--c-line-strong)] hover:bg-sunken")}>
-        <strong className={clsx("grid h-9 w-9 shrink-0 place-items-center rounded-xl border-2 text-sm", selected === option ? "border-fg text-fg" : "border-line-strong text-fg-muted")}>{option}</strong>
-        <span className="min-w-0 flex-1 text-lg"><MathText>{optionText(question, option)}</MathText></span>
-      </button>)}
-    </div>
-    <div className="flex flex-wrap justify-between gap-3">
-      <Button variant="secondary" disabled={submit.isPending} onClick={() => current === 0 ? setStep("text") : setCurrent(current - 1)}>{current === 0 ? "Releer lección" : "Anterior"}</Button>
-      {isLast
-        ? <Button disabled={Object.keys(answers).length < questions.length || submit.isPending} onClick={() => submit.mutate()}>Enviar respuestas</Button>
-        : <Button disabled={!selected} onClick={() => setCurrent(current + 1)}>Siguiente</Button>}
-    </div>
-  </div>;
+  const options = OPTIONS.map((option) => [option, optionText(question, option)] as const);
+  const next = () => {
+    if (isLast) return submit.mutate();
+    setCurrent(current + 1);
+    setSelected(null);
+  };
+  return <PracticeQuestion
+    onExit={() => navigate(ROUTE_HOME)}
+    progressLabel="Avance de la lección"
+    progressValue={(Object.keys(answers).length / questions.length) * 100}
+    streak={currentStreak(questions, answers, answerKey, chosen ? current + 1 : current)}
+    eyebrow={`Pregunta ${current + 1} de ${questions.length}`}
+    statement={question.statement}
+    options={options}
+    selected={selected}
+    chosen={chosen}
+    feedback={feedback}
+    optionsDisabled={submit.isPending}
+    onSelect={setSelected}
+    actions={feedback
+      ? <Button className="h-12 w-full sm:h-auto sm:w-auto" variant={feedback.is_correct ? "primary" : "danger"} disabled={submit.isPending} onClick={next}>{isLast ? "Finalizar lección" : "Siguiente"}</Button>
+      : <Button className="h-12 w-full sm:h-auto sm:w-auto" disabled={!selected} onClick={() => selected && setAnswers({ ...answers, [question.id]: selected })}>Confirmar respuesta</Button>}
+  />;
 }

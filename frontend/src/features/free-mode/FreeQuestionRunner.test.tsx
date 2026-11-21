@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ModalProvider } from "../../components/ui/modal";
 import { FreeQuestionRunner } from "./FreeQuestionRunner";
 import type { FreeModeQuestion } from "./api";
 
@@ -17,21 +18,23 @@ describe("FreeQuestionRunner", () => {
   it("corrects each answer instantly and reports every answer at the end", async () => {
     const user = userEvent.setup();
     const onFinish = vi.fn();
-    render(<FreeQuestionRunner questions={questions} onFinish={onFinish} />);
+    render(<ModalProvider><FreeQuestionRunner questions={questions} onFinish={onFinish} /></ModalProvider>);
 
     expect(screen.getByText("Pregunta 1 de 2")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^A/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(screen.getByText("Incorrecto. La respuesta correcta es la B.")).toBeInTheDocument();
+    expect(screen.getByText("Mal. La respuesta era la B")).toBeInTheDocument();
+    expect(screen.queryByText("Se suman.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ver explicación" }));
     expect(screen.getByText("Se suman.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByText("Pregunta 2 de 2")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^C4/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar respuesta" }));
-    expect(screen.getByText("¡Correcto!")).toBeInTheDocument();
+    expect(screen.getAllByText("Respuesta correcta")[0]).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Ver mi resultado" }));
+    await user.click(screen.getByRole("button", { name: "Finalizar práctica" }));
     expect(onFinish).toHaveBeenCalledWith({ q1: "A", q2: "C" });
   });
 });
