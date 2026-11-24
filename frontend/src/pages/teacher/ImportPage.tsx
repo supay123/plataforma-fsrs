@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { MascotHelp } from "../../features/mascot/MascotHelp";
 import type { Advice } from "../../features/mascot/advice";
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader } from "../../components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
+import { ModalForm } from "../../components/ui/modal-form";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
 import { useToast } from "../../components/ui/use-toast";
@@ -14,13 +15,15 @@ import {
   fileToBase64,
   importQuestions,
   listTopicQuestions,
+  updateQuestion,
+  type QuestionChanges,
 } from "../../features/questions/api";
 import { MathText } from "../../lib/math";
 import type { AnswerOption, ImportResponse, TopicQuestion } from "../../types/contracts";
 
 const OPTIONS = ["A", "B", "C", "D"] as const;
 
-function QuestionPreview({ question, onDelete }: { question: TopicQuestion; onDelete: () => void }) {
+function QuestionPreview({ question, onEdit, onDelete }: { question: TopicQuestion; onEdit: () => void; onDelete: () => void }) {
   const options: Record<AnswerOption, string> = {
     A: question.option_a,
     B: question.option_b,
@@ -40,9 +43,14 @@ function QuestionPreview({ question, onDelete }: { question: TopicQuestion; onDe
       </div>
       {question.explanation && <p className="mt-2 text-sm text-fg-muted"><strong className="font-medium text-fg">Explicación:</strong> <MathText>{question.explanation}</MathText></p>}
     </div>
-    <Button aria-label={`Eliminar pregunta: ${question.statement}`} className="shrink-0 px-2" title="Eliminar pregunta" variant="ghost" onClick={onDelete}>
-      <Trash2 aria-hidden="true" size={18} />
-    </Button>
+    <div className="flex shrink-0 gap-1">
+      <Button aria-label={`Editar pregunta: ${question.statement}`} className="px-2" title="Editar pregunta" variant="ghost" onClick={onEdit}>
+        <Pencil aria-hidden="true" size={18} />
+      </Button>
+      <Button aria-label={`Eliminar pregunta: ${question.statement}`} className="px-2" title="Eliminar pregunta" variant="ghost" onClick={onDelete}>
+        <Trash2 aria-hidden="true" size={18} />
+      </Button>
+    </div>
   </li>;
 }
 
@@ -53,6 +61,44 @@ const IMPORT_TIPS = [
   "Solo después de revisar el resultado, confirma la importación.",
 ];
 
+function EditQuestionModal({ question, pending, error, onCancel, onSubmit }: {
+  question: TopicQuestion;
+  pending: boolean;
+  error?: string;
+  onCancel: () => void;
+  onSubmit: (changes: QuestionChanges) => void;
+}) {
+  const [form, setForm] = useState<QuestionChanges>({
+    statement: question.statement,
+    option_a: question.option_a,
+    option_b: question.option_b,
+    option_c: question.option_c,
+    option_d: question.option_d,
+    correct_option: question.correct_option,
+    explanation: question.explanation,
+  });
+  return <ModalForm
+    title="Editar pregunta"
+    confirmLabel="Guardar cambios"
+    pending={pending}
+    error={error}
+    onCancel={onCancel}
+    onSubmit={() => onSubmit(form)}
+  >
+    <Field label="Pregunta"><Textarea required rows={3} value={form.statement} onChange={(event) => setForm({ ...form, statement: event.target.value })} /></Field>
+    {OPTIONS.map((option) => {
+      const field = `option_${option.toLowerCase()}` as "option_a" | "option_b" | "option_c" | "option_d";
+      return <Field key={option} label={`Alternativa ${option}`}><Input required value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })} /></Field>;
+    })}
+    <Field label="Respuesta correcta">
+      <Select value={form.correct_option} onChange={(event) => setForm({ ...form, correct_option: event.target.value as AnswerOption })}>
+        {OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+      </Select>
+    </Field>
+    <Field label="Explicación (opcional)"><Textarea rows={3} value={form.explanation ?? ""} onChange={(event) => setForm({ ...form, explanation: event.target.value })} /></Field>
+  </ModalForm>;
+}
+
 export function ImportPage() {
   const { topicId = "" } = useParams();
   const client = useQueryClient();
@@ -61,6 +107,7 @@ export function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportResponse | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [editing, setEditing] = useState<TopicQuestion | null>(null);
 
   const questions = useQuery({
     queryKey: ["topic-questions", topicId],
@@ -93,6 +140,14 @@ export function ImportPage() {
       void invalidateQuestions();
     },
     onError: (error) => toast.error(error.message),
+  });
+  const edit = useMutation({
+    mutationFn: (changes: QuestionChanges) => updateQuestion(editing!.id, changes),
+    onSuccess: () => {
+      toast.success("Pregunta actualizada.");
+      setEditing(null);
+      void invalidateQuestions();
+    },
   });
   const removeAll = useMutation({
     mutationFn: () => deleteAllTopicQuestions(topicId),
@@ -157,9 +212,17 @@ export function ImportPage() {
           : questions.error
             ? <div className="mt-4"><Alert tone="error">{questions.error.message}</Alert></div>
             : questions.data?.length
-              ? <ul className="mt-4 grid gap-3">{questions.data.map((question) => <QuestionPreview key={question.id} question={question} onDelete={() => requestDelete(question)} />)}</ul>
+              ? <ul className="mt-4 grid gap-3">{questions.data.map((question) => <QuestionPreview key={question.id} question={question} onEdit={() => { edit.reset(); setEditing(question); }} onDelete={() => requestDelete(question)} />)}</ul>
               : <div className="mt-4"><EmptyState>Este tema todavía no tiene preguntas.</EmptyState></div>}
       </div>
     </Card>
+    {editing && <EditQuestionModal
+      key={editing.id}
+      question={editing}
+      pending={edit.isPending}
+      error={edit.error?.message}
+      onCancel={() => setEditing(null)}
+      onSubmit={(changes) => edit.mutate(changes)}
+    />}
   </>;
 }

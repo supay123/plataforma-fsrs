@@ -21,17 +21,30 @@ export async function receiveWebhook(
   const notification = await request.json().catch(
     () => ({}),
   ) as MercadoPagoNotification;
-  const dataId = new URL(request.url).searchParams.get("data.id") ??
-    (notification.data?.id === undefined ? null : String(notification.data.id));
+  const queryDataId = new URL(request.url).searchParams.get("data.id");
+  const bodyDataId = notification.data?.id === undefined
+    ? null
+    : String(notification.data.id);
+  const dataId = queryDataId ?? bodyDataId;
 
   const { data: secret, error } = await context.supabaseAdmin.rpc(
     RPCS.mercadoPagoWebhookSecret,
   );
   if (error) throw new AppError(500, "webhook_lookup_failed", error.message);
-  if (
-    !secret ||
-    !(await verifyWebhookSignature(dataId, request.headers, secret))
-  ) {
+  // Mercado Pago firma con el data.id de la URL; si el aviso no lo trae en la
+  // URL (como el simulador del panel), la firma no lo incluye aunque el cuerpo sí.
+  const signedIds = new Set<string | null>([queryDataId, bodyDataId]);
+  let validSignature = false;
+  for (const signedId of signedIds) {
+    if (
+      secret &&
+      await verifyWebhookSignature(signedId, request.headers, secret)
+    ) {
+      validSignature = true;
+      break;
+    }
+  }
+  if (!validSignature) {
     throw new AppError(
       401,
       "invalid_signature",

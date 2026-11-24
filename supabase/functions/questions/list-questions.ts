@@ -26,7 +26,8 @@ export async function listQuestionsHandler(
     )
     .eq("topic_id", topicId)
     .neq("status", "archived")
-    .order("created_at");
+    .order("created_at")
+    .order("id");
 
   if (error) {
     throw new AppError(500, "question_lookup_failed", error.message);
