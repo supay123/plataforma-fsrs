@@ -241,6 +241,10 @@ html.portal {
 /* Todas las barras de desplazamiento son delgadas y discretas. */
 * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, currentColor 35%, transparent) transparent; }
 
+/* Zona que se recorre con flechas o deslizando, sin barra: va después de la regla global para ganarle. */
+.scrollbar-hidden { scrollbar-width: none; }
+.scrollbar-hidden::-webkit-scrollbar { display: none; }
+
 /* Barra de desplazamiento siempre visible en el desplegable de `Select` (en móvil los navegadores la ocultan). */
 .select-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, currentColor 40%, transparent) transparent; overscroll-behavior: contain; }
 .select-scroll::-webkit-scrollbar { width: 8px; }

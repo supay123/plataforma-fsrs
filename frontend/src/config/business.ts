@@ -7,6 +7,7 @@ export const BUSINESS = {
   address: "Av. Carlos Ugarte Mza. B Lote. 62 Coripata Sur, Santiago, Cusco, Cusco",
   phone: "+51 942 722 127",
   whatsapp: "51942722127",
+  whatsappShortLink: "https://walink.co/r8grwq",
   email: "pesupay@gmail.com",
   complaintsBookCode: "001",
   social: [] as Array<{ label: string; url: string }>,

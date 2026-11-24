@@ -45,7 +45,7 @@ export function RouteLessonsPage() {
   const topic = lessons.data?.topic;
   return <>
     <PageHeader title={topic ? routeTopicTitle(topic) : "Lecciones"} description="Crea cada lección con su nombre y agrégale su JSON con el texto y las preguntas."
-      actions={<Link to={routeManagementPath(profile?.role)}><Button variant="secondary">Volver a los temas</Button></Link>} />
+      actions={<Link to={topic ? `${routeManagementPath(profile?.role)}?curso=${topic.route_course_id}` : routeManagementPath(profile?.role)}><Button variant="secondary">Volver a los temas</Button></Link>} />
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <Card className="min-w-0">
         {lessons.data?.lessons.length ? <div className="grid gap-3">{lessons.data.lessons.map((lesson) => <div key={lesson.id} className="flex flex-col justify-between gap-3 rounded-2xl border-2 border-line p-4 sm:flex-row sm:items-center">

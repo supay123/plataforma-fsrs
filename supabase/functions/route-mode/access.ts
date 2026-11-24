@@ -4,12 +4,40 @@ import type { Tables } from "../_shared/database.types.ts";
 import { AppError } from "../_shared/errors.ts";
 import type { AppProfile, EdgeContext } from "../_shared/types.ts";
 
+export type RouteCourseRow = Tables<"route_courses">;
 export type RouteTopicRow = Tables<"route_topics">;
 export type RouteLessonRow = Tables<"route_lessons">;
 
 /** Administradores y profesores gestionan el modo ruta. */
 export function requireRouteManager(context: EdgeContext): Promise<AppProfile> {
   return requireProfile(context, ["admin", "teacher"]);
+}
+
+/** El profesor solo toca sus cursos de ruta; el administrador, los de cualquiera. */
+export async function authorizedRouteCourse(
+  context: EdgeContext,
+  manager: AppProfile,
+  courseId: string,
+): Promise<RouteCourseRow> {
+  const { data: course, error } = await context.supabaseAdmin
+    .from(TABLES.routeCourses)
+    .select("*")
+    .eq("id", courseId)
+    .maybeSingle();
+  if (error) {
+    throw new AppError(500, "route_course_lookup_failed", error.message);
+  }
+  if (!course) {
+    throw new AppError(404, "route_course_not_found", "Course not found.");
+  }
+  if (manager.role === "teacher" && course.teacher_id !== manager.id) {
+    throw new AppError(
+      403,
+      "forbidden",
+      "The teacher does not own this course.",
+    );
+  }
+  return course;
 }
 
 /** El profesor solo toca sus temas; el administrador, los de cualquiera. */

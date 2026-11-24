@@ -8,8 +8,39 @@ import { buildRouteProgress } from "../_shared/route-mode.ts";
 import type { AppProfile, EdgeContext } from "../_shared/types.ts";
 import { studentTeacherIds } from "./access.ts";
 
+/** Cursos de ruta de los profesores del estudiante, con el nombre del profesor. */
+export async function loadStudentRouteCourses(
+  context: EdgeContext,
+  student: AppProfile,
+) {
+  const teacherIds = await studentTeacherIds(context, student);
+  if (teacherIds.length === 0) return [];
+  const { data: courses, error } = await context.supabaseAdmin
+    .from(TABLES.routeCourses)
+    .select("id,teacher_id,name,description,position")
+    .in("teacher_id", teacherIds)
+    .order("position");
+  if (error) {
+    throw new AppError(500, "route_course_lookup_failed", error.message);
+  }
+  const { data: teachers, error: teachersError } = await context.supabaseAdmin
+    .from(TABLES.profiles)
+    .select("id,full_name")
+    .in("id", teacherIds);
+  if (teachersError) {
+    throw new AppError(500, "teacher_lookup_failed", teachersError.message);
+  }
+  const teacherNames = new Map(
+    (teachers ?? []).map((teacher) => [teacher.id, teacher.full_name]),
+  );
+  return (courses ?? []).map((course) => ({
+    ...course,
+    teacher_name: teacherNames.get(course.teacher_id) ?? null,
+  }));
+}
+
 /**
- * Temas y lecciones listas del profesor del estudiante, con el estado de cada
+ * Temas y lecciones listas de los cursos de ruta de los profesores del estudiante, con el estado de cada
  * lección. Es la única fuente de la regla de bloqueo: la usan el progreso, la
  * lista de lecciones, el contenido y el envío de intentos.
  */
@@ -22,7 +53,7 @@ export async function loadStudentRoute(
 
   const { data: topics, error: topicsError } = await context.supabaseAdmin
     .from(TABLES.routeTopics)
-    .select("id,teacher_id,name,description,position")
+    .select("id,teacher_id,route_course_id,name,description,position")
     .in("teacher_id", teacherIds);
   if (topicsError) {
     throw new AppError(500, "route_topic_lookup_failed", topicsError.message);

@@ -135,6 +135,62 @@ export function yapePhone(value: unknown): string {
   return digits;
 }
 
+export type YapePayerDocumentType = "DNI" | "CE";
+
+/** Nombre, apellido y documento de quien paga con Yape, que puede no ser el estudiante. */
+export interface YapePayer {
+  firstName: string;
+  lastName: string;
+  documentType: YapePayerDocumentType;
+  document: string;
+}
+
+const PAYER_NAME_PATTERN = /^\p{L}[\p{L}\s'.-]{0,49}$/u;
+// Mismas reglas que el documento del registro (validateStudentRegistration).
+const PAYER_DOCUMENT_PATTERNS: Record<YapePayerDocumentType, RegExp> = {
+  DNI: /^\d{8}$/,
+  CE: /^[A-Z0-9]{9,12}$/,
+};
+
+function payerName(value: unknown, field: string): string {
+  const name = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+  if (!PAYER_NAME_PATTERN.test(name)) {
+    throw new AppError(400, "validation_error", `${field} is invalid.`, {
+      field,
+    });
+  }
+  return name;
+}
+
+/**
+ * Datos del titular del Yape. Es opcional para no romper a quien aún no los
+ * envía; si llega, debe ser válido. Sin `document_type` se toma DNI.
+ */
+export function yapePayer(value: unknown): YapePayer | undefined {
+  if (value === undefined || value === null) return undefined;
+  const payer = typeof value === "object" ? value as Record<string, unknown> : {};
+  const documentType = payer.document_type ?? "DNI";
+  if (documentType !== "DNI" && documentType !== "CE") {
+    throw new AppError(400, "validation_error", "payer.document_type must be DNI or CE.", {
+      field: "payer.document_type",
+    });
+  }
+  const document = typeof payer.document === "string"
+    ? payer.document.replace(/[\s-]/g, "").toUpperCase()
+    : "";
+  if (!PAYER_DOCUMENT_PATTERNS[documentType].test(document)) {
+    throw new AppError(400, "validation_error", "payer.document is invalid for its type.", {
+      field: "payer.document",
+    });
+  }
+  return {
+    firstName: payerName(payer.first_name, "payer.first_name"),
+    lastName: payerName(payer.last_name, "payer.last_name"),
+    documentType,
+    document,
+  };
+}
+
 /**
  * Identificador de dispositivo de Mercado Pago (security.js). Es opcional: si
  * falta o no tiene forma válida se ignora, para no impedir el pago. Mide unos
@@ -183,6 +239,7 @@ export async function createPlanPayment(
     email: string | null;
     token: string;
     phone: string;
+    payer?: YapePayer;
     deviceSessionId?: string;
   },
 ): Promise<PlanPayment> {
@@ -244,6 +301,7 @@ export async function createPlanPayment(
       token: input.token,
       email: input.email,
       phone: input.phone,
+      payer: input.payer,
       plan: { code: input.plan, name: plan.name },
       deviceSessionId: input.deviceSessionId,
     });

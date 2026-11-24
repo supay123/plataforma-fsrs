@@ -74,7 +74,7 @@ export function pickRandomQuestions<Question>(
 }
 
 /**
- * Estado de cada lección para un estudiante. Dentro de cada profesor las
+ * Estado de cada lección para un estudiante. Dentro de cada curso de ruta las
  * lecciones forman una sola fila (temas por posición, lecciones por posición):
  * la primera está disponible y cada una siguiente solo cuando la anterior ya
  * tiene un intento aprobado. Repetir una lección completada es siempre posible.
@@ -101,7 +101,7 @@ export function buildRouteProgress(
     lessonsByTopic.set(lesson.topic_id, list);
   }
 
-  const previousPassedByTeacher = new Map<string, boolean>();
+  const previousPassedByCourse = new Map<string, boolean>();
   return orderedTopics.map((topic) => {
     const topicLessons = [...(lessonsByTopic.get(topic.id) ?? [])].sort(
       (first, second) =>
@@ -110,8 +110,8 @@ export function buildRouteProgress(
     const progress: RouteLessonProgress[] = topicLessons.map((lesson) => {
       const lessonAttempts = attemptsByLesson.get(lesson.id) ?? [];
       const passed = lessonAttempts.some((attempt) => attempt.passed);
-      const unlocked = previousPassedByTeacher.get(topic.teacher_id) ?? true;
-      previousPassedByTeacher.set(topic.teacher_id, passed);
+      const unlocked = previousPassedByCourse.get(topic.route_course_id) ?? true;
+      previousPassedByCourse.set(topic.route_course_id, passed);
       return {
         ...lesson,
         status: passed ? "completed" : unlocked ? "available" : "locked",

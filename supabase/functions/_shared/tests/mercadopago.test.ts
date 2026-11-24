@@ -8,6 +8,7 @@ import {
 import {
   deviceSessionId,
   publicPaymentStatus,
+  yapePayer,
   yapePhone,
   yapeToken,
 } from "../plan-payments.ts";
@@ -204,7 +205,25 @@ Deno.test("accepts a device id of Mercado Pago and ignores anything else", () =>
   assert.equal(deviceSessionId("x".repeat(513)), undefined);
 });
 
-Deno.test("describes the plan and the device in the Yape order, never the payer's identity", async () => {
+Deno.test("accepts the Yape holder as payer and rejects malformed data", () => {
+  assert.equal(yapePayer(undefined), undefined);
+  assert.deepEqual(
+    yapePayer({ first_name: "  María  José ", last_name: "Quispe", document: "12 345 678" }),
+    { firstName: "María José", lastName: "Quispe", documentType: "DNI", document: "12345678" },
+  );
+  assert.deepEqual(
+    yapePayer({ first_name: "Ana", last_name: "Quispe", document_type: "CE", document: "ce-1234567" }),
+    { firstName: "Ana", lastName: "Quispe", documentType: "CE", document: "CE1234567" },
+  );
+  assert.throws(() => yapePayer({ first_name: "Ana", last_name: "Quispe", document_type: "RUC", document: "12345678" }));
+  assert.throws(() => yapePayer({ first_name: "Ana", last_name: "Quispe", document_type: "CE", document: "123" }));
+  assert.throws(() => yapePayer({ first_name: "Ana", last_name: "Quispe", document: "1234" }));
+  assert.throws(() => yapePayer({ first_name: "", last_name: "Quispe", document: "12345678" }));
+  assert.throws(() => yapePayer({ first_name: "Ana", last_name: "<b>", document: "12345678" }));
+  assert.throws(() => yapePayer("12345678"));
+});
+
+Deno.test("describes the plan, the device and the Yape holder in the Yape order", async () => {
   const originalFetch = globalThis.fetch;
   Deno.env.set("MERCADOPAGO_ACCESS_TOKEN", "APP_USR-test");
   let sent: { headers: Headers; body: Record<string, unknown> } | undefined;
@@ -237,8 +256,10 @@ Deno.test("describes the plan and the device in the Yape order, never the payer'
       unit_price: "14.90",
       quantity: 1,
     }]);
-    const payer = sent?.body.payer as Record<string, unknown>;
-    assert.deepEqual(Object.keys(payer).sort(), ["email", "phone"]);
+    assert.deepEqual(
+      Object.keys(sent?.body.payer as Record<string, unknown>).sort(),
+      ["email", "phone"],
+    );
 
     await createYapeOrder({
       reference: "ref-2",
@@ -246,7 +267,15 @@ Deno.test("describes the plan and the device in the Yape order, never the payer'
       token: "token-12345678",
       email: "student@example.com",
       phone: "987654321",
+      payer: { firstName: "María José", lastName: "Quispe", documentType: "DNI", document: "12345678" },
       plan: { code: "mensual", name: "Plan Estudiante" },
+    });
+    assert.deepEqual(sent?.body.payer, {
+      email: "student@example.com",
+      first_name: "María José",
+      last_name: "Quispe",
+      identification: { type: "DNI", number: "12345678" },
+      phone: { area_code: "51", number: "987654321" },
     });
     assert.equal(sent?.headers.has("x-meli-session-id"), false);
   } finally {

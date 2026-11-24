@@ -4,17 +4,22 @@ import type { EncryptedAnswerKey } from "../../types/contracts";
 export type RouteOption = "A" | "B" | "C" | "D";
 export type RouteLessonStatus = "locked" | "available" | "completed";
 
-/** Tema de la ruta de un profesor (vista de gestión). */
+/** Curso de ruta de un profesor (vista de gestión). No tiene relación con los cursos de "Mi aprendizaje". */
+export interface RouteCourse { id: string; teacher_id: string; name: string; description: string | null; position: number; topic_count: number }
+/** Curso de ruta tal como lo ve el estudiante. */
+export interface RouteCourseProgress { id: string; teacher_id: string; teacher_name: string | null; name: string; description: string | null; position: number }
+
+/** Tema de un curso de ruta (vista de gestión). */
 export interface RouteTopic {
-  id: string; teacher_id: string; teacher_name: string | null; name: string; description: string | null;
+  id: string; teacher_id: string; route_course_id: string; teacher_name: string | null; name: string; description: string | null;
   position: number; lesson_count: number; ready_lesson_count: number;
 }
 /** Lección en la vista de gestión; `is_ready` es true cuando ya tiene su banco de preguntas. */
 export interface RouteLessonSummary { id: string; topic_id: string; position: number; title: string; is_ready: boolean }
 
 export interface RouteLessonProgress { id: string; topic_id: string; position: number; title: string; status: RouteLessonStatus; best_percent: number | null; attempts: number }
-export interface RouteTopicProgress { id: string; teacher_id: string; name: string; description: string | null; position: number; lessons: RouteLessonProgress[]; completed_lessons: number }
-export interface RouteProgress { pass_percent: number; topics: RouteTopicProgress[] }
+export interface RouteTopicProgress { id: string; teacher_id: string; route_course_id: string; name: string; description: string | null; position: number; lessons: RouteLessonProgress[]; completed_lessons: number }
+export interface RouteProgress { pass_percent: number; courses: RouteCourseProgress[]; topics: RouteTopicProgress[] }
 
 /** Pregunta tal como va en el JSON de la lección. */
 export interface RouteQuestionJson {
@@ -45,9 +50,10 @@ const none = {};
 const idQuery = (path: string, id: string) => `route-mode/${path}?id=${encodeURIComponent(id)}`;
 
 export const routeProgressKey = ["route-progress"] as const;
-/** Prefijo de todas las listas de temas: invalida las de cualquier profesor. */
+/** Prefijo de todas las listas de temas: invalida las de cualquier curso. */
 export const routeTopicsPrefix = ["route-topics"] as const;
-export const routeTopicsKey = (teacherId: string | null) => ["route-topics", teacherId] as const;
+export const routeTopicsKey = (routeCourseId: string | null) => ["route-topics", routeCourseId] as const;
+export const routeCoursesKey = (teacherId: string | null) => ["route-courses", teacherId] as const;
 export const routeLessonsKey = (topicId: string | null) => ["route-lessons", topicId] as const;
 export const routeLessonContentKey = (lessonId: string) => ["route-lesson-content", lessonId] as const;
 
@@ -55,13 +61,28 @@ export async function getRouteProgress() {
   return invokeFunction<RouteProgress, typeof none>("route-mode/progress", none, { method: "GET" });
 }
 
-/** GET /route-mode/topics: el profesor recibe los suyos; el administrador filtra por `teacherId`. */
-export async function listRouteTopics(teacherId?: string | null) {
+/** GET /route-mode/courses: el profesor recibe los suyos; el administrador filtra por `teacherId`. */
+export async function listRouteCourses(teacherId?: string | null) {
   const query = teacherId ? `?teacher_id=${encodeURIComponent(teacherId)}` : "";
-  const { topics } = await invokeFunction<{ topics: RouteTopic[] }, typeof none>(`route-mode/topics${query}`, none, { method: "GET" });
+  const { courses } = await invokeFunction<{ courses: RouteCourse[] }, typeof none>(`route-mode/courses${query}`, none, { method: "GET" });
+  return courses;
+}
+export function createRouteCourse(body: { name: string; description?: string; teacher_id?: string }) {
+  return invokeFunction<{ course: { id: string } }, typeof body>("route-mode/courses", body);
+}
+export function updateRouteCourse(courseId: string, body: { name?: string; description?: string | null }) {
+  return invokeFunction<{ course: { id: string } }, typeof body>(idQuery("courses", courseId), body, { method: "PUT" });
+}
+export function deleteRouteCourse(courseId: string) {
+  return invokeFunction<{ deleted: boolean }, typeof none>(idQuery("courses", courseId), none, { method: "DELETE" });
+}
+
+/** GET /route-mode/topics?route_course_id=: temas de un curso de ruta. */
+export async function listRouteTopics(routeCourseId: string) {
+  const { topics } = await invokeFunction<{ topics: RouteTopic[] }, typeof none>(`route-mode/topics?route_course_id=${encodeURIComponent(routeCourseId)}`, none, { method: "GET" });
   return topics;
 }
-export function createRouteTopic(body: { name: string; description?: string; teacher_id?: string }) {
+export function createRouteTopic(body: { route_course_id: string; name: string; description?: string }) {
   return invokeFunction<{ topic: { id: string } }, typeof body>("route-mode/topics", body);
 }
 export function updateRouteTopic(topicId: string, body: { name?: string; description?: string | null }) {
@@ -73,7 +94,7 @@ export function deleteRouteTopic(topicId: string) {
 
 /** Lecciones de un tema con el tema al que pertenecen (solo administrador y profesor). */
 export function listRouteLessons(topicId: string) {
-  return invokeFunction<{ topic: { id: string; name: string; position: number }; lessons: RouteLessonSummary[] }, typeof none>(`route-mode/lessons?topic_id=${encodeURIComponent(topicId)}`, none, { method: "GET" });
+  return invokeFunction<{ topic: { id: string; route_course_id: string; name: string; position: number }; lessons: RouteLessonSummary[] }, typeof none>(`route-mode/lessons?topic_id=${encodeURIComponent(topicId)}`, none, { method: "GET" });
 }
 /** Crea la lección con su nombre; queda sin contenido hasta guardar su JSON. */
 export function createRouteLesson(body: { topic_id: string; title: string }) {

@@ -19,6 +19,7 @@ export const TABLES = {
   profiles: "profiles",
   questionImportBatches: "question_import_batches",
   questions: "questions",
+  routeCourses: "route_courses",
   routeLessonAttempts: "route_lesson_attempts",
   routeLessons: "route_lessons",
   routeQuestions: "route_questions",

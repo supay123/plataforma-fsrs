@@ -9,6 +9,7 @@ import {
   uuid,
 } from "../_shared/validation.ts";
 import {
+  authorizedRouteCourse,
   authorizedRouteTopic,
   requireRouteManager,
   studentTeacherIds,
@@ -19,7 +20,7 @@ function queryId(request: Request): string {
   return uuid(new URL(request.url).searchParams.get("id"), "id");
 }
 
-/** POST /route-mode/topics — crea un tema al final de la ruta del profesor. */
+/** POST /route-mode/topics — crea un tema al final de un curso de ruta. */
 export async function createTopic(
   request: Request,
   context: EdgeContext,
@@ -30,29 +31,16 @@ export async function createTopic(
   const description = optionalString(body.description, "description", 500) ??
     null;
 
-  let teacherId = manager.id;
-  let collegeId = manager.college_id;
-  if (manager.role === "admin") {
-    teacherId = uuid(body.teacher_id, "teacher_id");
-    const { data: teacher, error } = await context.supabaseAdmin
-      .from(TABLES.profiles)
-      .select("id,college_id,role,is_active")
-      .eq("id", teacherId)
-      .maybeSingle();
-    if (error) throw new AppError(500, "teacher_lookup_failed", error.message);
-    if (!teacher || teacher.role !== "teacher" || !teacher.is_active) {
-      throw new AppError(404, "teacher_not_found", "Teacher not found.");
-    }
-    collegeId = teacher.college_id;
-  }
-  if (!collegeId) {
-    throw new AppError(409, "college_required", "The teacher has no college.");
-  }
+  const course = await authorizedRouteCourse(
+    context,
+    manager,
+    uuid(body.route_course_id, "route_course_id"),
+  );
 
   const { data: last, error: lastError } = await context.supabaseAdmin
     .from(TABLES.routeTopics)
     .select("position")
-    .eq("teacher_id", teacherId)
+    .eq("route_course_id", course.id)
     .order("position", { ascending: false })
     .limit(1);
   if (lastError) {
@@ -61,8 +49,9 @@ export async function createTopic(
   const { data: topic, error } = await context.supabaseAdmin
     .from(TABLES.routeTopics)
     .insert({
-      college_id: collegeId,
-      teacher_id: teacherId,
+      college_id: course.college_id,
+      teacher_id: course.teacher_id,
+      route_course_id: course.id,
       name,
       description,
       position: (last?.[0]?.position ?? 0) + 1,
@@ -147,10 +136,11 @@ export async function deleteTopic(
 }
 
 /**
- * GET /route-mode/topics[?teacher_id=...]
+ * GET /route-mode/topics[?route_course_id=...][&teacher_id=...]
  * Temas con la cantidad de lecciones. El profesor ve los suyos; el
  * administrador los de todos (o de un profesor con teacher_id); el estudiante,
- * los de su profesor, contando solo lecciones listas.
+ * los de sus profesores, contando solo lecciones listas. route_course_id
+ * limita la lista a un curso de ruta.
  */
 export async function listTopics(
   request: Request,
@@ -163,8 +153,8 @@ export async function listTopics(
   );
   let query = context.supabaseAdmin
     .from(TABLES.routeTopics)
-    .select("id,teacher_id,name,description,position")
-    .order("teacher_id")
+    .select("id,teacher_id,route_course_id,name,description,position")
+    .order("route_course_id")
     .order("position");
   if (profile.role === "teacher") {
     query = query.eq("teacher_id", profile.id);
@@ -179,6 +169,11 @@ export async function listTopics(
     );
     if (teacherId) query = query.eq("teacher_id", teacherId);
   }
+  const routeCourseId = optionalUuid(
+    new URL(request.url).searchParams.get("route_course_id"),
+    "route_course_id",
+  );
+  if (routeCourseId) query = query.eq("route_course_id", routeCourseId);
   const { data: topics, error } = await query;
   if (error) {
     throw new AppError(500, "route_topic_lookup_failed", error.message);

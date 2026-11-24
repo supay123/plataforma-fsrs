@@ -61,13 +61,13 @@ function ModalDialog({ modal, onClose }: { modal: OpenModal; onClose: () => void
         {modal.variant === "warning" && <TriangleAlert aria-hidden="true" className="h-5 w-5 shrink-0 text-amber-600 dark:text-yellow-400 portal:text-warning-text" />}
         {modal.title}
       </h2>
-      <div className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 portal:text-fg-muted">{modal.body}</div>
-      <div className="mt-6 flex justify-end gap-3">
+      <div className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 portal:text-fg-muted">{typeof modal.body === "function" ? modal.body(onClose) : modal.body}</div>
+      {!modal.hideConfirm && <div className="mt-6 flex justify-end gap-3">
         {!informative && <Button autoFocus type="button" variant="secondary" disabled={pending} onClick={onClose}>Cancelar</Button>}
         <Button autoFocus={informative} type="button" variant={variant.buttonVariant} disabled={pending} onClick={() => void confirm()}>
           {pending ? variant.pendingLabel : modal.confirmLabel ?? variant.confirmLabel}
         </Button>
-      </div>
+      </div>}
     </section>
     </div>
   </div>;
