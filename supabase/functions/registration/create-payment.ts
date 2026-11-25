@@ -4,6 +4,7 @@ import {
   createPlanPayment,
   deviceSessionId,
   paymentResponse,
+  yapePayer,
   yapePhone,
   yapeToken,
 } from "../_shared/plan-payments.ts";
@@ -27,6 +28,7 @@ export async function createPayment(
   const plan = planId(body.plan);
   const token = yapeToken(body.token);
   const phone = yapePhone(body.phone);
+  const payer = yapePayer(body.payer);
 
   const { data: registration, error } = await context.supabaseAdmin
     .from(TABLES.studentRegistrations)
@@ -57,6 +59,7 @@ export async function createPayment(
     email: registration.email,
     token,
     phone,
+    payer,
     deviceSessionId: deviceSessionId(body.device_session_id),
   });
   return json(paymentResponse(payment), 201);

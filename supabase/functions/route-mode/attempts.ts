@@ -10,7 +10,11 @@ import {
 import type { EdgeContext } from "../_shared/types.ts";
 import { uuid } from "../_shared/validation.ts";
 import type { SubmitAttemptBody } from "./interfaces.ts";
-import { loadStudentRoute, requireUnlockedLesson } from "./student-route.ts";
+import {
+  loadStudentRoute,
+  loadStudentRouteCourses,
+  requireUnlockedLesson,
+} from "./student-route.ts";
 
 /**
  * POST /route-mode/attempts
@@ -87,7 +91,7 @@ export async function submitAttempt(
   });
 }
 
-/** Siguiente lección de la fila del profesor, si existe y ya está lista. */
+/** Siguiente lección de la fila del mismo curso de ruta, si existe y ya está lista. */
 async function nextLessonId(
   context: EdgeContext,
   student: Parameters<typeof loadStudentRoute>[1],
@@ -95,18 +99,24 @@ async function nextLessonId(
 ): Promise<string | null> {
   const route = await loadStudentRoute(context, student);
   const row = route.flatMap((topic) =>
-    topic.lessons.map((lesson) => ({ ...lesson, teacher_id: topic.teacher_id }))
+    topic.lessons.map((lesson) => ({
+      ...lesson,
+      route_course_id: topic.route_course_id,
+    }))
   );
   const index = row.findIndex((lesson) => lesson.id === lessonId);
   const current = row[index];
   if (!current) return null;
   const next = row.slice(index + 1).find((lesson) =>
-    lesson.teacher_id === current.teacher_id
+    lesson.route_course_id === current.route_course_id
   );
   return next?.id ?? null;
 }
 
-/** GET /route-mode/progress — temas, lecciones y desbloqueos del estudiante. */
+/**
+ * GET /route-mode/progress — cursos de ruta, temas, lecciones y desbloqueos
+ * del estudiante. Cada tema indica su curso en `route_course_id`.
+ */
 export async function getProgress(
   _request: Request,
   context: EdgeContext,
@@ -114,6 +124,7 @@ export async function getProgress(
   const student = await requireProfile(context, ["student"], true);
   return json({
     pass_percent: ROUTE_PASS_PERCENT,
+    courses: await loadStudentRouteCourses(context, student),
     topics: await loadStudentRoute(context, student),
   });
 }

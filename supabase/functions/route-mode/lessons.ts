@@ -245,7 +245,12 @@ export async function listLessons(
     throw new AppError(500, "route_lesson_lookup_failed", error.message);
   }
   return json({
-    topic: { id: topic.id, name: topic.name, position: topic.position },
+    topic: {
+      id: topic.id,
+      route_course_id: topic.route_course_id,
+      name: topic.name,
+      position: topic.position,
+    },
     lessons: data ?? [],
   });
 }

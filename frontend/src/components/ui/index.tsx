@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 import { useId, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 import clsx from "clsx";
@@ -73,7 +73,8 @@ export function PageHeader({ title, description, actions, className }: { title: 
     </div>
   </header>;
 }
-export function Alert({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "error" | "success" }) { return <div role="alert" className={clsx("rounded-xl border p-3 text-sm portal:border-2", tone === "error" && "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300 portal:border-danger portal:bg-danger-soft portal:text-danger-text", tone === "success" && "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300 portal:border-success portal:bg-success-soft portal:text-success-text", tone === "info" && "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 portal:border-line-strong portal:bg-sunken portal:text-fg")}>{children}</div>; }
+/** `onDismiss`: muestra una "x" a la derecha para que quien lo lee pueda quitar el aviso. */
+export function Alert({ children, tone = "info", onDismiss }: { children: ReactNode; tone?: "info" | "error" | "success"; onDismiss?: () => void }) { return <div role="alert" className={clsx("rounded-xl border p-3 text-sm portal:border-2", onDismiss && "flex items-center justify-between gap-3", tone === "error" && "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300 portal:border-danger portal:bg-danger-soft portal:text-danger-text", tone === "success" && "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300 portal:border-success portal:bg-success-soft portal:text-success-text", tone === "info" && "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 portal:border-line-strong portal:bg-sunken portal:text-fg")}>{onDismiss ? <><div>{children}</div><div className="flex items-center self-stretch border-l border-current/20 pl-3"><button type="button" aria-label="Cerrar aviso" onClick={onDismiss} className="rounded-lg p-1 opacity-70 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"><X aria-hidden="true" size={16} /></button></div></> : children}</div>; }
 export function Spinner() { return <div role="status" className="mx-auto my-12 h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600 dark:border-white/10 dark:border-t-emerald-400 portal:border-line portal:border-t-primary"><span className="sr-only">Cargando</span></div>; }
 /** `mascot`: la mascota dormida sobre el texto (solo si la pantalla no tiene otra mascota). */
 export function EmptyState({ children, mascot = false }: { children: ReactNode; mascot?: boolean }) {

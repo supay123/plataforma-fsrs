@@ -3,6 +3,7 @@ export type RouteLessonStatus = "locked" | "available" | "completed";
 export interface RouteTopicRecord {
   id: string;
   teacher_id: string;
+  route_course_id: string;
   name: string;
   description: string | null;
   position: number;

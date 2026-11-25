@@ -66,6 +66,7 @@ const topics = [
   {
     id: "t2",
     teacher_id: "p1",
+    route_course_id: "c1",
     name: "Tema 2",
     description: null,
     position: 2,
@@ -73,11 +74,19 @@ const topics = [
   {
     id: "t1",
     teacher_id: "p1",
+    route_course_id: "c1",
     name: "Tema 1",
     description: null,
     position: 1,
   },
-  { id: "t3", teacher_id: "p2", name: "Otro", description: null, position: 1 },
+  {
+    id: "t3",
+    teacher_id: "p2",
+    route_course_id: "c2",
+    name: "Otro",
+    description: null,
+    position: 1,
+  },
 ];
 const lessons = [
   { id: "l3", topic_id: "t2", position: 1, title: "C" },
@@ -119,6 +128,32 @@ Deno.test("a failed attempt keeps the next lesson locked, a pass opens it across
   assert.equal(
     passed.find((topic) => topic.id === "t2")?.lessons[0]?.status,
     "available",
+  );
+});
+
+Deno.test("two route courses of the same teacher unlock independently", () => {
+  const progress = buildRouteProgress(
+    [
+      ...topics,
+      {
+        id: "t4",
+        teacher_id: "p1",
+        route_course_id: "c3",
+        name: "Segundo curso",
+        description: null,
+        position: 1,
+      },
+    ],
+    [...lessons, { id: "l5", topic_id: "t4", position: 1, title: "E" }],
+    [],
+  );
+  assert.equal(
+    progress.find((topic) => topic.id === "t4")?.lessons[0]?.status,
+    "available",
+  );
+  assert.equal(
+    progress.find((topic) => topic.id === "t1")?.lessons[1]?.status,
+    "locked",
   );
 });
 

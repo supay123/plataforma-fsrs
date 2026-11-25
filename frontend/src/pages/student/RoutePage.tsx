@@ -1,12 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, EmptyState, Eyebrow, PageHeader, ProgressBar } from "../../components/ui";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/ui/use-toast";
 import { RouteIsland } from "../../features/route-mode/RouteIsland";
-import { getRouteProgress, routeProgressKey, routeTopicTitle, type RouteLessonProgress, type RouteTopicProgress } from "../../features/route-mode/api";
+import { RouteCourseSelector } from "../../features/route-mode/RouteCourseSelector";
+import { getRouteProgress, routeProgressKey, routeTopicTitle, type RouteCourseProgress, type RouteLessonProgress, type RouteTopicProgress } from "../../features/route-mode/api";
+
+/** Curso elegido por última vez: así al volver de una lección se queda en el mismo curso. */
+const SELECTED_COURSE_STORAGE_KEY = "routeCourseId";
 
 const SKELETON_POSITIONS = ["justify-start", "justify-center", "justify-end", "justify-center"] as const;
 
@@ -58,18 +62,35 @@ function currentLessonId(topics: RouteTopicProgress[]): string | null {
   return (lessons.find((lesson) => lesson.status === "available") ?? lessons[lessons.length - 1])?.id ?? null;
 }
 
+/** Cursos con al menos una lección lista, en el orden del profesor. */
+function coursesWithLessons(courses: RouteCourseProgress[], topics: RouteTopicProgress[]): RouteCourseProgress[] {
+  return courses.filter((course) => topics.some((topic) => topic.route_course_id === course.id));
+}
+
 export function RoutePage() {
   const toast = useToast();
   const progress = useQuery({ queryKey: routeProgressKey, queryFn: getRouteProgress });
+  const [pickedCourseId, setPickedCourseId] = useState(() => sessionStorage.getItem(SELECTED_COURSE_STORAGE_KEY));
   useEffect(() => { if (progress.error) toast.error(progress.error.message); }, [progress.error, toast]);
   if (progress.isLoading) return <RouteSkeleton />;
-  const topics = (progress.data?.topics ?? []).filter((topic) => topic.lessons.length > 0);
+  const allTopics = (progress.data?.topics ?? []).filter((topic) => topic.lessons.length > 0);
+  const courses = coursesWithLessons(progress.data?.courses ?? [], allTopics);
+  // Sin elección válida se abre el curso donde el estudiante tiene su próxima lección.
+  const currentCourseId = allTopics.find((topic) => topic.lessons.some((lesson) => lesson.status === "available"))?.route_course_id;
+  const selectedCourse = courses.find((course) => course.id === pickedCourseId) ?? courses.find((course) => course.id === currentCourseId) ?? courses[0] ?? null;
+  const selectCourse = (courseId: string) => { sessionStorage.setItem(SELECTED_COURSE_STORAGE_KEY, courseId); setPickedCourseId(courseId); };
+  const topics = allTopics.filter((topic) => topic.route_course_id === selectedCourse?.id);
+  const showTeacherNames = new Set(courses.map((course) => course.teacher_id)).size > 1;
   // El zigzag no se reinicia en cada tema: la primera isla de un tema sigue donde terminó la del anterior.
   const firstIndexByTopic = topics.map((_, topicIndex) => topics.slice(0, topicIndex).reduce((total, topic) => total + topic.lessons.length, 0));
   const currentId = currentLessonId(topics);
   const passPercent = progress.data?.pass_percent ?? 80;
   return <>
     <PageHeader title="Modo ruta" description={`Aprende paso a paso. Para abrir la siguiente lección necesitas al menos ${passPercent}% de acierto en la anterior.`} />
+    {courses.length > 1 && <>
+      <RouteCourseSelector courses={courses} selectedCourseId={selectedCourse?.id ?? null} showTeacherNames={showTeacherNames} onSelect={selectCourse} />
+      <hr className="mb-8 border-line" />
+    </>}
     {topics.length === 0
       ? <EmptyState mascot>{progress.error ? "No pudimos cargar tu ruta." : "Tu profesor aún no publicó lecciones en el modo ruta."}</EmptyState>
       : <div className="grid gap-10">{topics.map((topic, topicIndex) => {

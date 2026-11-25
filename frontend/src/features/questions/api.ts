@@ -1,5 +1,5 @@
 import { invokeFunction } from "../../lib/api/functions";
-import type { ImportResponse, TopicQuestion } from "../../types/contracts";
+import type { AnswerOption, ImportResponse, TopicQuestion } from "../../types/contracts";
 
 export async function importQuestions(body: { action: "validate" | "confirm"; topic_id: string; filename: string; file_base64: string }) { return invokeFunction<ImportResponse, typeof body>("import-questions", body); }
 export async function fileToBase64(file: File) { const buffer = await file.arrayBuffer(); let binary = ""; for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte); return btoa(binary); }
@@ -23,5 +23,22 @@ export function deleteQuestion(questionId: string) {
 export function deleteAllTopicQuestions(topicId: string) {
   return invokeFunction<{ topic_id: string; archived: number }, Record<string, never>>(
     `questions/topic?topic_id=${encodeURIComponent(topicId)}`, {}, { method: "DELETE" },
+  );
+}
+
+export interface QuestionChanges {
+  statement: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_option: AnswerOption;
+  explanation: string | null;
+}
+
+/** PUT /questions?id=...: corrige una pregunta vigente del tema. */
+export function updateQuestion(questionId: string, changes: QuestionChanges) {
+  return invokeFunction<{ question_id: string }, QuestionChanges>(
+    `questions?id=${encodeURIComponent(questionId)}`, changes, { method: "PUT" },
   );
 }

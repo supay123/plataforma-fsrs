@@ -51,6 +51,9 @@ async function signUpAndPay(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText("Código de verificación"), "123456");
   await user.click(screen.getByRole("button", { name: "Verificar correo" }));
   await user.type(await screen.findByLabelText("Celular de Yape"), "111111111");
+  await user.type(screen.getByLabelText("Nombre del titular del Yape"), "María");
+  await user.type(screen.getByLabelText("Apellido del titular del Yape"), "Quispe");
+  await user.type(screen.getByLabelText("Número de documento"), "12345678");
   await user.type(screen.getByLabelText(/^Código de aprobación/), "123456");
   await user.click(screen.getByRole("button", { name: /Pagar S\/ 14.90 con Yape/ }));
 }
@@ -142,11 +145,14 @@ describe("SignUpPage", () => {
     // Validar los datos y enviar el código son dos llamadas distintas.
     expect(mocks.requestRegistrationCode).toHaveBeenCalledWith("registration-1");
     await waitFor(() => expect(mocks.validateRegistrationCode).toHaveBeenCalledWith("registration-1", "123456"));
-    expect(await screen.findByText("S/ 14.90")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Pagar S/ 14.90 con Yape" })).toBeInTheDocument();
     await user.type(screen.getByLabelText("Celular de Yape"), "111111111");
+    await user.type(screen.getByLabelText("Nombre del titular del Yape"), "María");
+    await user.type(screen.getByLabelText("Apellido del titular del Yape"), "Quispe");
+    await user.type(screen.getByLabelText("Número de documento"), "12345678");
     await user.type(screen.getByLabelText(/^Código de aprobación/), "123456");
     await user.click(screen.getByRole("button", { name: /Pagar S\/ 14.90 con Yape/ }));
-    await waitFor(() => expect(mocks.createRegistrationPayment).toHaveBeenCalledWith("registration-1", "mensual", { token: "yape-token-1", phone: "111111111", device_session_id: "device-1" }));
+    await waitFor(() => expect(mocks.createRegistrationPayment).toHaveBeenCalledWith("registration-1", "mensual", { token: "yape-token-1", phone: "111111111", payer: { first_name: "María", last_name: "Quispe", document_type: "DNI", document: "12345678" }, device_session_id: "device-1" }));
     expect(mocks.createYapeToken).toHaveBeenCalledWith("TEST-public-key", "111111111", "123456");
   });
 

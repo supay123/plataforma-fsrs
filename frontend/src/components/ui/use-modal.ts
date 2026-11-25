@@ -2,9 +2,11 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { MascotEvent } from "./use-mascot-animation";
 
 export type ModalVariant = "delete" | "create" | "warning" | "info";
+/** Contenido del modal; como función recibe `close` para cerrarlo desde dentro. */
+export type ModalBody = ReactNode | ((close: () => void) => ReactNode);
 export interface ModalOptions {
   title: string;
-  body: ReactNode;
+  body: ModalBody;
   /**
    * Acción del botón principal. Mientras su promesa está pendiente los botones
    * se desactivan; si se resuelve, el modal se cierra y si falla, sigue abierto
@@ -19,7 +21,9 @@ export interface ModalOptions {
 /** Modal informativo: solo un botón para cerrarlo, sin acción que confirmar. */
 export interface InfoModalOptions {
   title: string;
-  body: ReactNode;
+  body: ModalBody;
+  /** Oculta el botón de cerrar cuando el propio contenido ya trae uno. */
+  hideConfirm?: boolean;
   /** Texto del botón para cerrar; por defecto "Entendido". */
   confirmLabel?: string;
 }

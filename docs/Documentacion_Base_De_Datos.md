@@ -1263,16 +1263,28 @@ otorga). Hace idempotente el cierre.
 
 ## Modo ruta
 
-Temas con lecciones que el estudiante desbloquea en orden. Las preguntas son
+Cursos de ruta con temas y lecciones que el estudiante desbloquea en orden. Los
+cursos de ruta son independientes de `public.courses` ("Mi aprendizaje"). Las preguntas son
 propias de este modo (no son las de `questions`) y no alimentan FSRS. Toda
 lectura de contenido y escritura pasa por la Edge Function `route-mode`
 (`service_role`); las políticas RLS solo cubren lecturas directas.
 
+### public.route_courses
+
+`college_id`, `teacher_id` (el profesor dueño), `name` (único por profesor sin
+importar mayúsculas), `description` y `position`. Un profesor puede tener varios;
+cada uno tiene su propia fila de temas y lecciones. La migración
+`20261124120000_route_courses` creó para cada profesor con temas un curso
+"Ruta principal" con todos ellos. RLS de lectura: admin, el profesor dueño y los
+estudiantes matriculados en cursos (de "Mi aprendizaje") de ese profesor; no
+depende de qué curso de `courses` sea.
+
 ### public.route_topics
 
-`college_id`, `teacher_id` (el grupo dueño), `name`, `description` y `position`
-(1, 2, 3...: se muestra como "Tema N"). RLS de lectura: admin, el profesor dueño
-y los estudiantes matriculados en cursos de ese profesor.
+`college_id`, `teacher_id`, `route_course_id` (el curso de ruta al que pertenece;
+al borrar el curso se borran sus temas), `name`, `description` y `position`
+(1, 2, 3...: orden dentro del curso, se muestra como "Tema N"). RLS de lectura:
+admin, el profesor dueño y los estudiantes matriculados en cursos de ese profesor.
 
 ### public.route_lessons
 
@@ -1294,7 +1306,7 @@ y el profesor dueño (los estudiantes nunca leen la respuesta correcta).
 Cada intento: `student_id`, `lesson_id`, `correct_count`, `total_questions`,
 `score_percent`, `passed` (`score_percent >= 80`), `answers` y `xp_gained`. Una
 lección se completa cuando algún intento tiene `passed`; la siguiente se
-desbloquea entonces (dentro de la fila de temas y lecciones de cada profesor).
+desbloquea entonces (dentro de la fila de temas y lecciones de cada curso de ruta).
 RLS: el estudiante lee los suyos, el admin todos y el profesor los de sus temas.
 
 ### public.route_question_xp_awards

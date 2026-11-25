@@ -146,9 +146,9 @@ const ITEM_CATEGORY = "learnings";
  * Crea y procesa en el acto una orden pagada con Yape, usando el token que
  * generó el navegador (de un solo uso). La respuesta ya trae el resultado.
  *
- * Se describe el producto (el plan) y el dispositivo, nunca a una persona:
- * quien paga con Yape suele ser un familiar del estudiante, así que sus datos
- * no sirven como datos del pagador.
+ * Se describe el producto (el plan), el dispositivo y a quien paga. El nombre
+ * y el documento son los del titular del Yape, no los del estudiante: suele ser un
+ * familiar, y mezclar identidades levanta sospechas en el antifraude.
  */
 export function createYapeOrder(input: {
   reference: string;
@@ -156,6 +156,12 @@ export function createYapeOrder(input: {
   token: string;
   email: string;
   phone: string;
+  payer?: {
+    firstName: string;
+    lastName: string;
+    documentType: string;
+    document: string;
+  };
   plan: { code: string; name: string };
   /** Identifica el dispositivo del comprador para el antifraude. */
   deviceSessionId?: string;
@@ -182,6 +188,14 @@ export function createYapeOrder(input: {
       }],
       payer: {
         email: input.email,
+        ...(input.payer && {
+          first_name: input.payer.firstName,
+          last_name: input.payer.lastName,
+          identification: {
+            type: input.payer.documentType,
+            number: input.payer.document,
+          },
+        }),
         phone: { area_code: "51", number: input.phone },
       },
       transactions: {
