@@ -11,7 +11,7 @@ const VARIANTS: Record<ModalVariant, { confirmLabel: string; pendingLabel: strin
   info: { confirmLabel: "Entendido", pendingLabel: "Entendido", buttonVariant: "primary" },
 };
 
-interface OpenModal extends ModalOptions { id: number; variant: ModalVariant }
+interface OpenModal extends ModalOptions { id: number; variant: ModalVariant; hideConfirm?: boolean }
 
 function ModalDialog({ modal, onClose }: { modal: OpenModal; onClose: () => void }) {
   const [pending, setPending] = useState(false);

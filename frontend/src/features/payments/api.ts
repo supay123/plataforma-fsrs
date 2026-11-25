@@ -27,7 +27,7 @@ export function getPaymentConfig() {
 }
 
 /** Nombre, apellido y DNI del titular del Yape (quien paga, que puede no ser el estudiante). */
-export interface YapePayer { first_name: string; last_name: string; document: string }
+export interface YapePayer { first_name: string; last_name: string; document_type: "DNI" | "CE"; document: string }
 
 /** Token de Yape (de un solo uso), el celular con el que se generó, el titular del Yape y el identificador del dispositivo (antifraude), si se obtuvo. */
 export interface YapePayment { token: string; phone: string; payer: YapePayer; device_session_id?: string }
