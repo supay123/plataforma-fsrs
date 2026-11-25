@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Select } from "../../components/ui";
+import { InfiniteScrollTrigger } from "../../components/ui/infinite-scroll-trigger";
 import { ModalForm } from "../../components/ui/modal-form";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useModal } from "../../components/ui/use-modal";
@@ -53,10 +54,17 @@ export function RouteManagement() {
   const colleges = useQuery({ queryKey: ["colleges"], queryFn: listColleges, enabled: isAdmin });
   const collegeTeachers = (teachers.data ?? []).filter((teacher) => teacher.college_id === collegeId);
   const teacherId = isAdmin ? pickedTeacherId : profile?.id ?? null;
-  const courses = useQuery({ queryKey: routeCoursesKey(teacherId), queryFn: () => listRouteCourses(teacherId), enabled: Boolean(teacherId) });
+  const courses = useInfiniteQuery({
+    queryKey: routeCoursesKey(teacherId),
+    queryFn: ({ pageParam }) => listRouteCourses(teacherId, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, loadedPages) => loadedPages.length < lastPage.total_pages ? loadedPages.length + 1 : undefined,
+    enabled: Boolean(teacherId),
+  });
   useEffect(() => { if (courses.error) toast.error(courses.error.message); }, [courses.error, toast]);
+  const courseList = courses.data?.pages.flatMap((loadedPage) => loadedPage.courses);
   // El curso elegido va en la URL para volver a él desde las lecciones; si ya no existe, se usa el primero.
-  const selectedCourse = courses.data?.find((course) => course.id === searchParams.get("curso")) ?? courses.data?.[0] ?? null;
+  const selectedCourse = courseList?.find((course) => course.id === searchParams.get("curso")) ?? courseList?.[0] ?? null;
   const selectedCourseId = selectedCourse?.id ?? null;
   const topics = useQuery({ queryKey: routeTopicsKey(selectedCourseId), queryFn: () => listRouteTopics(selectedCourseId!), enabled: Boolean(selectedCourseId) });
   useEffect(() => { if (topics.error) toast.error(topics.error.message); }, [topics.error, toast]);
@@ -96,7 +104,7 @@ export function RouteManagement() {
     onError: (error) => toast.error(error.message),
   });
 
-  const guide = routeAdminAdvice({ hasCollege: Boolean(collegeId), teacherCount: collegeTeachers.length, hasTeacher: Boolean(teacherId), courseCount: courses.data?.length ?? 0 });
+  const guide = routeAdminAdvice({ hasCollege: Boolean(collegeId), teacherCount: collegeTeachers.length, hasTeacher: Boolean(teacherId), courseCount: courses.data?.pages[0]?.total ?? 0 });
   if (isAdmin && (teachers.isLoading || colleges.isLoading)) return <ManagementSkeleton />;
   return <>
     <PageHeader title="Modo ruta" description="Crea cursos de ruta, y dentro de cada uno sus temas y lecciones; tus estudiantes las desbloquean en orden con un 80% de acierto."
@@ -119,8 +127,9 @@ export function RouteManagement() {
             <h2 className="type-heading text-lg">Cursos de ruta</h2>
             <Button size="sm" onClick={() => setCourseForm({ id: null, ...emptyCourseForm })}>Nuevo curso</Button>
           </div>
-          {courses.data?.length ? <>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Cursos de ruta">{courses.data.map((course) => <Button key={course.id} size="sm" variant={course.id === selectedCourseId ? "primary" : "secondary"} aria-pressed={course.id === selectedCourseId} onClick={() => selectCourse(course.id)}>{course.name}</Button>)}</div>
+          {courseList?.length ? <>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Cursos de ruta">{courseList.map((course) => <Button key={course.id} size="sm" variant={course.id === selectedCourseId ? "primary" : "secondary"} aria-pressed={course.id === selectedCourseId} onClick={() => selectCourse(course.id)}>{course.name}</Button>)}</div>
+            <InfiniteScrollTrigger hasNextPage={courses.hasNextPage} isFetchingNextPage={courses.isFetchingNextPage} onLoadMore={() => void courses.fetchNextPage()} />
             {selectedCourse && <div className="mt-4 flex flex-col justify-between gap-3 rounded-2xl border-2 border-line p-4 sm:flex-row sm:items-center">
               <div className="min-w-0"><strong className="block truncate">{selectedCourse.name}</strong>
                 <span className="text-sm text-fg-muted">{selectedCourse.description || `${selectedCourse.topic_count} ${selectedCourse.topic_count === 1 ? "tema" : "temas"}`}</span></div>

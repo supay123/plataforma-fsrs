@@ -2,6 +2,21 @@ import { translateDatabaseError } from "../../lib/api/errors";
 import { supabase } from "../../lib/supabase/client";
 import type { TablesInsert, TablesUpdate } from "../../types/database";
 export async function listCourses() { const { data, error } = await supabase.from("courses").select("*, colleges(name), profiles!courses_teacher_id_fkey(full_name)").neq("status", "archived").order("name"); if (error) throw error; return data; }
+export const COURSES_PAGE_SIZE = 10;
+export type CoursesPageFilters = { page: number; search: string; teacherId: string; collegeId: string };
+/** Cursos no archivados de 10 en 10, con los filtros aplicados en la base de datos. */
+export async function listCoursesPage({ page, search, teacherId, collegeId }: CoursesPageFilters) {
+  const firstIndex = (page - 1) * COURSES_PAGE_SIZE;
+  let query = supabase.from("courses").select("*, colleges(name), profiles!courses_teacher_id_fkey(full_name)", { count: "exact" })
+    .neq("status", "archived").order("teacher_id").order("name").order("id").range(firstIndex, firstIndex + COURSES_PAGE_SIZE - 1);
+  if (teacherId) query = query.eq("teacher_id", teacherId);
+  if (collegeId) query = query.eq("college_id", collegeId);
+  const term = search.replace(/[,()%*\\]/g, " ").trim();
+  if (term) query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  const { data, count, error } = await query;
+  if (error) throw error;
+  return { courses: data, total: count ?? 0, totalPages: Math.ceil((count ?? 0) / COURSES_PAGE_SIZE) };
+}
 export async function createCourse(value: TablesInsert<"courses">) { const { data, error } = await supabase.from("courses").insert(value).select().single(); if (error) throw translateDatabaseError(error); return data; }
 export async function updateCourse(id: string, value: TablesUpdate<"courses">) { const { data, error } = await supabase.from("courses").update(value).eq("id", id).select().single(); if (error) throw translateDatabaseError(error); return data; }
 export async function archiveCourse(id: string) { const { error } = await supabase.from("courses").update({ status: "archived" }).eq("id", id); if (error) throw error; return id; }

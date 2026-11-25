@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
+import { InfiniteScrollTrigger } from "../../components/ui/infinite-scroll-trigger";
 import { PageSkeleton } from "../../components/ui/skeleton";
 import { ModalForm } from "../../components/ui/modal-form";
 import { useModal } from "../../components/ui/use-modal";
@@ -12,7 +13,7 @@ import type { Tables } from "../../types/database";
 import { useAuth } from "../auth/AuthProvider";
 import { listColleges } from "../colleges/api";
 import { listUsers } from "../users/api";
-import { archiveCourse, createCourse, duplicateCourse, listCourses, moveCourse, updateCourse } from "./api";
+import { archiveCourse, createCourse, duplicateCourse, listCourses, listCoursesPage, moveCourse, updateCourse } from "./api";
 
 type CourseFormState = { name: string; description: string; teacher_id: string; college_id: string };
 type TeacherOption = { id: string; full_name: string; college_id: string | null };
@@ -34,7 +35,6 @@ type CourseRow = Tables<"courses"> & {
 
 type CourseGroup = { teacherId: string; teacherName: string; courses: CourseRow[] };
 
-const normalize = (value: string | null | undefined) => value?.trim().toLocaleLowerCase("es-PE") ?? "";
 
 /** El embed de profesor puede llegar como objeto o arreglo según la versión de PostgREST. */
 function teacherName(course: CourseRow) {
@@ -94,19 +94,31 @@ export function CoursesView() {
   const isAdmin = profile?.role === "admin";
   const client = useQueryClient();
   const modal = useModal();
-  const query = useQuery({ queryKey: ["courses"], queryFn: listCourses });
+  const [search, setSearch] = useState("");
+  const [teacherFilter, setTeacherFilter] = useState("");
+  const [collegeFilter, setCollegeFilter] = useState("");
+  const adminQuery = useInfiniteQuery({
+    queryKey: ["courses", "admin-pages", search, teacherFilter, collegeFilter],
+    queryFn: ({ pageParam }) => listCoursesPage({ page: pageParam, search, teacherId: teacherFilter, collegeId: collegeFilter }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, loadedPages) => loadedPages.length < lastPage.totalPages ? loadedPages.length + 1 : undefined,
+    placeholderData: keepPreviousData,
+    enabled: isAdmin,
+  });
+  const teacherQuery = useQuery({ queryKey: ["courses"], queryFn: listCourses, enabled: !isAdmin });
+  const query = isAdmin ? adminQuery : teacherQuery;
   const users = useQuery({ queryKey: ["users"], queryFn: listUsers, enabled: isAdmin });
   const colleges = useQuery({ queryKey: ["colleges"], queryFn: listColleges, enabled: isAdmin });
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adminFormOpen, setAdminFormOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [teacherFilter, setTeacherFilter] = useState("");
-  const [collegeFilter, setCollegeFilter] = useState("");
   const [moving, setMoving] = useState<CourseRow | null>(null);
   const [moveTeacherId, setMoveTeacherId] = useState("");
 
-  const courses = useMemo(() => (query.data ?? []) as unknown as CourseRow[], [query.data]);
+  const courses = useMemo(
+    () => ((isAdmin ? adminQuery.data?.pages.flatMap((loadedPage) => loadedPage.courses) : teacherQuery.data) ?? []) as unknown as CourseRow[],
+    [isAdmin, adminQuery.data, teacherQuery.data],
+  );
   const teacherDirectory = useMemo<TeacherOption[]>(
     () => (users.data ?? []).filter((user) => user.role === "teacher")
       .map((user) => ({ id: user.id, full_name: user.full_name, college_id: user.college_id })),
@@ -130,27 +142,14 @@ export function CoursesView() {
   );
 
   const adminGroups = useMemo(() => {
-    const needle = normalize(search);
-    const result: CourseGroup[] = [];
-    for (const teacher of allTeachers) {
-      if (teacherFilter && teacher.id !== teacherFilter) continue;
-      if (collegeFilter && teacher.college_id !== collegeFilter) continue;
-      const teacherCourses = courses.filter((course) => {
-        if (course.teacher_id !== teacher.id) return false;
-        if (collegeFilter && course.college_id !== collegeFilter) return false;
-        if (!needle) return true;
-        return normalize([
-          course.name,
-          course.description ?? "",
-          teacherName(course),
-          course.colleges?.name ?? "",
-        ].join(" ")).includes(needle);
-      });
-      if (needle && !teacherCourses.length && !normalize(teacher.full_name).includes(needle)) continue;
-      result.push({ teacherId: teacher.id, teacherName: teacher.full_name, courses: teacherCourses });
+    const groups = new Map<string, CourseGroup>();
+    for (const course of courses) {
+      const group = groups.get(course.teacher_id) ?? { teacherId: course.teacher_id, teacherName: teacherName(course), courses: [] };
+      group.courses.push(course);
+      groups.set(course.teacher_id, group);
     }
-    return result;
-  }, [allTeachers, courses, search, teacherFilter, collegeFilter]);
+    return [...groups.values()].sort((a, b) => a.teacherName.localeCompare(b.teacherName, "es"));
+  }, [courses]);
 
   const save = useMutation({
     mutationFn: () => {
@@ -263,12 +262,12 @@ export function CoursesView() {
   if (query.isLoading) return <PageSkeleton />;
 
   if (isAdmin) return <>
-    <PageHeader title="Cursos" description="Todos los cursos de la plataforma, agrupados por profesor." actions={<Button onClick={openCreate}>Nuevo Curso</Button>} />
+    <PageHeader title="Cursos" description="Todos los cursos de la plataforma, de 10 en 10 y agrupados por profesor." actions={<Button onClick={openCreate}>Nuevo Curso</Button>} />
     <Card>
       <div className="grid gap-4 md:grid-cols-[1fr_16rem_16rem]">
-        <Field label="Buscar curso o profesor"><Input placeholder="Nombre del curso o del profesor" value={search} onChange={(event) => setSearch(event.target.value)} /></Field>
+        <Field label="Buscar curso"><Input placeholder="Nombre o descripción del curso" value={search} onChange={(event) => { setSearch(event.target.value); }} /></Field>
         <Field label="Institución"><Select value={collegeFilter} onChange={(event) => { setCollegeFilter(event.target.value); setTeacherFilter(""); }}><option value="">Todas las instituciones</option>{(colleges.data ?? []).map((college) => <option key={college.id} value={college.id}>{college.name}</option>)}</Select></Field>
-        <Field label="Profesor"><Select value={teacherFilter} onChange={(event) => setTeacherFilter(event.target.value)}><option value="">Todos los profesores</option>{teacherOptions.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</Select></Field>
+        <Field label="Profesor"><Select value={teacherFilter} onChange={(event) => { setTeacherFilter(event.target.value); }}><option value="">Todos los profesores</option>{teacherOptions.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</Select></Field>
       </div>
     </Card>
     {query.error && <div className="mt-4"><Alert tone="error">{query.error.message}</Alert></div>}
@@ -278,7 +277,7 @@ export function CoursesView() {
         <h2 className="text-lg font-bold text-fg">{group.teacherName}</h2>
         <span className="text-sm text-fg-muted">{courseCount(group.courses.length)}</span>
       </div>
-      <div className="grid gap-4">{!group.courses.length && <EmptyState>No hay cursos disponibles. Crea uno.</EmptyState>}{group.courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="grid gap-4">{group.courses.map((course) => <Card key={course.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-bold">{course.name}</h3>
@@ -296,7 +295,8 @@ export function CoursesView() {
           <Link to={courseTopicsPath(profile?.role, course.id)}><Button size="sm">Temas</Button></Link>
         </div>
       </Card>)}</div>
-    </section>)}</div> : <div className="mt-6"><EmptyState>No hay profesores que coincidan con los filtros.</EmptyState></div>}
+    </section>)}</div> : <div className="mt-6"><EmptyState>No hay cursos que coincidan con los filtros.</EmptyState></div>}
+    <InfiniteScrollTrigger hasNextPage={adminQuery.hasNextPage} isFetchingNextPage={adminQuery.isFetchingNextPage} onLoadMore={() => void adminQuery.fetchNextPage()} />
     {adminFormOpen && <ModalForm
       title={editingId ? "Editar curso" : "Nuevo curso"}
       confirmLabel={editingId ? "Guardar cambios" : "Crear curso"}

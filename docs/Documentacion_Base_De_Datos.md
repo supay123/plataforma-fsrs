@@ -911,11 +911,11 @@ Las funciones de `private` son guards de autorización. Todas son `SECURITY DEFI
 - **Retorna:** `trigger`.
 - Actualiza automáticamente `updated_at` antes de modificar una fila.
 
-### public.validate_course_teacher_and_limit
+### public.validate_course_teacher
 
 - **Parámetros:** ninguno; usa `NEW`.
 - **Retorna:** `trigger`.
-- Valida rol/colegio del profesor y el máximo de 8 cursos no archivados.
+- Valida rol/colegio del profesor; no hay límite de cursos por profesor.
 
 ### public.validate_topic_limit
 
@@ -960,7 +960,7 @@ Las funciones de `private` son guards de autorización. Todas son `SECURITY DEFI
 | `colleges` | `colleges_set_updated_at` | BEFORE UPDATE | `set_updated_at()` |
 | `profiles` | `profiles_set_updated_at` | BEFORE UPDATE | `set_updated_at()` |
 | `courses` | `courses_set_updated_at` | BEFORE UPDATE | `set_updated_at()` |
-| `courses` | `courses_validate_teacher_and_limit` | BEFORE INSERT/UPDATE | `validate_course_teacher_and_limit()` |
+| `courses` | `courses_validate_teacher` | BEFORE INSERT/UPDATE | `validate_course_teacher()` |
 | `course_enrollments` | `course_enrollments_set_updated_at` | BEFORE UPDATE | `set_updated_at()` |
 | `course_enrollments` | `course_enrollments_validate` | BEFORE INSERT/UPDATE | `validate_course_enrollment()` |
 | `topics` | `topics_set_updated_at` | BEFORE UPDATE | `set_updated_at()` |
@@ -1066,7 +1066,7 @@ Pruebas realizadas:
 Actualmente reporta ocho advertencias `function_search_path_mutable` sobre las funciones públicas de trigger:
 
 - `public.set_updated_at`
-- `public.validate_course_teacher_and_limit`
+- `public.validate_course_teacher`
 - `public.validate_topic_limit`
 - `public.validate_question_limit`
 - `public.validate_course_enrollment`

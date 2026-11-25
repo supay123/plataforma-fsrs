@@ -101,7 +101,6 @@ export async function normalizeError(error: unknown): Promise<AppError> {
  */
 const databaseMessages: Array<{ match: string; message: string }> = [
   { match: "courses_teacher_name_unique_active_ci", message: "Este profesor ya tiene un curso con ese nombre. Usa otro nombre o cambia el nombre del curso existente." },
-  { match: "at most 8 non-archived courses", message: "Un profesor puede tener como máximo 8 cursos. Archiva alguno o elige otro profesor." },
   { match: "teacher and course must belong to the same college", message: "El profesor y el curso deben ser del mismo colegio." },
   { match: "demo_college_protected", message: "Esta institución alimenta el modo gratuito del sitio y no se puede eliminar ni cambiar de código." },
   { match: "at most 25 non-archived topics", message: "Un curso puede tener como máximo 25 temas." },

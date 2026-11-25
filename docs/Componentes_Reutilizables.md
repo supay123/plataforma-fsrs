@@ -504,6 +504,10 @@ profesor. Los enlaces internos se arman con `lib/portal-paths.ts`
   nombre como en los temas de un curso. El botón «JSON» de cada lección abre
   `RouteLessonJsonPage` (`ruta/lecciones/:lessonId/json`): texto, banco de preguntas y
   `questions_to_show`, con ejemplo y guía de campos (`lesson-json.ts`).
+- `InfiniteScrollTrigger` (`components/ui/infinite-scroll-trigger.tsx`): carga por
+  scroll con `useInfiniteQuery`. Se coloca al final de la lista; al entrar en pantalla
+  llama a `onLoadMore` y muestra un `Spinner` mientras llega la siguiente página
+  (excepción aprobada a los `Skeleton`). Lo usan Cursos (admin) y Modo ruta.
 - `PaginatedText` (`PaginatedText.tsx`): texto largo que nunca pasa de una pantalla;
   se reparte en páginas (Anterior / Siguiente) con columnas CSS dentro de un alto
   `dvh` y muestra `lastPageAction` en la última página. Lo usa la lección del estudiante.

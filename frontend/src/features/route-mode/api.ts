@@ -61,11 +61,12 @@ export async function getRouteProgress() {
   return invokeFunction<RouteProgress, typeof none>("route-mode/progress", none, { method: "GET" });
 }
 
-/** GET /route-mode/courses: el profesor recibe los suyos; el administrador filtra por `teacherId`. */
-export async function listRouteCourses(teacherId?: string | null) {
-  const query = teacherId ? `?teacher_id=${encodeURIComponent(teacherId)}` : "";
-  const { courses } = await invokeFunction<{ courses: RouteCourse[] }, typeof none>(`route-mode/courses${query}`, none, { method: "GET" });
-  return courses;
+/** GET /route-mode/courses (de 10 en 10): el profesor recibe los suyos; el administrador filtra por `teacherId`. */
+export interface RouteCoursesPage { courses: RouteCourse[]; page: number; page_size: number; total: number; total_pages: number }
+export async function listRouteCourses(teacherId: string | null | undefined, page: number) {
+  const parameters = new URLSearchParams({ page: String(page) });
+  if (teacherId) parameters.set("teacher_id", teacherId);
+  return invokeFunction<RouteCoursesPage, typeof none>(`route-mode/courses?${parameters}`, none, { method: "GET" });
 }
 export function createRouteCourse(body: { name: string; description?: string; teacher_id?: string }) {
   return invokeFunction<{ course: { id: string } }, typeof body>("route-mode/courses", body);
