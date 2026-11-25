@@ -2,6 +2,7 @@ import { requireProfile, writeAudit } from "../_shared/auth.ts";
 import { TABLES } from "../_shared/database.constants.ts";
 import { AppError, json, readJson } from "../_shared/errors.ts";
 import type { EdgeContext } from "../_shared/types.ts";
+import { parsePositiveInteger } from "../_shared/ranking.ts";
 import {
   optionalString,
   optionalUuid,
@@ -16,6 +17,7 @@ import {
 import type { CreateCourseBody, UpdateCourseBody } from "./interfaces.ts";
 
 const POSTGRES_UNIQUE_VIOLATION = "23505";
+const COURSES_PAGE_SIZE = 10;
 
 function courseWriteError(
   error: { code?: string; message: string },
@@ -163,10 +165,10 @@ export async function deleteCourse(
 }
 
 /**
- * GET /route-mode/courses[?teacher_id=...]
- * Cursos de ruta con la cantidad de temas. El profesor ve los suyos; el
- * administrador los de un profesor (teacher_id); el estudiante, los de sus
- * profesores.
+ * GET /route-mode/courses[?teacher_id=...][&page=1]
+ * Cursos de ruta con la cantidad de temas, de 10 en 10. El profesor ve los
+ * suyos; el administrador los de un profesor (teacher_id); el estudiante, los
+ * de sus profesores.
  */
 export async function listCourses(
   request: Request,
@@ -177,16 +179,29 @@ export async function listCourses(
     ["admin", "teacher", "student"],
     true,
   );
+  const page = parsePositiveInteger(
+    new URL(request.url).searchParams.get("page"),
+    "page",
+    1,
+  );
+  const emptyPage = {
+    courses: [],
+    page,
+    page_size: COURSES_PAGE_SIZE,
+    total: 0,
+    total_pages: 0,
+  };
   let query = context.supabaseAdmin
     .from(TABLES.routeCourses)
-    .select("id,teacher_id,name,description,position")
+    .select("id,teacher_id,name,description,position", { count: "exact" })
     .order("teacher_id")
-    .order("position");
+    .order("position")
+    .order("id");
   if (profile.role === "teacher") {
     query = query.eq("teacher_id", profile.id);
   } else if (profile.role === "student") {
     const teacherIds = await studentTeacherIds(context, profile);
-    if (teacherIds.length === 0) return json({ courses: [] });
+    if (teacherIds.length === 0) return json(emptyPage);
     query = query.in("teacher_id", teacherIds);
   } else {
     const teacherId = optionalUuid(
@@ -195,11 +210,16 @@ export async function listCourses(
     );
     if (teacherId) query = query.eq("teacher_id", teacherId);
   }
-  const { data: courses, error } = await query;
+  const firstIndex = (page - 1) * COURSES_PAGE_SIZE;
+  const { data: courses, count, error } = await query.range(
+    firstIndex,
+    firstIndex + COURSES_PAGE_SIZE - 1,
+  );
   if (error) {
     throw new AppError(500, "route_course_lookup_failed", error.message);
   }
-  if (!courses?.length) return json({ courses: [] });
+  const total = count ?? 0;
+  if (!courses?.length) return json({ ...emptyPage, total, total_pages: Math.ceil(total / COURSES_PAGE_SIZE) });
 
   const { data: topics, error: topicsError } = await context.supabaseAdmin
     .from(TABLES.routeTopics)
@@ -220,5 +240,9 @@ export async function listCourses(
       ...course,
       topic_count: topicCounts.get(course.id) ?? 0,
     })),
+    page,
+    page_size: COURSES_PAGE_SIZE,
+    total,
+    total_pages: Math.ceil(total / COURSES_PAGE_SIZE),
   });
 }

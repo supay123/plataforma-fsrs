@@ -83,7 +83,7 @@ La solución será un piloto funcional para la administración de colegios, prof
 | Modalidad | Aplicación web responsive, tipo SPA/CSR, para celular, tablet y computadora. |
 | Instituciones | Hasta 4 colegios dentro de una única plataforma y base de datos. |
 | Usuarios | Hasta 150 estudiantes en total, además de profesores y un administrador. |
-| Cursos | Hasta 8 cursos por profesor. |
+| Cursos | Sin límite de cursos por profesor. |
 | Temas | Hasta 10 temas por curso. |
 | Preguntas | Hasta 50 preguntas por tema, con cuatro alternativas, una respuesta correcta, una explicación y soporte de expresiones LaTeX. |
 | Sesiones | Máximo 20 preguntas por sesión, asociadas a un único tema. |
@@ -155,7 +155,7 @@ Cada profesor podrá crear hasta ocho cursos y organizar temas dentro de cada un
 
 | Límite o estado | Valor |
 |---|---|
-| Cursos por profesor | Máximo 8 |
+| Cursos por profesor | Sin límite |
 | Temas por curso | Máximo 10 |
 | Preguntas por tema | Máximo 50 |
 | Sesión por tema | Máximo 20 preguntas |

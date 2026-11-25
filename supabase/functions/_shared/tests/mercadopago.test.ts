@@ -258,7 +258,7 @@ Deno.test("describes the plan, the device and the Yape holder in the Yape order"
     }]);
     assert.deepEqual(
       Object.keys(sent?.body.payer as Record<string, unknown>).sort(),
-      ["email", "phone"],
+      ["email", "entity_type", "phone"],
     );
 
     await createYapeOrder({
@@ -270,8 +270,10 @@ Deno.test("describes the plan, the device and the Yape holder in the Yape order"
       payer: { firstName: "María José", lastName: "Quispe", documentType: "DNI", document: "12345678" },
       plan: { code: "mensual", name: "Plan Estudiante" },
     });
+    assert.deepEqual(sent?.body.config, { location: { state_id: "PE-CUS" } });
     assert.deepEqual(sent?.body.payer, {
       email: "student@example.com",
+      entity_type: "individual",
       first_name: "María José",
       last_name: "Quispe",
       identification: { type: "DNI", number: "12345678" },

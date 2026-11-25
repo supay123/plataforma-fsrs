@@ -1,6 +1,6 @@
 -- Mover un curso a otro profesor y duplicarlo (solo administradores).
 -- Los triggers existentes validan que el profesor sea del mismo colegio y los
--- límites (8 cursos por profesor, 25 temas por curso, 50 preguntas por tema).
+-- límites (25 temas por curso, 50 preguntas por tema).
 
 create or replace function public.admin_move_course(
   p_course_id uuid,

@@ -97,6 +97,19 @@ async function mercadoPagoRequest<T>(
     headers["X-Idempotency-Key"] = options.idempotencyKey;
   }
 
+  // TEMPORAL (high_risk): registra datos personales reales; quitar al terminar el diagnóstico.
+  if (method === "POST" && path === "/v1/orders") {
+    const order = JSON.parse(JSON.stringify(options.body)) as {
+      transactions?: { payments?: Array<{ payment_method?: { token?: string } }> };
+    };
+    const yape = order.transactions?.payments?.[0]?.payment_method;
+    if (yape?.token) yape.token = "***";
+    console.log("mercadopago order request", JSON.stringify({
+      body: order,
+      deviceSessionIdLength: options.headers?.["X-meli-session-id"]?.length ?? 0,
+    }));
+  }
+
   let response: Response;
   try {
     response = await fetch(`${MERCADOPAGO_API}${path}`, {
@@ -118,6 +131,15 @@ async function mercadoPagoRequest<T>(
   const payload = await response.json().catch(() => null) as
     | (T & ErrorPayload)
     | null;
+  // TEMPORAL (high_risk): respuesta y ids para soporte; quitar al terminar el diagnóstico.
+  if (method === "POST" && path === "/v1/orders") {
+    console.log("mercadopago order response", JSON.stringify({
+      httpStatus: response.status,
+      requestId: response.headers.get("x-request-id"),
+      at: new Date().toISOString(),
+      body: payload,
+    }));
+  }
   // 402: Yape rechazó el pago. No es un error de la integración: la orden
   // fallida llega en data, con el motivo en sus transacciones.
   if (response.status === 402 && payload?.data?.id) {
@@ -139,6 +161,8 @@ async function mercadoPagoRequest<T>(
 
 /** Texto que el comprador ve en el resumen de Yape. */
 const STATEMENT_DESCRIPTOR = "CHANCON";
+/** Departamento de la compra (código ISO 3166-2); por ahora todos los pagos son de Cusco. */
+const PURCHASE_STATE_ID = "PE-CUS";
 /** Categoría de Mercado Pago para cursos y educación. */
 const ITEM_CATEGORY = "learnings";
 
@@ -177,6 +201,7 @@ export function createYapeOrder(input: {
       processing_mode: "automatic",
       external_reference: input.reference,
       total_amount: input.amount,
+      config: { location: { state_id: PURCHASE_STATE_ID } },
       description: input.plan.name,
       items: [{
         title: input.plan.name,
@@ -188,6 +213,7 @@ export function createYapeOrder(input: {
       }],
       payer: {
         email: input.email,
+        entity_type: "individual",
         ...(input.payer && {
           first_name: input.payer.firstName,
           last_name: input.payer.lastName,

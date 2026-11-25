@@ -54,7 +54,7 @@ reglas del documento original.
 ### 2.1 Límite de temas por curso
 
 Un curso puede tener hasta **25 temas** no archivados (antes: 10). Los demás
-límites no cambian: 8 cursos por profesor, 50 preguntas por tema y 20 preguntas
+límites no cambian: 50 preguntas por tema y 20 preguntas
 por sesión.
 
 ### 2.2 Recuperación de contraseña con pregunta de seguridad

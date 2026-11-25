@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   duplicateCourse: vi.fn(),
   moveCourse: vi.fn(),
   listCourses: vi.fn(),
+  listCoursesPage: vi.fn(),
   listUsers: vi.fn(),
   listColleges: vi.fn(),
   updateCourse: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("./api", () => ({
   duplicateCourse: mocks.duplicateCourse,
   moveCourse: mocks.moveCourse,
   listCourses: mocks.listCourses,
+  listCoursesPage: mocks.listCoursesPage,
   updateCourse: mocks.updateCourse,
 }));
 vi.mock("../auth/AuthProvider", () => ({
@@ -69,7 +71,7 @@ describe("CoursesView como administrador", () => {
   });
 
   beforeEach(() => {
-    mocks.listCourses.mockReset().mockResolvedValue(courses);
+    mocks.listCoursesPage.mockReset().mockResolvedValue({ courses, total: 3, totalPages: 1 });
     mocks.listUsers.mockReset().mockResolvedValue(users);
     mocks.listColleges.mockReset().mockResolvedValue(colleges);
     mocks.createCourse.mockReset().mockResolvedValue({});
@@ -101,30 +103,48 @@ describe("CoursesView como administrador", () => {
     ]));
   });
 
-  it("busca por nombre de curso o de profesor", async () => {
+  it("busca por nombre de curso en el servidor y vuelve a la página 1", async () => {
     const user = userEvent.setup();
     renderView();
     await screen.findByRole("heading", { name: "Ana Profesora" });
 
-    await user.type(screen.getByLabelText("Buscar curso o profesor"), "Beto");
+    mocks.listCoursesPage.mockResolvedValue({ courses: [courses[2]], total: 1, totalPages: 1 });
+    await user.type(screen.getByLabelText("Buscar curso"), "Historia");
+    expect(await screen.findByRole("heading", { name: "Beto Profesor" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Ana Profesora" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Historia" })).toBeInTheDocument();
-
-    await user.clear(screen.getByLabelText("Buscar curso o profesor"));
-    await user.type(screen.getByLabelText("Buscar curso o profesor"), "Geometría");
-    expect(screen.getByRole("heading", { name: "Ana Profesora" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Álgebra" })).not.toBeInTheDocument();
+    expect(mocks.listCoursesPage).toHaveBeenLastCalledWith({ page: 1, search: "Historia", teacherId: "", collegeId: "" });
   });
 
-  it("filtra por profesor", async () => {
+  it("filtra por profesor en el servidor", async () => {
     const user = userEvent.setup();
     renderView();
     await screen.findByRole("heading", { name: "Ana Profesora" });
 
+    mocks.listCoursesPage.mockResolvedValue({ courses: courses.slice(0, 2), total: 2, totalPages: 1 });
     await chooseSelectValue(user, screen.getByRole("combobox", { name: "Profesor" }), "teacher-1");
-    expect(screen.getByRole("heading", { name: "Ana Profesora" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Beto Profesor" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Beto Profesor" })).not.toBeInTheDocument());
     expect(screen.getByText("2 cursos")).toBeInTheDocument();
+    expect(mocks.listCoursesPage).toHaveBeenLastCalledWith({ page: 1, search: "", teacherId: "teacher-1", collegeId: "" });
+  });
+
+  it("carga la siguiente página al llegar al final de la lista", async () => {
+    let reachEnd: () => void = () => {};
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback: (entries: Array<{ isIntersecting: boolean }>) => void) { reachEnd = () => callback([{ isIntersecting: true }]); }
+      observe() {}
+      disconnect() {}
+    });
+    mocks.listCoursesPage.mockResolvedValue({ courses: courses.slice(0, 2), total: 3, totalPages: 2 });
+    renderView();
+    await screen.findByRole("heading", { name: "Ana Profesora" });
+    expect(screen.queryByRole("heading", { name: "Historia" })).not.toBeInTheDocument();
+
+    mocks.listCoursesPage.mockResolvedValue({ courses: [courses[2]], total: 3, totalPages: 2 });
+    reachEnd();
+    expect(await screen.findByRole("heading", { name: "Historia" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Álgebra" })).toBeInTheDocument();
+    expect(mocks.listCoursesPage).toHaveBeenLastCalledWith({ page: 2, search: "", teacherId: "", collegeId: "" });
+    vi.unstubAllGlobals();
   });
 
   it("crea un curso desde el modal con colegio y profesor", async () => {
